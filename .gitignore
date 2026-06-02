@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Backend secrets and runtime files (also covered by backend/.gitignore)
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.vercel
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts

@@ -1,0 +1,35 @@
+# Fly.io config for the ViralIQ backend — for the later transition off Render.
+# It reuses the same Dockerfile, so switching hosts needs no code changes.
+#
+# To deploy:
+#   fly launch --no-deploy        # accepts this file
+#   fly volumes create viraliq_data --size 1
+#   fly secrets set GEMINI_API_KEY=... ADMIN_PASSWORD=... ALLOWED_ORIGINS=https://viraliq.vercel.app
+#   fly deploy
+
+app = "viraliq-api"
+primary_region = "lhr"   # change to your nearest region
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DATABASE_URL = "sqlite+aiosqlite:////data/viraliq.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.checks]
+    [http_service.checks.health]
+      path = "/health"
+      interval = "30s"
+      timeout = "5s"
+
+[[mounts]]
+  source = "viraliq_data"
+  destination = "/data"

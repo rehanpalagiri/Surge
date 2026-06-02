@@ -1,0 +1,248 @@
+import { getToken } from "./auth";
+
+const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function authHeaders(token?: string | null): Record<string, string> {
+  const t = token ?? getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+export interface AnalysisOut {
+  id: number;
+  filename: string;
+  niche: string;
+  caption: string | null;
+  bio: string | null;
+  scores_json: {
+    overall_score: number;
+    hook_strength: number;
+    pacing_score: number;
+    audio_score: number;
+    caption_score: number;
+    trend_alignment: number;
+    predicted_views: string;
+    strengths: string[];
+    improvements: string[];
+    verdict: string;
+    analysis_summary: string;
+    improvement_plan?: ImprovementItem[];
+    caption_rewrite?: string;
+    hook_rewrite?: string;
+    projected_verdict?: string;
+    projected_views?: string;
+    locked?: boolean;
+    error?: string;
+  };
+  verdict: string;
+  actual_views: number | null;
+  created_at: string;
+}
+
+export interface AnalysisSummary {
+  id: number;
+  niche: string;
+  verdict: string;
+  overall_score: number | null;
+  caption_preview: string | null;
+  actual_views: number | null;
+  created_at: string;
+}
+
+export interface TokenOut {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserOut {
+  id: number;
+  username: string;
+  created_at: string;
+}
+
+export interface ImprovementItem {
+  area: string;
+  priority: number;
+  current_score: number;
+  problem: string;
+  fix: string;
+  example: string;
+}
+
+export interface SeedVideoOut {
+  id: number;
+  filename: string;
+  niche: string;
+  view_count: number;
+  like_count: number;
+  performed: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+async function handleResponse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+export async function analyzeVideo(
+  file: File,
+  niche: string,
+  caption: string = "",
+  bio: string = ""
+): Promise<{ id: number }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("niche", niche);
+  form.append("caption", caption);
+  form.append("bio", bio);
+  const res = await fetch(`${BASE}/api/analyze`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  return handleResponse<AnalysisOut>(res).then((a) => ({ id: a.id }));
+}
+
+export async function getAnalysis(
+  id: string | number,
+  token?: string | null
+): Promise<AnalysisOut> {
+  const res = await fetch(`${BASE}/api/analyses/${id}`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<AnalysisOut>(res);
+}
+
+export async function signup(
+  username: string,
+  password: string
+): Promise<TokenOut> {
+  const res = await fetch(`${BASE}/api/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  return handleResponse<TokenOut>(res);
+}
+
+export async function login(
+  username: string,
+  password: string
+): Promise<TokenOut> {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  return handleResponse<TokenOut>(res);
+}
+
+export async function getMe(token?: string | null): Promise<UserOut> {
+  const res = await fetch(`${BASE}/api/auth/me`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<UserOut>(res);
+}
+
+export async function getMyAnalyses(
+  token?: string | null
+): Promise<AnalysisSummary[]> {
+  const res = await fetch(`${BASE}/api/me/analyses`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<AnalysisSummary[]>(res);
+}
+
+export async function claimAnalysis(
+  id: string | number,
+  token?: string | null
+): Promise<AnalysisOut> {
+  const res = await fetch(`${BASE}/api/analyses/${id}/claim`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  return handleResponse<AnalysisOut>(res);
+}
+
+export async function submitFeedback(
+  id: string | number,
+  actualViews: number
+): Promise<AnalysisOut> {
+  const res = await fetch(`${BASE}/api/analyses/${id}/feedback`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actual_views: actualViews }),
+  });
+  return handleResponse<AnalysisOut>(res);
+}
+
+export async function getAdminSeeds(password: string): Promise<SeedVideoOut[]> {
+  const res = await fetch(`${BASE}/api/admin/seeds`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<SeedVideoOut[]>(res);
+}
+
+export async function addSeedVideo(
+  formData: FormData,
+  password: string
+): Promise<SeedVideoOut> {
+  const res = await fetch(`${BASE}/api/admin/seed`, {
+    method: "POST",
+    headers: { "X-Admin-Password": password },
+    body: formData,
+  });
+  return handleResponse<SeedVideoOut>(res);
+}
+
+export async function deleteSeedVideo(
+  id: number,
+  password: string
+): Promise<void> {
+  const res = await fetch(`${BASE}/api/admin/seeds/${id}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Password": password },
+  });
+  await handleResponse<unknown>(res);
+}
+
+export interface FetchStatus {
+  broken: boolean;
+  message?: string;
+  url?: string;
+  when?: string;
+}
+
+export async function seedFromUrl(
+  url: string,
+  niche: string,
+  password: string
+): Promise<SeedVideoOut> {
+  const form = new FormData();
+  form.append("url", url);
+  form.append("niche", niche);
+  const res = await fetch(`${BASE}/api/admin/seed/from-url`, {
+    method: "POST",
+    headers: { "X-Admin-Password": password },
+    body: form,
+  });
+  return handleResponse<SeedVideoOut>(res);
+}
+
+export async function getFetchStatus(password: string): Promise<FetchStatus> {
+  const res = await fetch(`${BASE}/api/admin/fetch-status`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<FetchStatus>(res);
+}
+
+export async function ackFetchStatus(password: string): Promise<void> {
+  const res = await fetch(`${BASE}/api/admin/fetch-status/ack`, {
+    method: "POST",
+    headers: { "X-Admin-Password": password },
+  });
+  await handleResponse<unknown>(res);
+}

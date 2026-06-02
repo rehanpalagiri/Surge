@@ -1,0 +1,88 @@
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import jwt
+import bcrypt
+from fastapi import Depends, HTTPException, Header
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from database import get_db
+from models import User
+
+JWT_ALGORITHM = "HS256"
+TOKEN_TTL_DAYS = 30
+
+
+def _secret() -> str:
+    return os.getenv("JWT_SECRET", "dev-insecure-secret-change-me")
+
+
+def hash_password(password: str) -> str:
+    # bcrypt only considers the first 72 bytes; truncate to avoid a ValueError.
+    pw = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pw, bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(
+            password.encode("utf-8")[:72], password_hash.encode("utf-8")
+        )
+    except (ValueError, TypeError):
+        return False
+
+
+def create_access_token(user_id: int) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "iat": now,
+        "exp": now + timedelta(days=TOKEN_TTL_DAYS),
+    }
+    return jwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
+
+
+def decode_access_token(token: str) -> Optional[int]:
+    try:
+        payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
+        return int(payload["sub"])
+    except Exception:
+        return None
+
+
+def _extract_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    parts = authorization.split(" ", 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    return authorization.strip()
+
+
+async def require_user(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    token = _extract_token(authorization)
+    user_id = decode_access_token(token) if token else None
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
+async def optional_user(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    token = _extract_token(authorization)
+    user_id = decode_access_token(token) if token else None
+    if user_id is None:
+        return None
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()

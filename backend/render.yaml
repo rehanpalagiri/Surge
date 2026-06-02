@@ -1,0 +1,26 @@
+# Render Blueprint for the ViralIQ backend.
+# In the Render dashboard: New > Blueprint, point it at this repo root.
+# All secrets (marked sync:false) must be set manually in the Render dashboard —
+# they are never committed to the repo.
+#
+# NOTE: SQLite on a persistent disk is gone. Production uses Neon Postgres.
+#       DATABASE_URL should be your Neon DIRECT (non-pooler) connection string.
+services:
+  - type: web
+    name: viraliq-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Neon direct URL, e.g. postgresql://user:pass@ep-xxx.neon.tech/dbname?sslmode=require
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false          # python -c "import secrets; print(secrets.token_urlsafe(48))"
+      - key: ALLOWED_ORIGINS
+        sync: false          # e.g. https://viraliq.vercel.app (set after Vercel deploy)
