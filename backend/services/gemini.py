@@ -1,10 +1,27 @@
 import os
+import math
 import json
 import asyncio
+from datetime import datetime, timezone
 from google import genai
 from google.genai import types
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+
+def _recency_multiplier(seed) -> float:
+    """Exponential decay based on how old the seed video is.
+    Uses posted_at if set, otherwise falls back to created_at.
+    Half-life ≈ 42 days → a 90-day-old video scores ~0.14×, a 180-day-old ~0.02×.
+    Very recent videos (< 7 days) are capped at 1.0 so they aren't over-weighted."""
+    now = datetime.now(timezone.utc)
+    ref = seed.posted_at or seed.created_at
+    if ref is None:
+        return 0.1  # unknown age → treat as old
+    if ref.tzinfo is None:
+        ref = ref.replace(tzinfo=timezone.utc)
+    age_days = max(0.0, (now - ref).total_seconds() / 86400)
+    return min(1.0, math.exp(-age_days / 60))
 
 
 def _build_system_prompt(
@@ -16,14 +33,25 @@ def _build_system_prompt(
     use_niche = len(niche_seeds) >= 6
     pool = niche_seeds if use_niche else seed_examples
 
-    # Top 10 strongest performers; bottom 10 weakest with no overlap.
-    sorted_pool = sorted(pool, key=lambda x: x.view_count, reverse=True)
+    # Sort by recency-weighted view count so that newer TikToks surface first.
+    # Formula: view_count × recency_multiplier — recent videos with average views
+    # rank above old videos with high views, reflecting current trend signals.
+    sorted_pool = sorted(
+        pool,
+        key=lambda s: s.view_count * _recency_multiplier(s),
+        reverse=True,
+    )
     top = sorted_pool[:10]
     bottom = [s for s in reversed(sorted_pool) if s not in top][:10]
 
     def fmt(s):
         notes = f" | Notes: {s.notes}" if s.notes else ""
-        return f"  - Niche: {s.niche} | Views: {s.view_count:,} | Likes: {s.like_count:,}{notes}"
+        ref = s.posted_at or s.created_at
+        date_str = f" | Posted: {ref.strftime('%b %Y')}" if ref else ""
+        return (
+            f"  - Niche: {s.niche} | Views: {s.view_count:,}"
+            f" | Likes: {s.like_count:,}{date_str}{notes}"
+        )
 
     top_str = "\n".join(fmt(s) for s in top) or "  (no data yet)"
     bottom_str = "\n".join(fmt(s) for s in bottom) or "  (no data yet)"

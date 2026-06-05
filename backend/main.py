@@ -15,12 +15,12 @@ from routers.auth import router as auth_router
 
 
 async def _ensure_columns(conn):
-    """Lightweight idempotent migration: add columns to an existing
-    user_analyses table if they're missing (SQLite has no ALTER-if-not-exists)."""
+    """Lightweight idempotent migration: add columns to existing tables
+    if they're missing (SQLite has no ALTER TABLE ADD COLUMN IF NOT EXISTS)."""
+    # --- user_analyses ---
     result = await conn.exec_driver_sql("PRAGMA table_info(user_analyses)")
     existing = {row[1] for row in result.fetchall()}
-    text_cols = ("caption", "bio")
-    for col in text_cols:
+    for col in ("caption", "bio"):
         if col not in existing:
             await conn.exec_driver_sql(
                 f"ALTER TABLE user_analyses ADD COLUMN {col} TEXT"
@@ -28,6 +28,14 @@ async def _ensure_columns(conn):
     if "user_id" not in existing:
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN user_id INTEGER"
+        )
+
+    # --- seed_videos ---
+    result = await conn.exec_driver_sql("PRAGMA table_info(seed_videos)")
+    seed_cols = {row[1] for row in result.fetchall()}
+    if "posted_at" not in seed_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE seed_videos ADD COLUMN posted_at DATETIME"
         )
 
 

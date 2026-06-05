@@ -24,6 +24,7 @@ class SeedVideo(Base):
     like_count = Column(Integer, nullable=False)
     performed = Column(Boolean, nullable=False)
     notes = Column(Text, nullable=True)
+    posted_at = Column(DateTime, nullable=True)   # when the TikTok was originally posted
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

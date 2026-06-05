@@ -19,6 +19,7 @@ class SeedVideoOut(BaseModel):
     like_count: int
     performed: bool
     notes: Optional[str]
+    posted_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:

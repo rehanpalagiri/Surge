@@ -1,6 +1,7 @@
 import os
 import uuid
 import asyncio
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update
@@ -30,6 +31,7 @@ async def add_seed_video(
     like_count: int = Form(...),
     performed: bool = Form(...),
     notes: Optional[str] = Form(None),
+    posted_at: Optional[str] = Form(None),  # ISO date string e.g. "2025-03-15"
     db: AsyncSession = Depends(get_db),
     _: None = Depends(check_admin),
 ):
@@ -42,6 +44,13 @@ async def add_seed_video(
     with open(file_path, "wb") as f:
         f.write(content)
 
+    parsed_posted_at = None
+    if posted_at:
+        try:
+            parsed_posted_at = datetime.fromisoformat(posted_at)
+        except ValueError:
+            pass  # ignore bad date — field is optional
+
     seed = SeedVideo(
         filename=safe_name,
         niche=niche,
@@ -49,6 +58,7 @@ async def add_seed_video(
         like_count=like_count,
         performed=performed,
         notes=notes,
+        posted_at=parsed_posted_at,
     )
     db.add(seed)
     await db.commit()
@@ -156,6 +166,15 @@ async def seed_from_url(
     notes = f"Caption: {description}" if description else None
     performed = view_count >= 10000
 
+    # yt-dlp returns upload_date as "YYYYMMDD" string
+    posted_at = None
+    raw_date = info.get("upload_date")
+    if raw_date:
+        try:
+            posted_at = datetime.strptime(raw_date, "%Y%m%d")
+        except ValueError:
+            pass
+
     seed = SeedVideo(
         filename=os.path.basename(filepath) if filepath else f"{prefix}.mp4",
         niche=niche,
@@ -163,6 +182,7 @@ async def seed_from_url(
         like_count=like_count,
         performed=performed,
         notes=notes,
+        posted_at=posted_at,
     )
     db.add(seed)
     await db.commit()
