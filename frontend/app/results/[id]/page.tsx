@@ -8,7 +8,8 @@ import VerdictBanner from "@/components/VerdictBanner";
 import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
-import { getAnalysis, AnalysisOut } from "@/lib/api";
+import { getAnalysis, claimAnalysis, AnalysisOut } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 
 function ErrorScreen({ title, message }: { title: string; message: string }) {
   return (
@@ -36,15 +37,33 @@ export default function ResultsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getAnalysis(id)
-      .then((a) => {
-        if (cancelled) return;
+
+    async function load() {
+      const token = getToken();
+      let a = await getAnalysis(id, token);
+
+      // If the result is locked but the user is logged in, the analysis may
+      // not have been claimed yet (e.g., a previous claim failed silently).
+      // Attempt a claim now and re-fetch so the user gets the full view.
+      if (a.scores_json.locked && token) {
+        try {
+          await claimAnalysis(id, token);
+          a = await getAnalysis(id, token);
+        } catch {
+          // If claim is rejected (belongs to another account), keep the locked view.
+        }
+      }
+
+      if (!cancelled) {
         setAnalysis(a);
         setStatus("ok");
-      })
-      .catch(() => {
-        if (!cancelled) setStatus("notfound");
-      });
+      }
+    }
+
+    load().catch(() => {
+      if (!cancelled) setStatus("notfound");
+    });
+
     return () => {
       cancelled = true;
     };

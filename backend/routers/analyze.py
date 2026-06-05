@@ -12,6 +12,9 @@ from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut
 from services.gemini import analyze_video
 from auth import optional_user, require_user
 
+MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
+ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
+
 router = APIRouter(prefix="/api", tags=["analyze"])
 
 
@@ -27,12 +30,21 @@ async def analyze(
 ):
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
 
+    # Validate content type (client-declared; best-effort guard)
+    if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
+
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
 
-    safe_name = f"{uuid.uuid4()}_{file.filename}"
+    # Sanitize filename — strip any path separators the client may have supplied
+    original_name = os.path.basename(file.filename or "upload")
+    safe_name = f"{uuid.uuid4()}_{original_name}"
     file_path = os.path.join(uploads_dir, safe_name)
     content = await file.read()
+    # Enforce size limit server-side (the 100MB UI check is bypassed by direct API calls)
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB.")
     with open(file_path, "wb") as f:
         f.write(content)
 
@@ -104,7 +116,11 @@ async def get_analysis(
     analysis = result.scalar_one_or_none()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    if user is None:
+    # Anonymous users always get the locked view.
+    # Authenticated users only get the full view for their OWN analyses.
+    # If the analysis hasn't been claimed yet (user_id is None), treat as locked
+    # for everyone except the eventual owner (they'll claim then re-fetch).
+    if user is None or (analysis.user_id is not None and analysis.user_id != user.id):
         return _to_locked(analysis)
     return _to_out(analysis)
 
@@ -169,6 +185,7 @@ async def submit_feedback(
     analysis_id: int,
     feedback: FeedbackIn,
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
 ):
     result = await db.execute(
         select(UserAnalysis).where(UserAnalysis.id == analysis_id)
@@ -176,6 +193,9 @@ async def submit_feedback(
     analysis = result.scalar_one_or_none()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
+    # Only the analysis owner can submit feedback
+    if analysis.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
     analysis.actual_views = feedback.actual_views
     await db.commit()
     await db.refresh(analysis)

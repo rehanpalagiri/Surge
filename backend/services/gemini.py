@@ -205,6 +205,13 @@ async def analyze_video(
             ),
         )
 
+        # Delete the uploaded file immediately — Gemini auto-purges after 48h,
+        # but we clean up early to avoid storing users' video data longer than needed.
+        try:
+            await client.aio.files.delete(name=uploaded.name)
+        except Exception:
+            pass  # Non-fatal; Gemini will expire it automatically
+
         return json.loads(response.text)
 
     except json.JSONDecodeError as e:

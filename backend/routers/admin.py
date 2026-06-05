@@ -1,5 +1,6 @@
 import os
 import uuid
+import hmac
 import asyncio
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 def check_admin(x_admin_password: Optional[str] = Header(None)):
     expected = os.getenv("ADMIN_PASSWORD", "viraliq-admin")
-    if not x_admin_password or x_admin_password != expected:
+    # Use constant-time comparison to prevent timing-based password enumeration
+    if not x_admin_password or not hmac.compare_digest(x_admin_password, expected):
         raise HTTPException(status_code=401, detail="Invalid or missing admin password")
 
 
@@ -38,7 +40,8 @@ async def add_seed_video(
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
 
-    safe_name = f"{uuid.uuid4()}_{file.filename}"
+    original_name = os.path.basename(file.filename or "upload")
+    safe_name = f"{uuid.uuid4()}_{original_name}"
     file_path = os.path.join(uploads_dir, safe_name)
     content = await file.read()
     with open(file_path, "wb") as f:
