@@ -203,7 +203,7 @@ export default function ProfilePage() {
             <div>
               <label className="block text-sm font-medium text-text-muted mb-1.5">
                 Target audience
-                <span className="text-text-muted/60 font-normal ml-1">(who you're trying to reach)</span>
+                <span className="text-text-muted/60 font-normal ml-1">(who you&apos;re trying to reach)</span>
               </label>
               <textarea
                 placeholder="e.g. 'Women 18–25 interested in fitness and weight loss'"
