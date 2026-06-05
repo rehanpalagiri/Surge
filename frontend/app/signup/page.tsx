@@ -43,7 +43,12 @@ function SignupForm() {
           // Non-fatal.
         }
       }
-      router.push(next || "/projects");
+      // If coming from a results page, go back there; otherwise go to onboarding.
+      if (next && next !== "/projects") {
+        router.push(next);
+      } else {
+        router.push("/onboarding");
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("409")) {

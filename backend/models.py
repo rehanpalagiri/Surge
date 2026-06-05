@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
 
@@ -28,11 +28,29 @@ class SeedVideo(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    platform = Column(String, nullable=False)          # "tiktok" | "instagram"
+    handle = Column(String, nullable=True)             # @username on the platform
+    display_name = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)
+    target_audience = Column(Text, nullable=True)      # who they're trying to reach
+    niche = Column(String, nullable=True)              # their primary content niche
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("user_id", "platform", name="uq_user_platform"),)
+
+
 class UserAnalysis(Base):
     __tablename__ = "user_analyses"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    platform = Column(String, nullable=True, default="tiktok")  # "tiktok" | "instagram"
     filename = Column(String, nullable=False)
     niche = Column(String, nullable=False)
     caption = Column(Text, nullable=True)

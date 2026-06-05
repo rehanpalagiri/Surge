@@ -24,8 +24,41 @@ def _recency_multiplier(seed) -> float:
     return min(1.0, math.exp(-age_days / 60))
 
 
+_PLATFORM_CONTEXT = {
+    "tiktok": {
+        "name": "TikTok",
+        "algorithm": "For You Page (FYP)",
+        "analyst_title": "elite TikTok performance analyst",
+        "signals": "watch time, replays, shares, comments, follows-from-video, and FYP distribution signals",
+        "platform_tips": (
+            "TikTok-specific factors: hook must land in the first 1–2 seconds to stop the scroll; "
+            "trending sounds boost FYP distribution; duet/stitch potential adds reach; "
+            "TikTok SEO (keywords in caption + spoken words) affects search discovery."
+        ),
+    },
+    "instagram": {
+        "name": "Instagram",
+        "algorithm": "Explore page and Reels tab",
+        "analyst_title": "elite Instagram Reels performance analyst",
+        "signals": "saves, shares, watch-through rate, profile visits, and Explore/Reels feed distribution",
+        "platform_tips": (
+            "Instagram Reels-specific factors: aesthetic quality and visual polish matter more than TikTok; "
+            "saves and shares are the highest-weight signals for the Explore algorithm; "
+            "on-screen text and captions are critical since many users watch without sound; "
+            "hashtag strategy (mix of niche + broad) affects Explore reach; "
+            "the first frame must be visually compelling as a static thumbnail in the grid."
+        ),
+    },
+}
+
+
 def _build_system_prompt(
-    niche: str, seed_examples: list, caption: str = "", bio: str = ""
+    niche: str,
+    seed_examples: list,
+    caption: str = "",
+    bio: str = "",
+    platform: str = "tiktok",
+    profile_context: str = "",
 ) -> str:
     # Prefer examples from the same niche; fall back to the global pool when the
     # niche isn't seeded enough yet (so the prompt is never empty or too sparse).
@@ -56,13 +89,16 @@ def _build_system_prompt(
     top_str = "\n".join(fmt(s) for s in top) or "  (no data yet)"
     bottom_str = "\n".join(fmt(s) for s in bottom) or "  (no data yet)"
 
+    ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
+    pname = ctx["name"]
+
     # Label by niche only when we're actually using same-niche examples.
     if use_niche:
-        top_heading = f"TOP PERFORMING {niche.upper()} VIDEOS"
-        bottom_heading = f"WORST PERFORMING {niche.upper()} VIDEOS"
+        top_heading = f"TOP PERFORMING {niche.upper()} {pname.upper()} VIDEOS"
+        bottom_heading = f"WORST PERFORMING {niche.upper()} {pname.upper()} VIDEOS"
     else:
-        top_heading = "TOP PERFORMING VIDEOS FROM OUR DATABASE"
-        bottom_heading = "WORST PERFORMING VIDEOS FROM OUR DATABASE"
+        top_heading = f"TOP PERFORMING {pname.upper()} VIDEOS FROM OUR DATABASE"
+        bottom_heading = f"WORST PERFORMING {pname.upper()} VIDEOS FROM OUR DATABASE"
 
     caption_block = (
         f'\nThe creator\'s CAPTION for this video is:\n"""\n{caption.strip()}\n"""'
@@ -72,10 +108,15 @@ def _build_system_prompt(
     bio_block = (
         f'\nThe creator\'s PROFILE BIO is:\n"""\n{bio.strip()}\n"""'
         if bio and bio.strip()
-        else "\nThe creator did not provide a profile bio."
+        else f"\nThe creator did not provide a profile bio."
+    )
+    profile_block = (
+        f"\n\nCREATOR PROFILE CONTEXT:\n{profile_context.strip()}"
+        if profile_context and profile_context.strip()
+        else ""
     )
 
-    return f"""You are an elite TikTok performance analyst with years of experience identifying viral content patterns across all niches. You have studied thousands of videos and can predict performance with high accuracy by analyzing hook strength, pacing, audio choices, captions, and trend alignment.
+    return f"""You are an {ctx["analyst_title"]} with years of experience identifying viral content patterns across all niches. You have studied thousands of videos and can predict performance with high accuracy by analyzing hook strength, pacing, audio choices, captions, and trend alignment.
 
 {top_heading}:
 {top_str}
@@ -83,17 +124,22 @@ def _build_system_prompt(
 {bottom_heading}:
 {bottom_str}
 
-The user's video is in the **{niche}** niche.
+The user's video is a **{pname} Reel/video** in the **{niche}** niche.
 {caption_block}
 {bio_block}
+{profile_block}
 
-When scoring caption_score, judge the actual caption text above (hook words, hashtags, call-to-action, length). Consider whether the caption and bio reinforce the video's topic and niche, and whether the bio would convert a viewer into a follower.
+PLATFORM-SPECIFIC CONTEXT ({pname}):
+The primary distribution surface is the {ctx["algorithm"]}. The key engagement signals are: {ctx["signals"]}.
+{ctx["platform_tips"]}
 
-Analyze the provided video carefully and be SPECIFIC and ACTIONABLE — no generic advice like "improve your hook." Instead say things like "Your hook takes 3 seconds to show the payoff — cut it to under 1 second" or "Your caption buries the hook; lead with 'I lost 20lbs doing THIS' instead of the brand name."
+When scoring caption_score, judge the actual caption text above (hook words, hashtags, call-to-action, length) specifically for {pname}'s caption norms. Consider whether the caption and bio reinforce the video's topic and niche, and whether the bio would convert a viewer into a follower on {pname}.
+
+Analyze the provided video carefully and be SPECIFIC and ACTIONABLE — no generic advice. Every suggestion must be tailored to how the **{pname} algorithm** rewards content in {niche}.
 
 Build the "improvement_plan" by targeting this video's WEAKEST scores first: each item's "area" should correspond to a low score above, "priority" 1 is the single highest-impact change, and items must be ordered by impact (priority 1 first). Every "problem", "fix", and "example" must be specific to THIS video — never generic. The "example" must show a concrete before → after. Provide 3–5 plan items.
 
-For "caption_rewrite", rewrite the creator's caption to be punchier and more clickable (if no caption was given, write one from scratch that fits the video). For "hook_rewrite", rewrite the first 1–2 seconds of the video (spoken line or on-screen text). "projected_verdict" and "projected_views" are your honest estimate of how this video would perform IF the creator applied the full plan.
+For "caption_rewrite", rewrite the creator's caption optimized for {pname} (if no caption was given, write one from scratch that fits the video and {pname}'s style). For "hook_rewrite", rewrite the first 1–2 seconds of the video (spoken line or on-screen text). "projected_verdict" and "projected_views" are your honest estimate of how this video would perform on {pname} IF the creator applied the full plan.
 
 Return ONLY valid JSON with exactly this structure:
 {{
@@ -131,9 +177,11 @@ async def analyze_video(
     seed_examples: list,
     caption: str = "",
     bio: str = "",
+    platform: str = "tiktok",
+    profile_context: str = "",
 ) -> dict:
     try:
-        prompt = _build_system_prompt(niche, seed_examples, caption, bio)
+        prompt = _build_system_prompt(niche, seed_examples, caption, bio, platform, profile_context)
 
         uploaded = await client.aio.files.upload(file=video_path)
 

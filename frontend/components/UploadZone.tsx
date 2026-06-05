@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { analyzeVideo } from "@/lib/api";
+import { analyzeVideo, getProfile } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 
 const NICHES = [
   "Fitness",
@@ -25,7 +26,7 @@ const TIPS = [
   "Generating your performance score...",
 ];
 
-export default function UploadZone() {
+export default function UploadZone({ platform = "tiktok" }: { platform?: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -36,6 +37,16 @@ export default function UploadZone() {
   const [tipIndex, setTipIndex] = useState(0);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+
+  const pName = platform === "instagram" ? "Instagram" : "TikTok";
+
+  // Auto-fill bio from saved profile when platform changes
+  useEffect(() => {
+    if (!getToken()) return;
+    getProfile(platform).then((prof) => {
+      if (prof?.bio) setBio(prof.bio);
+    }).catch(() => {});
+  }, [platform]);
 
   const handleFile = (f: File) => {
     if (f.size > 100 * 1024 * 1024) {
@@ -72,7 +83,7 @@ export default function UploadZone() {
     }, 5000);
 
     try {
-      const { id } = await analyzeVideo(file, niche, caption, bio);
+      const { id } = await analyzeVideo(file, niche, caption, bio, platform);
       router.push(`/results/${id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Analysis failed. Please try again.");
@@ -138,7 +149,7 @@ export default function UploadZone() {
           ) : (
             <>
               <p className="text-text-primary font-semibold">
-                Drop your TikTok video here
+                Drop your {pName} video here
               </p>
               <p className="text-text-muted text-sm">
                 or click to browse — .mp4 or .mov, max 100MB
@@ -189,7 +200,7 @@ export default function UploadZone() {
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             maxLength={500}
-            placeholder="Your TikTok profile bio"
+            placeholder={`Your ${pName} profile bio`}
             className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
           />
         </div>

@@ -3,6 +3,30 @@ from typing import Optional, Any
 from datetime import datetime
 
 
+class UserProfileIn(BaseModel):
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    target_audience: Optional[str] = None
+    niche: Optional[str] = None
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    user_id: int
+    platform: str
+    handle: Optional[str]
+    display_name: Optional[str]
+    bio: Optional[str]
+    target_audience: Optional[str]
+    niche: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class SeedVideoCreate(BaseModel):
     niche: str
     view_count: int
@@ -28,6 +52,7 @@ class SeedVideoOut(BaseModel):
 
 class AnalysisOut(BaseModel):
     id: int
+    platform: Optional[str] = "tiktok"
     filename: str
     niche: str
     caption: Optional[str]

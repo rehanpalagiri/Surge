@@ -45,6 +45,12 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
               >
                 My Projects
               </Link>
+              <Link
+                href="/profile"
+                className="text-text-muted hover:text-text-primary transition-colors"
+              >
+                Profile
+              </Link>
               <button
                 onClick={logout}
                 className="text-text-muted hover:text-danger transition-colors"

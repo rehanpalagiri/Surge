@@ -7,8 +7,30 @@ function authHeaders(token?: string | null): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+export interface UserProfile {
+  id: number;
+  user_id: number;
+  platform: string;
+  handle: string | null;
+  display_name: string | null;
+  bio: string | null;
+  target_audience: string | null;
+  niche: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserProfileIn {
+  handle?: string;
+  display_name?: string;
+  bio?: string;
+  target_audience?: string;
+  niche?: string;
+}
+
 export interface AnalysisOut {
   id: number;
+  platform: string;
   filename: string;
   niche: string;
   caption: string | null;
@@ -91,19 +113,41 @@ export async function analyzeVideo(
   file: File,
   niche: string,
   caption: string = "",
-  bio: string = ""
+  bio: string = "",
+  platform: string = "tiktok"
 ): Promise<{ id: number }> {
   const form = new FormData();
   form.append("file", file);
   form.append("niche", niche);
   form.append("caption", caption);
   form.append("bio", bio);
+  form.append("platform", platform);
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",
     headers: authHeaders(),
     body: form,
   });
   return handleResponse<AnalysisOut>(res).then((a) => ({ id: a.id }));
+}
+
+export async function getProfile(platform: string): Promise<UserProfile | null> {
+  const res = await fetch(`${BASE}/api/me/profile/${platform}`, {
+    headers: authHeaders(),
+  });
+  if (res.status === 404) return null;
+  return handleResponse<UserProfile>(res);
+}
+
+export async function upsertProfile(
+  platform: string,
+  data: UserProfileIn
+): Promise<UserProfile> {
+  const res = await fetch(`${BASE}/api/me/profile/${platform}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<UserProfile>(res);
 }
 
 export async function getAnalysis(

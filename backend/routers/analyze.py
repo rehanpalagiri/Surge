@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database import get_db
-from models import SeedVideo, UserAnalysis, User
+from models import SeedVideo, UserAnalysis, UserProfile, User
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut
 from services.gemini import analyze_video
 from auth import optional_user, require_user
@@ -21,9 +21,12 @@ async def analyze(
     niche: str = Form(...),
     caption: str = Form(""),
     bio: str = Form(""),
+    platform: str = Form("tiktok"),
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(optional_user),
 ):
+    platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
+
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
 
@@ -36,8 +39,34 @@ async def analyze(
     seeds_result = await db.execute(select(SeedVideo))
     seeds = seeds_result.scalars().all()
 
+    # Build profile context string from the user's saved platform profile (if any).
+    profile_context = ""
+    if user:
+        prof_result = await db.execute(
+            select(UserProfile).where(
+                UserProfile.user_id == user.id,
+                UserProfile.platform == platform,
+            )
+        )
+        prof = prof_result.scalar_one_or_none()
+        if prof:
+            parts = []
+            if prof.display_name:
+                parts.append(f"Creator name: {prof.display_name}")
+            if prof.handle:
+                parts.append(f"Handle: @{prof.handle.lstrip('@')}")
+            if prof.niche:
+                parts.append(f"Primary niche: {prof.niche}")
+            if prof.bio:
+                parts.append(f"Profile bio: {prof.bio}")
+            if prof.target_audience:
+                parts.append(f"Target audience: {prof.target_audience}")
+            profile_context = "\n".join(parts)
+
     try:
-        result = await analyze_video(file_path, niche, seeds, caption, bio)
+        result = await analyze_video(
+            file_path, niche, seeds, caption, bio, platform, profile_context
+        )
     finally:
         # Remove the temp upload — the video has already been sent to Gemini,
         # so we don't need to keep it on the server's disk.
@@ -48,6 +77,7 @@ async def analyze(
 
     analysis = UserAnalysis(
         user_id=user.id if user else None,
+        platform=platform,
         filename=safe_name,
         niche=niche,
         caption=caption or None,
@@ -155,6 +185,7 @@ async def submit_feedback(
 def _to_out(analysis: UserAnalysis) -> dict:
     return {
         "id": analysis.id,
+        "platform": analysis.platform or "tiktok",
         "filename": analysis.filename,
         "niche": analysis.niche,
         "caption": analysis.caption,
@@ -175,6 +206,7 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         scores = {}
     return {
         "id": analysis.id,
+        "platform": analysis.platform or "tiktok",
         "filename": analysis.filename,
         "niche": analysis.niche,
         "caption": None,

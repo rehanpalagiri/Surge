@@ -12,6 +12,7 @@ from models import Base
 from routers.admin import router as admin_router
 from routers.analyze import router as analyze_router
 from routers.auth import router as auth_router
+from routers.profile import router as profile_router
 
 
 async def _ensure_columns(conn):
@@ -36,6 +37,12 @@ async def _ensure_columns(conn):
     if "posted_at" not in seed_cols:
         await conn.exec_driver_sql(
             "ALTER TABLE seed_videos ADD COLUMN posted_at DATETIME"
+        )
+
+    # --- user_analyses: platform column (default tiktok for existing rows) ---
+    if "platform" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN platform TEXT DEFAULT 'tiktok'"
         )
 
 
@@ -68,6 +75,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(analyze_router)
+app.include_router(profile_router)
 
 
 @app.get("/health")
