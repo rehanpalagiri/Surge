@@ -108,7 +108,7 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
           </div>
           <div className="text-center">
             <p className="text-xl font-bold text-text-primary animate-pulse-slow">
-              ViralIQ is analyzing your video...
+              Surge is analyzing your video...
             </p>
             <p className="text-text-muted text-sm mt-1">This can take 15–30 seconds</p>
           </div>

@@ -143,7 +143,7 @@ export default function ResultsPage() {
                       <ScoreBar
                         key={l}
                         label={l}
-                        score={[78, 64, 55, 71, 48, 62][i]}
+                        score={[8, 6, 5, 7, 5, 6][i]}
                         animate={false}
                       />
                     )

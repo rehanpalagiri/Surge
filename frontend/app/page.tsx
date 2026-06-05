@@ -12,7 +12,7 @@ const PLATFORM_CONFIG = {
   tiktok: {
     icon: "🎵",
     label: "TikTok",
-    badge: "AI-Powered TikTok Analysis",
+    badge: "AI-Powered TikTok Scoring",
     headline: (
       <>
         Will your TikTok{" "}
@@ -25,7 +25,7 @@ const PLATFORM_CONFIG = {
   instagram: {
     icon: "📸",
     label: "Instagram",
-    badge: "AI-Powered Instagram Analysis",
+    badge: "AI-Powered Instagram Scoring",
     headline: (
       <>
         Will your Reel{" "}
@@ -47,7 +47,7 @@ function SplashScreen({ onGuest }: { onGuest: () => void }) {
         <div className="space-y-4">
           <div className="text-6xl">🎬</div>
           <h1 className="text-5xl font-extrabold gradient-text tracking-tight">
-            ViralIQ
+            Surge
           </h1>
           <p className="text-text-muted text-lg leading-relaxed max-w-sm mx-auto">
             Find out if your video will go viral — before you post it.

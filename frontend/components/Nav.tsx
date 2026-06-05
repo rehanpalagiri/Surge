@@ -12,10 +12,10 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
   useEffect(() => {
     const update = () => setLoggedIn(!!getToken());
     update();
-    window.addEventListener("viraliq-auth", update);
+    window.addEventListener("surge-auth", update);
     window.addEventListener("storage", update);
     return () => {
-      window.removeEventListener("viraliq-auth", update);
+      window.removeEventListener("surge-auth", update);
       window.removeEventListener("storage", update);
     };
   }, []);
@@ -30,7 +30,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
       <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <Link href="/" className="font-bold text-xl gradient-text">
-            ViralIQ
+            Surge
           </Link>
           {subtitle && (
             <span className="text-text-muted text-sm capitalize">{subtitle}</span>

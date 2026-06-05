@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="ViralIQ API", lifespan=lifespan)
+app = FastAPI(title="Surge API", lifespan=lifespan)
 
 # Comma-separated origins from env, e.g. "http://localhost:3000,https://viraliq.vercel.app"
 _origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")

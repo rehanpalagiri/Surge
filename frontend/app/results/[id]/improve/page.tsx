@@ -8,14 +8,14 @@ import { getAnalysis, AnalysisOut, ImprovementItem } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 function scoreColor(score: number): string {
-  if (score >= 70) return "text-success";
-  if (score >= 40) return "text-warning";
+  if (score >= 7) return "text-success";
+  if (score >= 4) return "text-warning";
   return "text-danger";
 }
 
 function scoreBorder(score: number): string {
-  if (score >= 70) return "border-success/30";
-  if (score >= 40) return "border-warning/30";
+  if (score >= 7) return "border-success/30";
+  if (score >= 4) return "border-warning/30";
   return "border-danger/30";
 }
 
@@ -112,7 +112,7 @@ export default function ImprovePage() {
           <p className="text-text-muted">
             Current score{" "}
             <span className={`font-bold ${scoreColor(s.overall_score)}`}>
-              {s.overall_score}/100
+              {s.overall_score}/10
             </span>{" "}
             · Verdict{" "}
             <span className="text-text-primary font-semibold">{s.verdict}</span>
@@ -160,7 +160,7 @@ export default function ImprovePage() {
                       <span
                         className={`text-sm font-bold ${scoreColor(item.current_score)}`}
                       >
-                        {item.current_score}/100
+                        {item.current_score}/10
                       </span>
                     </div>
                     <div>

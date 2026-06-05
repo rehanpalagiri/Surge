@@ -65,7 +65,7 @@ function SignupForm() {
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-8 space-y-6">
         <div className="text-center">
           <Link href="/" className="font-bold text-2xl gradient-text">
-            ViralIQ
+            Surge
           </Link>
           <h1 className="text-xl font-bold text-text-primary mt-4">
             Create your free account

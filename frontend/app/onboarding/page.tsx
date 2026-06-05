@@ -103,7 +103,7 @@ function OnboardingForm() {
         {/* Header */}
         <div className="text-center space-y-2">
           <Link href="/" className="font-bold text-2xl gradient-text inline-block">
-            ViralIQ
+            Surge
           </Link>
           <h1 className="text-xl font-bold text-text-primary">
             Set up your creator profiles

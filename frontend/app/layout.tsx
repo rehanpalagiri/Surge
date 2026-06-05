@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ViralIQ — TikTok Video Performance Predictor",
-  description: "Find out if your TikTok will go viral before you post it.",
+  title: "Surge — AI Video Performance Predictor",
+  description: "Find out if your TikTok or Instagram Reel will go viral before you post it.",
 };
 
 export const viewport: Viewport = {

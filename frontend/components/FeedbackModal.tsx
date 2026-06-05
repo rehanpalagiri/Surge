@@ -38,7 +38,7 @@ export default function FeedbackModal({ analysisId }: FeedbackModalProps) {
         <div className="text-3xl mb-2">🎉</div>
         <p className="text-success font-semibold text-lg">Thanks for the feedback!</p>
         <p className="text-text-muted text-sm mt-1">
-          This helps ViralIQ improve its predictions.
+          This helps Surge improve its predictions.
         </p>
       </div>
     );
@@ -50,7 +50,7 @@ export default function FeedbackModal({ analysisId }: FeedbackModalProps) {
         How did your video actually perform?
       </h3>
       <p className="text-text-muted text-sm mb-4">
-        Share your actual view count to help improve ViralIQ&apos;s predictions.
+        Share your actual view count to help improve Surge&apos;s predictions.
       </p>
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
         <input
