@@ -26,7 +26,15 @@ const TIPS = [
   "Generating your performance score...",
 ];
 
-export default function UploadZone({ platform = "tiktok" }: { platform?: string }) {
+const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+
+interface Props {
+  platform?: string;
+  /** Pre-populate with a file (e.g. from the Web Share Target) */
+  initialFile?: File | null;
+}
+
+export default function UploadZone({ platform = "tiktok", initialFile = null }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -40,16 +48,29 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
 
   const pName = platform === "instagram" ? "Instagram" : "TikTok";
 
+  // Accept a file pre-populated by the share page
+  useEffect(() => {
+    if (!initialFile) return;
+    if (initialFile.size > MAX_BYTES) {
+      setError("File must be under 100MB.");
+      return;
+    }
+    setError("");
+    setFile(initialFile);
+  }, [initialFile]);
+
   // Auto-fill bio from saved profile when platform changes
   useEffect(() => {
     if (!getToken()) return;
-    getProfile(platform).then((prof) => {
-      if (prof?.bio) setBio(prof.bio);
-    }).catch(() => {});
+    getProfile(platform)
+      .then((prof) => {
+        if (prof?.bio) setBio(prof.bio);
+      })
+      .catch(() => {});
   }, [platform]);
 
   const handleFile = (f: File) => {
-    if (f.size > 100 * 1024 * 1024) {
+    if (f.size > MAX_BYTES) {
       setError("File must be under 100MB.");
       return;
     }
@@ -86,7 +107,9 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
       const { id } = await analyzeVideo(file, niche, caption, bio, platform);
       router.push(`/results/${id}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Analysis failed. Please try again.");
+      setError(
+        err instanceof Error ? err.message : "Analysis failed. Please try again."
+      );
       setLoading(false);
     } finally {
       clearInterval(interval);
@@ -104,13 +127,17 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
         <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center gap-6 px-4">
           <div className="relative">
             <div className="w-20 h-20 rounded-full border-4 border-purple-from/20 border-t-purple-to animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center text-2xl">🎬</div>
+            <div className="absolute inset-0 flex items-center justify-center text-2xl">
+              🎬
+            </div>
           </div>
           <div className="text-center">
             <p className="text-xl font-bold text-text-primary animate-pulse-slow">
               Surge is analyzing your video...
             </p>
-            <p className="text-text-muted text-sm mt-1">This can take 15–30 seconds</p>
+            <p className="text-text-muted text-sm mt-1">
+              This can take 15–30 seconds
+            </p>
           </div>
           <div className="bg-card border border-border rounded-xl px-6 py-3 text-text-muted text-sm animate-pulse">
             {TIPS[tipIndex]}
@@ -119,23 +146,29 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
       )}
 
       <form onSubmit={handleSubmit} className="w-full max-w-xl mx-auto space-y-4">
+        {/* ── Drop / tap zone ──────────────────────────────────────────────── */}
         <div
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onClick={() => inputRef.current?.click()}
-          className={`cursor-pointer rounded-2xl border-2 border-dashed transition-all p-10 flex flex-col items-center gap-3 text-center
-            ${dragging
-              ? "border-purple-to bg-purple-from/10"
-              : file
-              ? "border-success/60 bg-success/5"
-              : "border-border bg-card hover:border-purple-from/50 hover:bg-card/80"
+          className={`cursor-pointer rounded-2xl border-2 border-dashed transition-all
+            p-6 sm:p-10 min-h-[120px]
+            flex flex-col items-center justify-center gap-3 text-center
+            ${
+              dragging
+                ? "border-purple-to bg-purple-from/10"
+                : file
+                ? "border-success/60 bg-success/5"
+                : "border-border bg-card hover:border-purple-from/50 hover:bg-card/80"
             }`}
         >
+          {/* accept="video/*" — on iOS this shows "Photo Library" as primary option.
+              No `capture` attribute so camera isn't forced. */}
           <input
             ref={inputRef}
             type="file"
-            accept=".mp4,.mov,video/mp4,video/quicktime"
+            accept="video/*"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />
@@ -144,20 +177,36 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
             <>
               <p className="text-text-primary font-semibold">{file.name}</p>
               <p className="text-text-muted text-sm">{formatSize(file.size)}</p>
-              <p className="text-text-muted text-xs">Click to change file</p>
+              <p className="text-text-muted text-xs">Tap to change file</p>
             </>
           ) : (
             <>
-              <p className="text-text-primary font-semibold">
+              {/* Mobile copy */}
+              <p className="text-text-primary font-semibold sm:hidden">
+                Tap to choose from Camera Roll
+              </p>
+              {/* Desktop copy */}
+              <p className="text-text-primary font-semibold hidden sm:block">
                 Drop your {pName} video here
               </p>
-              <p className="text-text-muted text-sm">
-                or click to browse — .mp4 or .mov, max 100MB
+              <p className="text-text-muted text-sm hidden sm:block">
+                or click to browse — video files up to 100MB
+              </p>
+              <p className="text-text-muted text-sm sm:hidden">
+                Video files up to 100MB
               </p>
             </>
           )}
         </div>
 
+        {/* TikTok/Instagram save helper — mobile only */}
+        {!file && (
+          <p className="sm:hidden text-text-muted/60 text-xs text-center -mt-1 px-2">
+            On {pName}: tap ··· → Save video → come back here and tap above
+          </p>
+        )}
+
+        {/* ── Niche ────────────────────────────────────────────────────────── */}
         <div>
           <label className="block text-sm font-medium text-text-muted mb-2">
             Content Niche
@@ -175,6 +224,7 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
           </select>
         </div>
 
+        {/* ── Caption ──────────────────────────────────────────────────────── */}
         <div>
           <label className="block text-sm font-medium text-text-muted mb-2">
             Caption{" "}
@@ -190,6 +240,7 @@ export default function UploadZone({ platform = "tiktok" }: { platform?: string 
           />
         </div>
 
+        {/* ── Bio ──────────────────────────────────────────────────────────── */}
         <div>
           <label className="block text-sm font-medium text-text-muted mb-2">
             Profile bio{" "}
