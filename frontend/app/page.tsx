@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import UploadZone from "@/components/UploadZone";
 import Nav from "@/components/Nav";
+import { getToken } from "@/lib/auth";
 
 type Platform = "tiktok" | "instagram";
 
@@ -35,8 +37,97 @@ const PLATFORM_CONFIG = {
   },
 };
 
+// ─── Splash screen ────────────────────────────────────────────────────────────
+
+function SplashScreen({ onGuest }: { onGuest: () => void }) {
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-background">
+      <div className="w-full max-w-md text-center space-y-10">
+        {/* Branding */}
+        <div className="space-y-4">
+          <div className="text-6xl">🎬</div>
+          <h1 className="text-5xl font-extrabold gradient-text tracking-tight">
+            ViralIQ
+          </h1>
+          <p className="text-text-muted text-lg leading-relaxed max-w-sm mx-auto">
+            Find out if your video will go viral — before you post it.
+          </p>
+        </div>
+
+        {/* Feature chips */}
+        <div className="flex flex-wrap justify-center gap-2">
+          {[
+            "6-score AI breakdown",
+            "Hook analysis",
+            "Caption rewrites",
+            "Full improvement plan",
+            "TikTok & Instagram",
+          ].map((f) => (
+            <span
+              key={f}
+              className="bg-surface border border-border text-text-muted text-xs px-3 py-1.5 rounded-full"
+            >
+              {f}
+            </span>
+          ))}
+        </div>
+
+        {/* CTAs */}
+        <div className="space-y-3">
+          {/* Primary — most appealing */}
+          <Link
+            href="/signup"
+            className="block w-full gradient-btn text-white font-bold py-4 rounded-xl text-lg shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
+          >
+            Create free account
+          </Link>
+
+          {/* Secondary */}
+          <Link
+            href="/login"
+            className="block w-full bg-card border border-border text-text-primary font-semibold py-3 rounded-xl hover:border-purple-from/50 transition-colors"
+          >
+            Log in
+          </Link>
+
+          {/* Least appealing — guest */}
+          <div className="pt-2">
+            <button
+              onClick={onGuest}
+              className="text-text-muted/60 text-sm hover:text-text-muted transition-colors"
+            >
+              Continue as guest
+            </button>
+            <p className="text-text-muted/40 text-xs mt-1">
+              Results are locked · no history saved
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Home() {
   const [platform, setPlatform] = useState<Platform>("tiktok");
+  // null = still checking localStorage (avoids flash); true = show splash; false = show app
+  const [showSplash, setShowSplash] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // If a valid token exists the user is already logged in — skip the splash entirely.
+    // localStorage persists across tab closes, so reopening the tab keeps them signed in.
+    setShowSplash(!getToken());
+  }, []);
+
+  // Nothing rendered until we know whether to show splash (avoids layout flash)
+  if (showSplash === null) return null;
+
+  if (showSplash) {
+    return <SplashScreen onGuest={() => setShowSplash(false)} />;
+  }
+
   const cfg = PLATFORM_CONFIG[platform];
 
   return (
