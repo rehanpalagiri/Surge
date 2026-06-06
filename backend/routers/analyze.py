@@ -148,6 +148,7 @@ async def my_analyses(
         out.append(
             {
                 "id": a.id,
+                "platform": a.platform,
                 "niche": a.niche,
                 "verdict": a.verdict,
                 "overall_score": scores.get("overall_score"),

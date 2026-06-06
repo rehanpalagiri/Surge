@@ -60,13 +60,27 @@ Browser → Next.js (Netlify) → FastAPI (Render) → Neon Postgres
 - **`app/onboarding/page.tsx`** — Two-step profile setup shown after signup (TikTok → Instagram). Each step saves via `PUT /api/me/profile/{platform}`. Skippable. Redirected here from signup unless user came from a results page.
 - **`app/profile/page.tsx`** — Tabbed TikTok/Instagram profile editor. Loads both profiles on mount, saves on button click.
 - **`components/UploadZone.tsx`** — Accepts `platform` prop. On platform change, auto-fills the bio field from the user's saved profile (`getProfile(platform)`). Passes `platform` to `analyzeVideo()`.
-- **`lib/auth.ts`** — Token in `localStorage` as `viraliq_token`. `setToken`/`clearToken` dispatch `viraliq-auth` CustomEvent so Nav updates without page reload.
-- **`lib/api.ts`** — All API calls. Throws on non-2xx with status in message. `analyzeVideo` now takes `platform` param. `getProfile` / `upsertProfile` for profile CRUD.
-- **`components/Nav.tsx`** — Listens to `viraliq-auth` + `storage` events. Shows My Projects + Profile + Log out when authenticated.
+- **`lib/auth.ts`** — Token in `localStorage` as `surge_token` (auto-migrates from old `viraliq_token`). `setToken`/`clearToken` dispatch `surge-auth` CustomEvent so Nav updates without page reload.
+- **`lib/api.ts`** — All API calls. Throws on non-2xx with status in message. `analyzeVideo` takes `platform` param. `getProfile` / `upsertProfile` for profile CRUD.
+- **`components/Nav.tsx`** — Listens to `surge-auth` + `storage` events. Shows My Projects + Profile + Log out when authenticated.
+- **`components/UpsellModal.tsx`** — Shown to anonymous users on locked results. Prompts sign-up to unlock full scores.
+- **`components/VerdictBanner.tsx`** — Displays top-level verdict + predicted views; shown in both locked and unlocked states.
+- **`components/FeedbackModal.tsx`** — Thumbs up/down feedback on an analysis. Calls `PATCH /api/analyses/{id}/feedback`; requires auth + ownership.
 
 **Freemium gate:** `results/[id]/page.tsx` checks `scores_json.locked`. Locked data is stripped server-side in `_to_locked()` — full scores never leave the backend for anonymous users.
 
 **Claim flow:** After signup/login, if `?next=/results/{id}` is present, calls `claimAnalysis(id)` to transfer the anonymous analysis to the new account.
+
+**Results sub-pages:** `results/[id]/improve/page.tsx` — prioritized improvement plan with hook/caption rewrites. Only accessible to the analysis owner.
+
+### PWA
+
+- **`public/sw.js`** — Intercepts the share_target POST from the OS share sheet. Stashes the video file in Cache API under `surge-share-v1/pending-share`, then redirects to `/share`. Also serves `/_next/static/` cache-first.
+- **`public/manifest.json`** — Makes the app installable. `share_target` action is `/share` with `method: "POST"`, `enctype: "multipart/form-data"`, field name `video`.
+- **`app/share/page.tsx`** — Reads the pending file from Cache API on mount, pre-populates `UploadZone` via the `initialFile` prop.
+- **`components/InstallBanner.tsx`** — Mobile "Add to Home Screen" nudge, dismissable.
+- **`components/RegisterSW.tsx`** — Registers `/sw.js` on mount (placed in `layout.tsx`).
+- `netlify.toml` sets `Cache-Control: no-cache` for both `sw.js` and `manifest.json` so PWA metadata always stays fresh.
 
 ---
 

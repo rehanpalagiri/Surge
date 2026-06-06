@@ -62,6 +62,7 @@ export interface AnalysisOut {
 
 export interface AnalysisSummary {
   id: number;
+  platform: string;
   niche: string;
   verdict: string;
   overall_score: number | null;

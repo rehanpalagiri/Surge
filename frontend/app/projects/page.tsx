@@ -20,24 +20,35 @@ function scoreColor(score: number | null): string {
   return "text-danger";
 }
 
+type Platform = "tiktok" | "instagram";
+
+const PLATFORM_TABS: { id: Platform; icon: string; label: string }[] = [
+  { id: "tiktok", icon: "🎵", label: "TikTok" },
+  { id: "instagram", icon: "📸", label: "Instagram" },
+];
+
 export default function ProjectsPage() {
   const router = useRouter();
   const [analyses, setAnalyses] = useState<AnalysisSummary[] | null>(null);
-  const [error, setError] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("tiktok");
 
-  useEffect(() => {
+  const load = () => {
     const token = getToken();
     if (!token) {
       router.replace("/login?next=/projects");
       return;
     }
+    setAnalyses(null);
+    setLoadFailed(false);
     getMyAnalyses(token)
       .then(setAnalyses)
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Failed to load projects");
-        setAnalyses([]);
-      });
-  }, [router]);
+      .catch(() => setLoadFailed(true));
+  };
+
+  useEffect(load, [router]);
+
+  const filtered = analyses?.filter((a) => a.platform === platform) ?? null;
 
   return (
     <main className="min-h-screen bg-background">
@@ -52,16 +63,50 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        {error && <p className="text-danger text-sm">{error}</p>}
+        {/* Platform Switcher */}
+        <div className="flex justify-center">
+          <div className="flex bg-card border border-border rounded-2xl p-1 gap-1">
+            {PLATFORM_TABS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPlatform(p.id)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  platform === p.id
+                    ? "gradient-btn text-white shadow-sm"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <span>{p.icon}</span>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {analyses === null ? (
+        {loadFailed ? (
+          <div className="bg-card border border-border rounded-2xl p-10 text-center">
+            <div className="text-4xl mb-3">🔄</div>
+            <p className="text-text-primary font-semibold">
+              Couldn&apos;t reach the server
+            </p>
+            <p className="text-text-muted text-sm mt-1 mb-5">
+              The backend may still be waking up — give it a moment and try again.
+            </p>
+            <button
+              onClick={load}
+              className="inline-block gradient-btn text-white font-semibold px-6 py-3 rounded-xl"
+            >
+              Retry
+            </button>
+          </div>
+        ) : filtered === null ? (
           <p className="text-text-muted">Loading…</p>
-        ) : analyses.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-10 text-center">
             <div className="text-4xl mb-3">🎬</div>
             <p className="text-text-primary font-semibold">No projects yet</p>
             <p className="text-text-muted text-sm mt-1 mb-5">
-              Analyze your first video to see it here.
+              Analyze your first {platform === "tiktok" ? "TikTok" : "Reel"} to see it here.
             </p>
             <Link
               href="/"
@@ -72,7 +117,7 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {analyses.map((a) => (
+            {filtered.map((a) => (
               <Link
                 key={a.id}
                 href={`/results/${a.id}`}

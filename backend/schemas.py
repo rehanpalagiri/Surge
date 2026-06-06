@@ -96,6 +96,7 @@ class TokenOut(BaseModel):
 
 class AnalysisSummaryOut(BaseModel):
     id: int
+    platform: str
     niche: str
     verdict: str
     overall_score: Optional[int] = None
