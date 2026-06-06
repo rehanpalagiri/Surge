@@ -86,7 +86,7 @@ function SignupForm() {
           />
           <input
             type="password"
-            placeholder="Password (min 6 characters)"
+            placeholder="Password (6+ chars)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
