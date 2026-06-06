@@ -110,6 +110,30 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+/**
+ * Render's free tier spins the backend down after ~15 min idle, so the very
+ * first request after a lull can take 20-60s to wake it up. If that wake-up
+ * happens *during* the big multipart video upload, mobile Safari tends to
+ * drop the connection entirely and throw a generic "Load failed" — instead,
+ * ping the lightweight /health endpoint first (small, cheap requests) and
+ * keep retrying until the backend responds, THEN kick off the real upload
+ * once it's already warm. Returns true once the backend answers, or false if
+ * it never wakes within maxWaitMs (caller can still try the real request).
+ */
+export async function wakeBackend(maxWaitMs: number = 90_000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const res = await fetch(`${BASE}/health`, { cache: "no-store" });
+      if (res.ok) return true;
+    } catch {
+      // Backend still asleep / unreachable — fall through and retry.
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  return false;
+}
+
 export async function analyzeVideo(
   file: File,
   niche: string,

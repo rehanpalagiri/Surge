@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { analyzeVideo, getProfile } from "@/lib/api";
+import { analyzeVideo, getProfile, wakeBackend } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 const NICHES = [
@@ -42,6 +42,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
+  const [waking, setWaking] = useState(false);
   const [tipIndex, setTipIndex] = useState(0);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -104,13 +105,26 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
     }, 5000);
 
     try {
+      // Ping the backend with a tiny request first and wait for it to respond.
+      // Render's free tier can take 20-60s to wake from a cold start — if that
+      // wake-up happens mid-upload (a big multipart POST), mobile Safari often
+      // drops the connection and throws a generic "Load failed". Warming it up
+      // first keeps the heavy upload itself fast and reliable.
+      setWaking(true);
+      await wakeBackend();
+      setWaking(false);
+
       const { id } = await analyzeVideo(file, niche, caption, bio, platform);
       router.push(`/results/${id}`);
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
       setError(
-        err instanceof Error ? err.message : "Analysis failed. Please try again."
+        msg.toLowerCase().includes("load failed") || msg.toLowerCase().includes("failed to fetch")
+          ? "Couldn't reach the server. Check your connection and try again — if you're on cellular, switching to Wi-Fi can help."
+          : msg || "Analysis failed. Please try again."
       );
       setLoading(false);
+      setWaking(false);
     } finally {
       clearInterval(interval);
     }
@@ -133,14 +147,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           </div>
           <div className="text-center">
             <p className="text-xl font-bold text-text-primary animate-pulse-slow">
-              Surge is analyzing your video...
+              {waking ? "Waking up the server…" : "Surge is analyzing your video..."}
             </p>
             <p className="text-text-muted text-sm mt-1">
-              This can take 15–30 seconds
+              {waking
+                ? "First request after a quiet period can take up to a minute — hang tight"
+                : "This can take 15–30 seconds"}
             </p>
           </div>
           <div className="bg-card border border-border rounded-xl px-6 py-3 text-text-muted text-sm animate-pulse">
-            {TIPS[tipIndex]}
+            {waking ? "Connecting to Surge's analysis engine…" : TIPS[tipIndex]}
           </div>
         </div>
       )}
