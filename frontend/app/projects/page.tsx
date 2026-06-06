@@ -22,9 +22,27 @@ function scoreColor(score: number | null): string {
 
 type Platform = "tiktok" | "instagram";
 
-const PLATFORM_TABS: { id: Platform; icon: string; label: string }[] = [
-  { id: "tiktok", icon: "🎵", label: "TikTok" },
-  { id: "instagram", icon: "📸", label: "Instagram" },
+const PLATFORM_TABS: {
+  id: Platform;
+  icon: string;
+  label: string;
+  textGradient: string;
+  btnGradient: string;
+}[] = [
+  {
+    id: "tiktok",
+    icon: "🎵",
+    label: "TikTok",
+    textGradient: "gradient-text-tiktok",
+    btnGradient: "gradient-btn-tiktok",
+  },
+  {
+    id: "instagram",
+    icon: "📸",
+    label: "Instagram",
+    textGradient: "gradient-text-instagram",
+    btnGradient: "gradient-btn-instagram",
+  },
 ];
 
 export default function ProjectsPage() {
@@ -49,6 +67,7 @@ export default function ProjectsPage() {
   useEffect(load, [router]);
 
   const filtered = analyses?.filter((a) => a.platform === platform) ?? null;
+  const cfg = PLATFORM_TABS.find((p) => p.id === platform)!;
 
   return (
     <main className="min-h-screen bg-background">
@@ -56,7 +75,7 @@ export default function ProjectsPage() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-extrabold">
-            Your <span className="gradient-text">Past Projects</span>
+            Your <span className={cfg.textGradient}>Past Projects</span>
           </h1>
           <p className="text-text-muted mt-1">
             Every video you&apos;ve analyzed, saved to your account.
@@ -72,7 +91,7 @@ export default function ProjectsPage() {
                 onClick={() => setPlatform(p.id)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   platform === p.id
-                    ? "gradient-btn text-white shadow-sm"
+                    ? `${p.btnGradient} text-white shadow-sm`
                     : "text-text-muted hover:text-text-primary"
                 }`}
               >
@@ -110,7 +129,7 @@ export default function ProjectsPage() {
             </p>
             <Link
               href="/"
-              className="inline-block gradient-btn text-white font-semibold px-6 py-3 rounded-xl"
+              className={`inline-block ${cfg.btnGradient} text-white font-semibold px-6 py-3 rounded-xl`}
             >
               Analyze a video →
             </Link>

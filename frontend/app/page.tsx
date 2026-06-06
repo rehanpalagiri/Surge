@@ -13,27 +13,25 @@ const PLATFORM_CONFIG = {
     icon: "🎵",
     label: "TikTok",
     badge: "AI-Powered TikTok Scoring",
-    headline: (
-      <>
-        Will your TikTok{" "}
-        <span className="gradient-text">go viral?</span>
-      </>
-    ),
+    headlinePre: "Will your TikTok",
+    headlineAccent: "go viral?",
     sub: "Upload your TikTok video and get an instant AI-powered performance prediction — hook strength, pacing, audio, captions, trend alignment, and more.",
     uploadDesc: "Drop any .mp4 or .mov TikTok video up to 100MB.",
+    textGradient: "gradient-text-tiktok",
+    btnGradient: "gradient-btn-tiktok",
+    badgeClass: "bg-[#25f4ee]/10 border-[#fe2c55]/30 text-[#fe2c55]",
   },
   instagram: {
     icon: "📸",
     label: "Instagram",
     badge: "AI-Powered Instagram Scoring",
-    headline: (
-      <>
-        Will your Reel{" "}
-        <span className="gradient-text">blow up?</span>
-      </>
-    ),
+    headlinePre: "Will your Reel",
+    headlineAccent: "blow up?",
     sub: "Upload your Instagram Reel and get an instant AI-powered performance prediction — saves, shares, Explore reach, aesthetic score, and more.",
     uploadDesc: "Drop any .mp4 or .mov Instagram Reel up to 100MB.",
+    textGradient: "gradient-text-instagram",
+    btnGradient: "gradient-btn-instagram",
+    badgeClass: "bg-[#fd1d1d]/10 border-[#fcaf45]/30 text-[#fcaf45]",
   },
 };
 
@@ -143,7 +141,7 @@ export default function Home() {
               onClick={() => setPlatform(p)}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 platform === p
-                  ? "gradient-btn text-white shadow-sm"
+                  ? `${PLATFORM_CONFIG[p].btnGradient} text-white shadow-sm`
                   : "text-text-muted hover:text-text-primary"
               }`}
             >
@@ -158,11 +156,14 @@ export default function Home() {
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
         <div className="max-w-3xl mx-auto space-y-8">
           <div className="space-y-4">
-            <div className="inline-block bg-purple-from/20 border border-purple-from/30 text-purple-to text-xs font-semibold px-3 py-1 rounded-full mb-2 uppercase tracking-wide">
+            <div
+              className={`inline-block border text-xs font-semibold px-3 py-1 rounded-full mb-2 uppercase tracking-wide ${cfg.badgeClass}`}
+            >
               {cfg.badge}
             </div>
             <h1 className="text-5xl md:text-7xl font-extrabold leading-tight">
-              {cfg.headline}
+              {cfg.headlinePre}{" "}
+              <span className={cfg.textGradient}>{cfg.headlineAccent}</span>
             </h1>
             <p className="text-text-muted text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
               {cfg.sub}
@@ -177,7 +178,7 @@ export default function Home() {
               { value: "30s", label: "Analysis time" },
             ].map((s) => (
               <div key={s.label}>
-                <div className="text-2xl font-bold gradient-text">{s.value}</div>
+                <div className={`text-2xl font-bold ${cfg.textGradient}`}>{s.value}</div>
                 <div className="text-text-muted text-xs mt-0.5">{s.label}</div>
               </div>
             ))}

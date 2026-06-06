@@ -265,7 +265,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
         <button
           type="submit"
           disabled={!file || loading}
-          className="w-full gradient-btn text-white font-bold py-4 rounded-xl text-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
+          className={`w-full ${
+            platform === "instagram" ? "gradient-btn-instagram" : "gradient-btn-tiktok"
+          } text-white font-bold py-4 rounded-xl text-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]`}
         >
           {loading ? "Analyzing..." : "Analyze My Video"}
         </button>
