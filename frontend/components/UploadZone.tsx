@@ -256,22 +256,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           />
         </div>
 
-        {/* ── Bio ──────────────────────────────────────────────────────────── */}
-        <div>
-          <label className="block text-sm font-medium text-text-muted mb-2">
-            Profile bio{" "}
-            <span className="text-text-muted/60 font-normal">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            maxLength={500}
-            placeholder={`Your ${pName} profile bio`}
-            className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
-          />
-        </div>
-
         {error && (
           <div className="bg-danger/10 border border-danger/30 rounded-xl px-4 py-3 text-danger text-sm">
             {error}
