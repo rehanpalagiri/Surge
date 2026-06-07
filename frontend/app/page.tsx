@@ -140,12 +140,6 @@ export default function Home() {
 
   const cfg = PLATFORM_CONFIG[platform];
 
-  const stats = [
-    { value: "6", label: "Score metrics" },
-    { value: "AI", label: "Gemini powered" },
-    { value: "30s", label: "Analysis time" },
-  ];
-
   return (
     <main className={`min-h-screen flex flex-col transition-colors duration-300 ${cfg.pageBg}`}>
       <Nav />
@@ -186,16 +180,6 @@ export default function Home() {
             <p className="text-text-muted text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
               {cfg.sub}
             </p>
-          </div>
-
-          {/* Stats row */}
-          <div className="flex justify-center gap-8 text-center">
-            {stats.map((s, i) => (
-              <div key={s.label}>
-                <div className={`text-2xl font-bold ${cfg.statColors[i]}`}>{s.value}</div>
-                <div className="text-text-muted text-xs mt-0.5">{s.label}</div>
-              </div>
-            ))}
           </div>
 
           {/* Upload zone */}
