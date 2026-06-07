@@ -19,8 +19,7 @@ const PLATFORM_CONFIG = {
     uploadDesc: "Drop any .mp4 or .mov TikTok video up to 100MB.",
     textGradient: "gradient-text-tiktok",
     btnGradient: "gradient-btn-tiktok",
-    // High-contrast TikTok badge: black bg, cyan border, red text
-    badgeClass: "bg-black border-[#25f4ee] text-[#fe2c55] font-bold tracking-widest",
+    badgeClass: "bg-[#fe2c55]/10 border-[#fe2c55]/40 text-[#fe2c55]",
     // Near-black page bg — the real TikTok aesthetic
     pageBg: "bg-[#010101]",
     // Glitch class on the accent headline word

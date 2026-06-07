@@ -67,14 +67,13 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  /* Solid TikTok red — matches TikTok's own CTA button colour */
   .gradient-btn-tiktok {
-    background: linear-gradient(135deg, #0d1117, #1a1a2e);
-    border: 1px solid #fe2c55;
+    background: #fe2c55;
     color: #ffffff;
   }
   .gradient-btn-tiktok:hover {
-    background: linear-gradient(135deg, #25f4ee22, #fe2c5522);
-    border-color: #25f4ee;
+    background: #ff4d6d;
   }
 
   /* TikTok-iconic split glitch shadow — offset red right, cyan left */

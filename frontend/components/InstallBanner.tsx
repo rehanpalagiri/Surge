@@ -8,7 +8,6 @@ export default function InstallBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Only show on mobile devices
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (!isMobile) return;
 
@@ -18,10 +17,8 @@ export default function InstallBanner() {
       (navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (isStandalone) return;
 
-    // Don't show if the user already dismissed it
     if (localStorage.getItem(DISMISSED_KEY)) return;
 
-    // Small delay so it doesn't flash immediately on load
     const t = setTimeout(() => setShow(true), 2000);
     return () => clearTimeout(t);
   }, []);
@@ -34,7 +31,7 @@ export default function InstallBanner() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 bg-card border border-purple-from/40 rounded-2xl p-4 shadow-2xl flex items-start gap-3 animate-fade-in">
+    <div className="fixed bottom-4 left-4 right-4 z-50 bg-card border border-purple-from/40 rounded-2xl p-4 shadow-2xl flex items-start gap-3">
       <div className="text-2xl flex-shrink-0 mt-0.5">📲</div>
       <div className="flex-1 min-w-0">
         <p className="text-text-primary text-sm font-semibold">
@@ -42,8 +39,8 @@ export default function InstallBanner() {
         </p>
         <p className="text-text-muted text-xs mt-0.5 leading-relaxed">
           Tap <span className="text-purple-to font-medium">Share</span> →{" "}
-          <span className="text-purple-to font-medium">Add to Home Screen</span> to
-          analyze videos directly from TikTok &amp; Instagram.
+          <span className="text-purple-to font-medium">Add to Home Screen</span> for
+          the best experience.
         </p>
       </div>
       <button
