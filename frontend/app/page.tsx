@@ -12,14 +12,22 @@ const PLATFORM_CONFIG = {
   tiktok: {
     icon: "🎵",
     label: "TikTok",
-    badge: "AI-Powered TikTok Scoring",
+    badge: "AI-Powered TikTok Analysis",
     headlinePre: "Will your TikTok",
     headlineAccent: "go viral?",
-    sub: "Upload your TikTok video and get an instant AI-powered performance prediction — hook strength, pacing, audio, captions, trend alignment, and more.",
+    sub: "Upload your TikTok and get an instant AI breakdown — hook strength, pacing, audio, captions, trend alignment, and a full improvement plan.",
     uploadDesc: "Drop any .mp4 or .mov TikTok video up to 100MB.",
     textGradient: "gradient-text-tiktok",
     btnGradient: "gradient-btn-tiktok",
-    badgeClass: "bg-[#25f4ee]/10 border-[#fe2c55]/30 text-[#fe2c55]",
+    // High-contrast TikTok badge: black bg, cyan border, red text
+    badgeClass: "bg-black border-[#25f4ee] text-[#fe2c55] font-bold tracking-widest",
+    // Near-black page bg — the real TikTok aesthetic
+    pageBg: "bg-[#010101]",
+    // Glitch class on the accent headline word
+    accentClass: "tiktok-glitch",
+    // Per-stat colours — alternating cyan / red / cyan
+    statColors: ["tiktok-cyan", "tiktok-red", "tiktok-cyan"],
+    uploadZoneExtra: "tiktok-glow",
   },
   instagram: {
     icon: "📸",
@@ -32,6 +40,10 @@ const PLATFORM_CONFIG = {
     textGradient: "gradient-text-instagram",
     btnGradient: "gradient-btn-instagram",
     badgeClass: "bg-[#fd1d1d]/10 border-[#fcaf45]/30 text-[#fcaf45]",
+    pageBg: "bg-background",
+    accentClass: "gradient-text-instagram",
+    statColors: ["gradient-text-instagram", "gradient-text-instagram", "gradient-text-instagram"],
+    uploadZoneExtra: "",
   },
 };
 
@@ -128,8 +140,14 @@ export default function Home() {
 
   const cfg = PLATFORM_CONFIG[platform];
 
+  const stats = [
+    { value: "6", label: "Score metrics" },
+    { value: "AI", label: "Gemini powered" },
+    { value: "30s", label: "Analysis time" },
+  ];
+
   return (
-    <main className="min-h-screen flex flex-col">
+    <main className={`min-h-screen flex flex-col transition-colors duration-300 ${cfg.pageBg}`}>
       <Nav />
 
       {/* Platform Switcher */}
@@ -157,13 +175,13 @@ export default function Home() {
         <div className="max-w-3xl mx-auto space-y-8">
           <div className="space-y-4">
             <div
-              className={`inline-block border text-xs font-semibold px-3 py-1 rounded-full mb-2 uppercase tracking-wide ${cfg.badgeClass}`}
+              className={`inline-block border text-xs font-semibold px-3 py-1 rounded-full mb-2 uppercase tracking-widest ${cfg.badgeClass}`}
             >
               {cfg.badge}
             </div>
             <h1 className="text-5xl md:text-7xl font-extrabold leading-tight">
               {cfg.headlinePre}{" "}
-              <span className={cfg.textGradient}>{cfg.headlineAccent}</span>
+              <span className={cfg.accentClass}>{cfg.headlineAccent}</span>
             </h1>
             <p className="text-text-muted text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
               {cfg.sub}
@@ -172,20 +190,16 @@ export default function Home() {
 
           {/* Stats row */}
           <div className="flex justify-center gap-8 text-center">
-            {[
-              { value: "6", label: "Score metrics" },
-              { value: "AI", label: "Gemini powered" },
-              { value: "30s", label: "Analysis time" },
-            ].map((s) => (
+            {stats.map((s, i) => (
               <div key={s.label}>
-                <div className={`text-2xl font-bold ${cfg.textGradient}`}>{s.value}</div>
+                <div className={`text-2xl font-bold ${cfg.statColors[i]}`}>{s.value}</div>
                 <div className="text-text-muted text-xs mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
 
           {/* Upload zone */}
-          <div className="w-full">
+          <div className={`w-full rounded-2xl ${cfg.uploadZoneExtra}`}>
             <UploadZone platform={platform} />
           </div>
 
@@ -203,30 +217,16 @@ export default function Home() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              {
-                icon: "📤",
-                title: "Upload your video",
-                desc: cfg.uploadDesc,
-              },
-              {
-                icon: "🤖",
-                title: "AI analyzes it",
-                desc: "Google Gemini 2.5 Flash reviews hook, pacing, audio, captions, and trend alignment.",
-              },
-              {
-                icon: "📈",
-                title: "Get your score",
-                desc: "Receive a full performance breakdown with specific, actionable improvements.",
-              },
+              { icon: "📤", title: "Upload your video", desc: cfg.uploadDesc },
+              { icon: "🤖", title: "AI analyzes it",   desc: "Google Gemini 2.5 Flash reviews hook, pacing, audio, captions, and trend alignment." },
+              { icon: "📈", title: "Get your score",   desc: "Receive a full performance breakdown with specific, actionable improvements." },
             ].map((step) => (
               <div
                 key={step.title}
                 className="bg-card border border-border rounded-2xl p-6 text-center"
               >
                 <div className="text-4xl mb-3">{step.icon}</div>
-                <h3 className="font-semibold text-text-primary mb-1">
-                  {step.title}
-                </h3>
+                <h3 className="font-semibold text-text-primary mb-1">{step.title}</h3>
                 <p className="text-text-muted text-sm">{step.desc}</p>
               </div>
             ))}

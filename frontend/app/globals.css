@@ -2,15 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Design tokens (dark mode default) ───────────────────────────────────── */
+:root {
+  --color-background: #0a0a0f;
+  --color-surface:    #13131a;
+  --color-card:       #1c1c28;
+  --color-border:     #2a2a3d;
+  --color-text-primary: #f1f0ff;
+  --color-text-muted:   #8b8aa8;
+  --color-purple-from:  #7c3aed;
+  --color-purple-to:    #a855f7;
+  --color-blue-from:    #2563eb;
+  --color-blue-to:      #3b82f6;
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-danger:  #ef4444;
+}
+
+/* ─── Light mode overrides ─────────────────────────────────────────────────── */
+html.light {
+  --color-background:   #f4f4ff;
+  --color-surface:      #ffffff;
+  --color-card:         #ededf8;
+  --color-border:       #d8d8ee;
+  --color-text-primary: #0c0c1e;
+  --color-text-muted:   #5a5a80;
+  --color-purple-from:  #7c3aed;
+  --color-purple-to:    #a855f7;
+  --color-blue-from:    #2563eb;
+  --color-blue-to:      #3b82f6;
+  --color-success: #16a34a;
+  --color-warning: #ca8a04;
+  --color-danger:  #dc2626;
+}
+
 body {
-  background-color: #0a0a0f;
-  color: #f1f0ff;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* ── Default Surge gradient (purple → blue) ── */
   .gradient-text {
     background: linear-gradient(135deg, #a855f7, #3b82f6);
     -webkit-background-clip: text;
@@ -24,7 +60,7 @@ body {
     background: linear-gradient(135deg, #a855f7, #3b82f6);
   }
 
-  /* TikTok duo-tone: cyan -> pink/red */
+  /* ── TikTok duo-tone: cyan → pink/red ── */
   .gradient-text-tiktok {
     background: linear-gradient(135deg, #25f4ee, #fe2c55);
     -webkit-background-clip: text;
@@ -32,13 +68,33 @@ body {
     background-clip: text;
   }
   .gradient-btn-tiktok {
-    background: linear-gradient(135deg, #25f4ee, #fe2c55);
+    background: linear-gradient(135deg, #0d1117, #1a1a2e);
+    border: 1px solid #fe2c55;
+    color: #ffffff;
   }
   .gradient-btn-tiktok:hover {
-    background: linear-gradient(135deg, #6ff8f4, #fe6286);
+    background: linear-gradient(135deg, #25f4ee22, #fe2c5522);
+    border-color: #25f4ee;
   }
 
-  /* Instagram gradient: purple -> pink -> orange */
+  /* TikTok-iconic split glitch shadow — offset red right, cyan left */
+  .tiktok-glitch {
+    color: #ffffff;
+    text-shadow:
+       3px  2px 0 #fe2c55,
+      -3px -2px 0 #25f4ee;
+  }
+
+  /* Solid TikTok accent colours for individual elements */
+  .tiktok-cyan  { color: #25f4ee; }
+  .tiktok-red   { color: #fe2c55; }
+
+  /* TikTok upload-zone glow */
+  .tiktok-glow {
+    box-shadow: 0 0 0 1px #fe2c5540, 0 0 18px 2px #25f4ee18;
+  }
+
+  /* ── Instagram gradient: purple → pink → orange ── */
   .gradient-text-instagram {
     background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcaf45);
     -webkit-background-clip: text;

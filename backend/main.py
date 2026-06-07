@@ -13,6 +13,7 @@ from routers.admin import router as admin_router
 from routers.analyze import router as analyze_router
 from routers.auth import router as auth_router
 from routers.profile import router as profile_router
+from routers.settings import router as settings_router
 
 
 async def _ensure_columns(conn):
@@ -76,6 +77,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(analyze_router)
 app.include_router(profile_router)
+app.include_router(settings_router)
 
 
 @app.get("/health")

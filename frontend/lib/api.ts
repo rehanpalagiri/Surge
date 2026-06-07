@@ -248,6 +248,30 @@ export async function submitFeedback(
   return handleResponse<AnalysisOut>(res);
 }
 
+export async function changeUsername(
+  newUsername: string,
+  currentPassword: string
+): Promise<{ username: string }> {
+  const res = await fetch(`${BASE}/api/me/username`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ new_username: newUsername, current_password: currentPassword }),
+  });
+  return handleResponse<{ username: string }>(res);
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/me/password`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  return handleResponse<{ ok: boolean }>(res);
+}
+
 export async function getAdminSeeds(password: string): Promise<SeedVideoOut[]> {
   const res = await fetch(`${BASE}/api/admin/seeds`, {
     headers: { "X-Admin-Password": password },

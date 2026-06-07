@@ -1,0 +1,63 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from database import get_db
+from models import User
+from auth import require_user, hash_password, verify_password
+
+router = APIRouter(prefix="/api/me", tags=["settings"])
+
+
+class ChangeUsernameIn(BaseModel):
+    new_username: str
+    current_password: str
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.patch("/username")
+async def change_username(
+    body: ChangeUsernameIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    new = body.new_username.strip()
+    if not new or len(new) < 2:
+        raise HTTPException(status_code=400, detail="Username must be at least 2 characters.")
+    if len(new) > 40:
+        raise HTTPException(status_code=400, detail="Username must be 40 characters or fewer.")
+
+    # Verify current password before allowing the change
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect current password.")
+
+    # Check uniqueness
+    result = await db.execute(select(User).where(User.username == new))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="That username is already taken.")
+
+    user.username = new
+    await db.commit()
+    return {"username": new}
+
+
+@router.patch("/password")
+async def change_password(
+    body: ChangePasswordIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect current password.")
+
+    user.password_hash = hash_password(body.new_password)
+    await db.commit()
+    return {"ok": True}
