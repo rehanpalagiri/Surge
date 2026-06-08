@@ -216,7 +216,7 @@ async def _fetch_instagram(url: str) -> dict:
         raise ValueError("RAPIDAPI_KEY is not configured. Add it to your environment variables.")
 
     ig_host = os.getenv("RAPIDAPI_IG_HOST", "instagram-reels-downloader-api.p.rapidapi.com")
-    ig_path = os.getenv("RAPIDAPI_IG_PATH", "/downloadReel")
+    ig_path = os.getenv("RAPIDAPI_IG_PATH", "/download")
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.get(
