@@ -97,6 +97,7 @@ export interface ImprovementItem {
 export interface SeedVideoOut {
   id: number;
   filename: string;
+  platform: string;
   niche: string;
   view_count: number;
   like_count: number;
@@ -333,11 +334,13 @@ export interface FetchStatus {
 export async function seedFromUrl(
   url: string,
   niche: string,
+  platform: string,
   password: string
 ): Promise<SeedVideoOut> {
   const form = new FormData();
   form.append("url", url);
   form.append("niche", niche);
+  form.append("platform", platform);
   const res = await fetch(`${BASE}/api/admin/seed/from-url`, {
     method: "POST",
     headers: { "X-Admin-Password": password },

@@ -114,6 +114,30 @@ def _build_system_prompt(
     top_str = "\n".join(fmt(s) for s in top) or "  (no data yet)"
     bottom_str = "\n".join(fmt(s) for s in bottom) or "  (no data yet)"
 
+    # Compute real benchmark stats from the seed pool for this platform+niche
+    if top:
+        avg_top_views = int(sum(s.view_count for s in top) / len(top))
+        avg_top_likes = int(sum(s.like_count for s in top) / len(top))
+        max_top_views = max(s.view_count for s in top)
+    else:
+        avg_top_views = avg_top_likes = max_top_views = 0
+    if bottom:
+        avg_bottom_views = int(sum(s.view_count for s in bottom) / len(bottom))
+        avg_bottom_likes = int(sum(s.like_count for s in bottom) / len(bottom))
+    else:
+        avg_bottom_views = avg_bottom_likes = 0
+
+    if avg_top_views > 0:
+        benchmark_block = (
+            f"\nREAL BENCHMARK DATA ({pname}, {niche if use_niche else 'all niches'}):\n"
+            f"  Top performers avg: {avg_top_views:,} views / {avg_top_likes:,} likes "
+            f"(peak: {max_top_views:,} views)\n"
+            f"  Bottom performers avg: {avg_bottom_views:,} views / {avg_bottom_likes:,} likes\n"
+            f"Use THESE real numbers to anchor predicted_views — not a generic table."
+        )
+    else:
+        benchmark_block = ""
+
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
 
@@ -144,6 +168,7 @@ def _build_system_prompt(
     past_block = _build_past_analyses_block(past_analyses)
 
     return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh.
+{benchmark_block}
 
 SCORING RULES (0–10) — read carefully before scoring anything:
 - 0–2: Failing. Fundamental problems. Hook doesn't work, content is unwatchable or painfully generic.
@@ -189,7 +214,7 @@ ANALYSIS INSTRUCTIONS:
 - For "caption_rewrite": rewrite their actual caption to maximize {pname} performance. If they gave no caption, write one from scratch that fits the video.
 - For "hook_rewrite": rewrite the exact first spoken line or on-screen text to stop the scroll.
 - "projected_verdict" and "projected_views" should be your honest estimate IF the creator applies every fix — don't be overly optimistic.
-- For predicted_views: most creator videos get under 5k views. Only predict more if the content is genuinely strong. Err on the side of lower predictions — a creator who gets more than predicted feels good; one who gets less feels misled.
+- For predicted_views: anchor to the REAL BENCHMARK DATA injected above. Most videos land far closer to the bottom-performer average than the top. Err low — a creator who beats the prediction feels great; one who falls short feels misled.
 
 Return ONLY valid JSON with exactly this structure:
 {{
@@ -199,7 +224,7 @@ Return ONLY valid JSON with exactly this structure:
   "audio_score": <0-10>,
   "caption_score": <0-10>,
   "trend_alignment": <0-10>,
-  "predicted_views": "<conservative view range — use the calibration table: score 0-3='under 500 views', score 4='500-2k views', score 5='1k-5k views', score 6='5k-30k views', score 7='30k-150k views', score 8='150k-500k views', score 9='500k+ views'. When in doubt predict LESS, not more.>",
+  "predicted_views": "<view range derived from the REAL BENCHMARK DATA above. Where does this video sit relative to the top and bottom performers in the seed database? A video near bottom-performer quality predicts near that avg. A genuinely strong video predicts closer to top-performer avg. Never exceed the max_top_views unless the content is clearly exceptional. When in doubt, predict LESS.>",
   "strengths": ["<specific genuine strength 1>", "<specific genuine strength 2>"],
   "improvements": ["<blunt specific improvement 1>", "<blunt specific improvement 2>", "<blunt specific improvement 3>"],
   "verdict": "<exactly one of: High potential | Average potential | Needs work>",
@@ -217,7 +242,7 @@ Return ONLY valid JSON with exactly this structure:
   "caption_rewrite": "<rewritten caption optimized for {pname}>",
   "hook_rewrite": "<specific rewrite of the first 1-2 seconds>",
   "projected_verdict": "<honest verdict if they apply the full plan>",
-  "projected_views": "<realistic projected range after fixes — use the same calibration table as predicted_views. Only go high if the fixes would genuinely move the score to 7+. Most creators max out at 6–7 even after improvements.>"
+  "projected_views": "<realistic projected range after fixes — use the same REAL BENCHMARK DATA as predicted_views. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer avg even after improvements.>"
 }}"""
 
 

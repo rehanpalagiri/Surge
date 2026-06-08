@@ -48,7 +48,9 @@ async def analyze(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    seeds_result = await db.execute(select(SeedVideo))
+    seeds_result = await db.execute(
+        select(SeedVideo).where(SeedVideo.platform == platform)
+    )
     seeds = seeds_result.scalars().all()
 
     # Fetch the user's last 3 analyses on this platform for historical context.

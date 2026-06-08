@@ -28,6 +28,7 @@ def check_admin(x_admin_password: Optional[str] = Header(None)):
 @router.post("/seed", response_model=SeedVideoOut)
 async def add_seed_video(
     file: UploadFile = File(...),
+    platform: str = Form("tiktok"),
     niche: str = Form(...),
     view_count: int = Form(...),
     like_count: int = Form(...),
@@ -54,8 +55,10 @@ async def add_seed_video(
         except ValueError:
             pass  # ignore bad date — field is optional
 
+    platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
     seed = SeedVideo(
         filename=safe_name,
+        platform=platform,
         niche=niche,
         view_count=view_count,
         like_count=like_count,
@@ -131,6 +134,7 @@ async def _record_status(db: AsyncSession, ok: bool, message: str, url: str):
 async def seed_from_url(
     url: str = Form(...),
     niche: str = Form(...),
+    platform: str = Form("tiktok"),
     db: AsyncSession = Depends(get_db),
     _: None = Depends(check_admin),
 ):
@@ -178,8 +182,10 @@ async def seed_from_url(
         except ValueError:
             pass
 
+    platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
     seed = SeedVideo(
         filename=os.path.basename(filepath) if filepath else f"{prefix}.mp4",
+        platform=platform,
         niche=niche,
         view_count=view_count,
         like_count=like_count,

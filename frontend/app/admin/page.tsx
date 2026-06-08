@@ -32,6 +32,7 @@ export default function AdminPage() {
 
   // Form state
   const [file, setFile] = useState<File | null>(null);
+  const [platform, setPlatform] = useState("tiktok");
   const [niche, setNiche] = useState("Fitness");
   const [viewCount, setViewCount] = useState("");
   const [likeCount, setLikeCount] = useState("");
@@ -42,6 +43,7 @@ export default function AdminPage() {
 
   // URL fetch state
   const [fetchUrl, setFetchUrl] = useState("");
+  const [fetchPlatform, setFetchPlatform] = useState("tiktok");
   const [fetchNiche, setFetchNiche] = useState("Fitness");
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState("");
@@ -99,7 +101,7 @@ export default function AdminPage() {
     setFetching(true);
     setFetchError("");
     try {
-      await seedFromUrl(fetchUrl.trim(), fetchNiche, password);
+      await seedFromUrl(fetchUrl.trim(), fetchNiche, fetchPlatform, password);
       setFetchUrl("");
       await loadSeeds(password);
       await refreshFetchStatus(password);
@@ -128,6 +130,7 @@ export default function AdminPage() {
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("platform", platform);
       form.append("niche", niche);
       form.append("view_count", viewCount);
       form.append("like_count", likeCount);
@@ -265,6 +268,17 @@ export default function AdminPage() {
               />
             </div>
             <div>
+              <label className="block text-sm text-text-muted mb-1">Platform</label>
+              <select
+                value={fetchPlatform}
+                onChange={(e) => setFetchPlatform(e.target.value)}
+                className="w-full md:w-auto bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
+              >
+                <option value="tiktok" className="bg-card">TikTok</option>
+                <option value="instagram" className="bg-card">Instagram</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm text-text-muted mb-1">Niche</label>
               <select
                 value={fetchNiche}
@@ -307,6 +321,19 @@ export default function AdminPage() {
                   className="w-full text-text-muted text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-surface file:text-text-primary file:cursor-pointer"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-text-muted mb-1">
+                  Platform
+                </label>
+                <select
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
+                >
+                  <option value="tiktok" className="bg-card">TikTok</option>
+                  <option value="instagram" className="bg-card">Instagram</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm text-text-muted mb-1">
@@ -437,6 +464,7 @@ export default function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-text-muted border-b border-border">
+                    <th className="text-left py-2 pr-4">Platform</th>
                     <th className="text-left py-2 pr-4">Niche</th>
                     <th className="text-right py-2 pr-4">Views</th>
                     <th className="text-right py-2 pr-4">Likes</th>
@@ -452,6 +480,11 @@ export default function AdminPage() {
                       key={seed.id}
                       className="border-b border-border/50 hover:bg-surface/50 transition-colors"
                     >
+                      <td className="py-2.5 pr-4">
+                        <span className="text-text-muted text-xs font-medium bg-surface border border-border px-2 py-0.5 rounded-full capitalize">
+                          {seed.platform}
+                        </span>
+                      </td>
                       <td className="py-2.5 pr-4 text-text-primary font-medium">
                         {seed.niche}
                       </td>

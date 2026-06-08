@@ -19,12 +19,13 @@ class SeedVideo(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String, nullable=False)
+    platform = Column(String, nullable=False, default="tiktok")  # "tiktok" | "instagram"
     niche = Column(String, nullable=False)
     view_count = Column(Integer, nullable=False)
     like_count = Column(Integer, nullable=False)
     performed = Column(Boolean, nullable=False)
     notes = Column(Text, nullable=True)
-    posted_at = Column(DateTime, nullable=True)   # when the TikTok was originally posted
+    posted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

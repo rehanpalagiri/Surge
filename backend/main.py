@@ -39,6 +39,10 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE seed_videos ADD COLUMN posted_at DATETIME"
         )
+    if "platform" not in seed_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE seed_videos ADD COLUMN platform TEXT DEFAULT 'tiktok'"
+        )
 
     # --- user_analyses: platform column (default tiktok for existing rows) ---
     if "platform" not in existing:

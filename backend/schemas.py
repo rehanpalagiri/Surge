@@ -28,6 +28,7 @@ class UserProfileOut(BaseModel):
 
 
 class SeedVideoCreate(BaseModel):
+    platform: str = "tiktok"
     niche: str
     view_count: int
     like_count: int
@@ -38,6 +39,7 @@ class SeedVideoCreate(BaseModel):
 class SeedVideoOut(BaseModel):
     id: int
     filename: str
+    platform: str
     niche: str
     view_count: int
     like_count: int
