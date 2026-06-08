@@ -52,120 +52,146 @@ _PLATFORM_CONTEXT = {
 }
 
 
-def _build_past_analyses_block(past_analyses: list) -> str:
-    if not past_analyses:
-        return ""
-    lines = []
-    for i, a in enumerate(past_analyses, 1):
-        try:
-            scores = json.loads(a.scores_json) if isinstance(a.scores_json, str) else (a.scores_json or {})
-        except Exception:
-            scores = {}
-        line = (
-            f"  #{i}: niche={a.niche}"
-            f" | overall={scores.get('overall_score', '?')}/10"
-            f" | predicted={scores.get('predicted_views', '?')}"
-        )
-        if a.actual_views is not None:
-            line += f" | actual views={a.actual_views:,}"
-        if a.actual_likes is not None:
-            line += f" | actual likes={a.actual_likes:,}"
-        lines.append(line)
-    return "\n\nCREATOR'S LAST {} UPLOAD(S) ON THIS PLATFORM (most recent first):\n{}".format(
-        len(lines), "\n".join(lines)
-    )
+# Mode-specific guidance for the predicted_views field. {pname} is filled at build time.
+_PREDICTED_VIEWS_GUIDANCE = {
+    "quick": (
+        "For predicted_views: you have NO reference library for this run — rely on your "
+        "general training knowledge of {pname}. Most videos from creators who haven't "
+        "broken through land under 5,000 views. Give a realistic range and err LOW."
+    ),
+    "thinking": (
+        "For predicted_views: anchor to the GLOBAL PERFORMANCE REFERENCE and REAL BENCHMARK "
+        "DATA above. Most videos land far closer to the low-performer range than the high. "
+        "Never exceed the high-performer peak unless the video is clearly exceptional. Err LOW."
+    ),
+    "deep_thinking": (
+        "For predicted_views: anchor primarily to this creator's VERIFIED history above, and "
+        "also use the global benchmark data when shown. If their typical video gets ~800 views, "
+        "require clear breakout signals in THIS video to predict meaningfully higher. Err LOW."
+    ),
+}
+
+
+def _seed_summary(s) -> str:
+    """Pull the AI-written seed_summary out of a seed's stored gemini_analysis JSON.
+    Never raises — returns '' if the field is missing or the JSON is malformed."""
+    try:
+        data = json.loads(s.gemini_analysis) if s.gemini_analysis else {}
+        if isinstance(data, dict):
+            return (data.get("seed_summary") or "").strip()
+    except (ValueError, TypeError):
+        pass
+    return ""
+
+
+def select_seed_examples(pool_for_platform: list, niche: str):
+    """Bucket seeds into HIGH (rating >= 6) and LOW (rating <= 4) performers using the
+    Gemini virality rating. Disjoint thresholds make overlap impossible; rating == 5 or
+    None is dormant (never injected — we don't seed average videos). Recency is only an
+    intra-rating tiebreaker, so it can never move a video between buckets.
+
+    Prefers same-niche seeds, falling back to the full platform pool when the niche
+    isn't seeded enough yet. Returns (high[:10], low[:10]).
+    """
+    niche_seeds = [s for s in pool_for_platform if s.niche == niche]
+    pool = niche_seeds if len(niche_seeds) >= 6 else pool_for_platform
+    high = [s for s in pool if s.rating is not None and s.rating >= 6]
+    low = [s for s in pool if s.rating is not None and s.rating <= 4]
+    high.sort(key=lambda s: (s.rating, s.view_count * _recency_multiplier(s)), reverse=True)
+    low.sort(key=lambda s: (s.rating, s.view_count * _recency_multiplier(s)))
+    return high[:10], low[:10]
 
 
 def _build_system_prompt(
     niche: str,
-    seed_examples: list,
+    high_seeds: list,
+    low_seeds: list,
     caption: str = "",
     bio: str = "",
     platform: str = "tiktok",
     profile_context: str = "",
-    past_analyses: list = [],
+    channel_profile: str | None = None,
+    mode: str = "quick",
 ) -> str:
-    # Prefer examples from the same niche; fall back to the global pool when the
-    # niche isn't seeded enough yet (so the prompt is never empty or too sparse).
-    niche_seeds = [s for s in seed_examples if s.niche == niche]
-    use_niche = len(niche_seeds) >= 6
-    pool = niche_seeds if use_niche else seed_examples
-
-    # Sort by recency-weighted view count so that newer TikToks surface first.
-    # Formula: view_count × recency_multiplier — recent videos with average views
-    # rank above old videos with high views, reflecting current trend signals.
-    sorted_pool = sorted(
-        pool,
-        key=lambda s: s.view_count * _recency_multiplier(s),
-        reverse=True,
-    )
-    top = sorted_pool[:10]
-    bottom = [s for s in reversed(sorted_pool) if s not in top][:10]
-
-    def fmt(s):
-        notes = f" | Notes: {s.notes}" if s.notes else ""
-        ref = s.posted_at or s.created_at
-        date_str = f" | Posted: {ref.strftime('%b %Y')}" if ref else ""
-        return (
-            f"  - Niche: {s.niche} | Views: {s.view_count:,}"
-            f" | Likes: {s.like_count:,}{date_str}{notes}"
-        )
-
-    top_str = "\n".join(fmt(s) for s in top) or "  (no data yet)"
-    bottom_str = "\n".join(fmt(s) for s in bottom) or "  (no data yet)"
-
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
+    show_seeds = mode in ("thinking", "deep_thinking")
+    show_personal = mode in ("thinking", "deep_thinking")  # bio + saved profile context
 
-    # Compute real benchmark stats from the seed pool for this platform+niche
-    if top:
-        avg_top_views = int(sum(s.view_count for s in top) / len(top))
-        avg_top_likes = int(sum(s.like_count for s in top) / len(top))
-        max_top_views = max(s.view_count for s in top)
-    else:
-        avg_top_views = avg_top_likes = max_top_views = 0
-    if bottom:
-        avg_bottom_views = int(sum(s.view_count for s in bottom) / len(bottom))
-        avg_bottom_likes = int(sum(s.like_count for s in bottom) / len(bottom))
-    else:
-        avg_bottom_views = avg_bottom_likes = 0
+    high_seeds = high_seeds or []
+    low_seeds = low_seeds or []
 
-    if avg_top_views > 0:
+    # --- Global seed reference + numeric benchmark (Thinking / Deep, when present) ---
+    seed_block = ""
+    benchmark_block = ""
+    if show_seeds and (high_seeds or low_seeds):
+        def fmt_seed(s, label):
+            summary = _seed_summary(s) or "(no summary available)"
+            return (
+                f"[{label} | {s.niche} | {s.view_count:,} views | "
+                f"{s.like_count:,} likes | Rating {s.rating}/10]\n{summary}"
+            )
+
+        sections = [
+            f"GLOBAL PERFORMANCE REFERENCE ({pname} — real videos with verified results).",
+            "When you spot a pattern in the user's video, ask: does it match the HIGH or LOW "
+            "performers below? Name that connection explicitly in analysis_summary. Reward "
+            "HIGH-PERFORMER patterns, penalize LOW-PERFORMER ones. If it matches neither, say so.",
+        ]
+        if high_seeds:
+            sections.append(
+                "\n── HIGH PERFORMERS — what made these succeed ──\n"
+                + "\n\n".join(fmt_seed(s, "HIGH PERFORMER") for s in high_seeds)
+            )
+        if low_seeds:
+            sections.append(
+                "\n── LOW PERFORMERS — what caused these to fail ──\n"
+                + "\n\n".join(fmt_seed(s, "LOW PERFORMER") for s in low_seeds)
+            )
+        seed_block = "\n".join(sections)
+
+        bm = []
+        if high_seeds:
+            hv = [s.view_count for s in high_seeds]
+            hl = [s.like_count for s in high_seeds]
+            bm.append(
+                f"  High performers: avg {sum(hv) // len(hv):,} views / "
+                f"{sum(hl) // len(hl):,} likes (peak {max(hv):,} views)"
+            )
+        if low_seeds:
+            lv = [s.view_count for s in low_seeds]
+            ll = [s.like_count for s in low_seeds]
+            bm.append(
+                f"  Low performers: avg {sum(lv) // len(lv):,} views / {sum(ll) // len(ll):,} likes"
+            )
         benchmark_block = (
-            f"\nREAL BENCHMARK DATA ({pname}, {niche if use_niche else 'all niches'}):\n"
-            f"  Top performers avg: {avg_top_views:,} views / {avg_top_likes:,} likes "
-            f"(peak: {max_top_views:,} views)\n"
-            f"  Bottom performers avg: {avg_bottom_views:,} views / {avg_bottom_likes:,} likes\n"
-            f"Use THESE real numbers to anchor predicted_views — not a generic table."
+            f"\nREAL BENCHMARK DATA ({pname}):\n"
+            + "\n".join(bm)
+            + "\nUse THESE real numbers to anchor predicted_views — not a generic table."
         )
-    else:
-        benchmark_block = ""
 
-    # Label by niche only when we're actually using same-niche examples.
-    if use_niche:
-        top_heading = f"TOP PERFORMING {niche.upper()} {pname.upper()} VIDEOS"
-        bottom_heading = f"WORST PERFORMING {niche.upper()} {pname.upper()} VIDEOS"
-    else:
-        top_heading = f"TOP PERFORMING {pname.upper()} VIDEOS FROM OUR DATABASE"
-        bottom_heading = f"WORST PERFORMING {pname.upper()} VIDEOS FROM OUR DATABASE"
+    # --- Creator channel profile (Deep only) ---
+    profile_perf_block = ""
+    if mode == "deep_thinking" and channel_profile:
+        profile_perf_block = "\n" + channel_profile.strip() + "\n"
 
+    # --- Per-upload video details ---
     caption_block = (
         f'\nThe creator\'s CAPTION for this video is:\n"""\n{caption.strip()}\n"""'
         if caption and caption.strip()
         else "\nThe creator did not provide a caption — factor that into the caption_score."
     )
-    bio_block = (
-        f'\nThe creator\'s PROFILE BIO is:\n"""\n{bio.strip()}\n"""'
-        if bio and bio.strip()
-        else f"\nThe creator did not provide a profile bio."
-    )
-    profile_block = (
-        f"\n\nCREATOR PROFILE CONTEXT:\n{profile_context.strip()}"
-        if profile_context and profile_context.strip()
-        else ""
-    )
+    bio_block = ""
+    profile_block = ""
+    if show_personal:
+        if bio and bio.strip():
+            bio_block = f'\nThe creator\'s PROFILE BIO is:\n"""\n{bio.strip()}\n"""'
+        if profile_context and profile_context.strip():
+            profile_block = f"\n\nCREATOR PROFILE CONTEXT:\n{profile_context.strip()}"
 
-    past_block = _build_past_analyses_block(past_analyses)
+    predicted_guidance = _PREDICTED_VIEWS_GUIDANCE.get(
+        mode, _PREDICTED_VIEWS_GUIDANCE["quick"]
+    ).format(pname=pname)
 
     return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh.
 {benchmark_block}
@@ -185,18 +211,11 @@ CALIBRATION (internalize this before scoring):
 - A creator who posts regularly but hasn't broken through = 4–5.
 - A video that gets 50k–200k views organically = 6–7.
 - A video that blows up (500k+) = 8–9.
-- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't.{past_block}
-
-{top_heading}:
-{top_str}
-
-{bottom_heading}:
-{bottom_str}
+- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't.
+{profile_perf_block}{seed_block}
 
 The user's video is a **{pname} video** in the **{niche}** niche.
-{caption_block}
-{bio_block}
-{profile_block}
+{caption_block}{bio_block}{profile_block}
 
 PLATFORM CONTEXT ({pname}):
 Distribution surface: {ctx["algorithm"]}. Key signals: {ctx["signals"]}.
@@ -214,7 +233,7 @@ ANALYSIS INSTRUCTIONS:
 - For "caption_rewrite": rewrite their actual caption to maximize {pname} performance. If they gave no caption, write one from scratch that fits the video.
 - For "hook_rewrite": rewrite the exact first spoken line or on-screen text to stop the scroll.
 - "projected_verdict" and "projected_views" should be your honest estimate IF the creator applies every fix — don't be overly optimistic.
-- For predicted_views: anchor to the REAL BENCHMARK DATA injected above. Most videos land far closer to the bottom-performer average than the top. Err low — a creator who beats the prediction feels great; one who falls short feels misled.
+- {predicted_guidance}
 
 Return ONLY valid JSON with exactly this structure:
 {{
@@ -224,7 +243,7 @@ Return ONLY valid JSON with exactly this structure:
   "audio_score": <0-10>,
   "caption_score": <0-10>,
   "trend_alignment": <0-10>,
-  "predicted_views": "<view range derived from the REAL BENCHMARK DATA above. Where does this video sit relative to the top and bottom performers in the seed database? A video near bottom-performer quality predicts near that avg. A genuinely strong video predicts closer to top-performer avg. Never exceed the max_top_views unless the content is clearly exceptional. When in doubt, predict LESS.>",
+  "predicted_views": "<realistic view range. {predicted_guidance} When in doubt, predict LESS.>",
   "strengths": ["<specific genuine strength 1>", "<specific genuine strength 2>"],
   "improvements": ["<blunt specific improvement 1>", "<blunt specific improvement 2>", "<blunt specific improvement 3>"],
   "verdict": "<exactly one of: High potential | Average potential | Needs work>",
@@ -242,22 +261,34 @@ Return ONLY valid JSON with exactly this structure:
   "caption_rewrite": "<rewritten caption optimized for {pname}>",
   "hook_rewrite": "<specific rewrite of the first 1-2 seconds>",
   "projected_verdict": "<honest verdict if they apply the full plan>",
-  "projected_views": "<realistic projected range after fixes — use the same REAL BENCHMARK DATA as predicted_views. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer avg even after improvements.>"
+  "projected_views": "<realistic projected range after fixes. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer numbers even after improvements.>"
 }}"""
 
 
 async def analyze_video(
     video_path: str,
     niche: str,
-    seed_examples: list,
+    high_seeds: list,
+    low_seeds: list,
     caption: str = "",
     bio: str = "",
     platform: str = "tiktok",
     profile_context: str = "",
-    past_analyses: list = [],
+    channel_profile: str | None = None,
+    mode: str = "quick",
 ) -> dict:
     try:
-        prompt = _build_system_prompt(niche, seed_examples, caption, bio, platform, profile_context, past_analyses)
+        prompt = _build_system_prompt(
+            niche,
+            high_seeds,
+            low_seeds,
+            caption,
+            bio,
+            platform,
+            profile_context,
+            channel_profile,
+            mode,
+        )
 
         uploaded = await client.aio.files.upload(file=video_path)
 

@@ -58,6 +58,7 @@ export interface AnalysisOut {
   verdict: string;
   actual_views: number | null;
   actual_likes: number | null;
+  mode?: string;
   created_at: string;
 }
 
@@ -71,6 +72,7 @@ export interface AnalysisSummary {
   caption_preview: string | null;
   actual_views: number | null;
   actual_likes: number | null;
+  mode?: string;
   created_at: string;
 }
 
@@ -101,8 +103,10 @@ export interface SeedVideoOut {
   niche: string;
   view_count: number;
   like_count: number;
-  performed: boolean;
+  rating: number | null;
+  gemini_analysis: string | null; // raw JSON; parse for seed_summary
   notes: string | null;
+  posted_at?: string | null;
   created_at: string;
 }
 
@@ -143,7 +147,8 @@ export async function analyzeVideo(
   niche: string,
   caption: string = "",
   bio: string = "",
-  platform: string = "tiktok"
+  platform: string = "tiktok",
+  mode: string = "quick"
 ): Promise<{ id: number }> {
   const form = new FormData();
   form.append("file", file);
@@ -151,6 +156,7 @@ export async function analyzeVideo(
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
+  form.append("mode", mode);
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",
     headers: authHeaders(),

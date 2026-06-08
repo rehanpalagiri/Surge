@@ -23,7 +23,17 @@ class SeedVideo(Base):
     niche = Column(String, nullable=False)
     view_count = Column(Integer, nullable=False)
     like_count = Column(Integer, nullable=False)
-    performed = Column(Boolean, nullable=False)
+    # Virality rating (0–10) extracted from the Gemini seed analysis. Nullable so
+    # pre-1.13 seeds (no rating) are simply ignored by the bucketer until reseeded.
+    rating = Column(Integer, nullable=True)
+    # Full JSON from the seed-analysis prompt — the durable artifact (the video
+    # file itself is deleted after analysis). Read back into the scoring prompt.
+    gemini_analysis = Column(Text, nullable=True)
+    # DEPRECATED (v1.13): no longer used. Kept as a column with default=False so
+    # SQLAlchemy always supplies a value on INSERT — this satisfies the existing
+    # NOT NULL constraint on the production Postgres table without a manual
+    # `ALTER COLUMN ... DROP NOT NULL` migration. Do not read this field.
+    performed = Column(Boolean, nullable=True, default=False)
     notes = Column(Text, nullable=True)
     posted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -60,6 +70,10 @@ class UserAnalysis(Base):
     verdict = Column(String, nullable=False)
     actual_views = Column(Integer, nullable=True)
     actual_likes = Column(Integer, nullable=True)
+    # The EFFECTIVE mode that actually ran ("quick" | "thinking" | "deep_thinking").
+    # May differ from what the user requested if the run degraded (e.g. Deep with
+    # no channel profile → Thinking). The results badge reads this.
+    mode = Column(String, nullable=True, default="quick")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

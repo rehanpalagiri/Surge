@@ -120,11 +120,25 @@ export default function ResultsPage() {
     { label: "Trend Alignment", score: s.trend_alignment },
   ];
 
+  const MODE_LABEL: Record<string, string> = {
+    quick: "⚡ Quick",
+    thinking: "🧠 Thinking",
+    deep_thinking: "🔬 Deep Thinking — Personalized",
+  };
+  const modeLabel = MODE_LABEL[analysis.mode ?? "quick"] ?? MODE_LABEL.quick;
+
   return (
     <main className="min-h-screen bg-background">
       <Nav subtitle={analysis.niche} />
 
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        {/* Effective-mode badge — reflects what actually ran, never overclaims */}
+        <div className="flex justify-center">
+          <span className="text-xs font-medium text-text-muted bg-card border border-border px-3 py-1 rounded-full">
+            {modeLabel}
+          </span>
+        </div>
+
         {/* Verdict banner — always shown */}
         <VerdictBanner verdict={analysis.verdict} predictedViews={s.predicted_views} />
 

@@ -9,13 +9,32 @@ from sqlalchemy import select
 from database import get_db
 from models import SeedVideo, UserAnalysis, UserProfile, User
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut
-from services.gemini import analyze_video
+from services.gemini import analyze_video, select_seed_examples
+from services.channel_profile import build_channel_profile
 from auth import optional_user, require_user
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
+VALID_MODES = {"quick", "thinking", "deep_thinking"}
+MAX_ACTUAL_VIEWS = 500_000_000  # sanity ceiling for feedback (no real video tops this)
 
 router = APIRouter(prefix="/api", tags=["analyze"])
+
+
+def resolve_mode(requested: str, user, has_usable_seeds: bool, channel_profile) -> str:
+    """Authoritative server-side resolution of the EFFECTIVE mode that will run.
+    Degrades gracefully so the badge can never overclaim:
+      - guests are always Quick;
+      - Deep needs a channel profile (>= 2 analyses), else falls back;
+      - Thinking/Deep need usable seed buckets, else fall back to Quick.
+    """
+    if user is None:
+        return "quick"
+    if requested == "deep_thinking" and channel_profile:
+        return "deep_thinking"
+    if requested in ("thinking", "deep_thinking") and has_usable_seeds:
+        return "thinking"
+    return "quick"
 
 
 @router.post("/analyze", response_model=AnalysisOut)
@@ -25,10 +44,12 @@ async def analyze(
     caption: str = Form(""),
     bio: str = Form(""),
     platform: str = Form("tiktok"),
+    mode: str = Form("quick"),
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(optional_user),
 ):
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
+    requested_mode = mode if mode in VALID_MODES else "quick"
 
     # Validate content type (client-declared; best-effort guard)
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -48,25 +69,34 @@ async def analyze(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    seeds_result = await db.execute(
-        select(SeedVideo).where(SeedVideo.platform == platform)
-    )
-    seeds = seeds_result.scalars().all()
-
-    # Fetch the user's last 3 analyses on this platform for historical context.
-    past_analyses = []
-    if user:
-        past_result = await db.execute(
-            select(UserAnalysis)
-            .where(UserAnalysis.user_id == user.id, UserAnalysis.platform == platform)
-            .order_by(UserAnalysis.created_at.desc())
-            .limit(3)
+    # --- Seed reference (Thinking / Deep) ---
+    high_seeds: list = []
+    low_seeds: list = []
+    if requested_mode in ("thinking", "deep_thinking") and user:
+        seeds_result = await db.execute(
+            select(SeedVideo).where(SeedVideo.platform == platform)
         )
-        past_analyses = past_result.scalars().all()
+        seeds = seeds_result.scalars().all()
+        high_seeds, low_seeds = select_seed_examples(seeds, niche)
+    has_usable_seeds = bool(high_seeds or low_seeds)
 
-    # Build profile context string from the user's saved platform profile (if any).
+    # --- Creator channel profile (Deep only, needs >= 2 prior analyses) ---
+    channel_profile = None
+    if requested_mode == "deep_thinking" and user:
+        hist_result = await db.execute(
+            select(UserAnalysis).where(
+                UserAnalysis.user_id == user.id,
+                UserAnalysis.platform == platform,
+            )
+        )
+        channel_profile = build_channel_profile(hist_result.scalars().all())
+
+    effective_mode = resolve_mode(requested_mode, user, has_usable_seeds, channel_profile)
+
+    # Build saved-profile context (name/handle/niche/bio/audience). The prompt builder
+    # only injects it for Thinking/Deep, so Quick stays a pure video assessment.
     profile_context = ""
-    if user:
+    if user and effective_mode in ("thinking", "deep_thinking"):
         prof_result = await db.execute(
             select(UserProfile).where(
                 UserProfile.user_id == user.id,
@@ -88,9 +118,23 @@ async def analyze(
                 parts.append(f"Target audience: {prof.target_audience}")
             profile_context = "\n".join(parts)
 
+    # Scope the heavy context to the effective mode.
+    seeds_high = high_seeds if effective_mode in ("thinking", "deep_thinking") else []
+    seeds_low = low_seeds if effective_mode in ("thinking", "deep_thinking") else []
+    profile_arg = channel_profile if effective_mode == "deep_thinking" else None
+
     try:
         result = await analyze_video(
-            file_path, niche, seeds, caption, bio, platform, profile_context, past_analyses
+            file_path,
+            niche,
+            seeds_high,
+            seeds_low,
+            caption,
+            bio,
+            platform,
+            profile_context,
+            profile_arg,
+            effective_mode,
         )
     finally:
         # Remove the temp upload — the video has already been sent to Gemini,
@@ -109,6 +153,7 @@ async def analyze(
         bio=bio or None,
         scores_json=json.dumps(result),
         verdict=result.get("verdict", "Needs work"),
+        mode=effective_mode,
     )
     db.add(analysis)
     await db.commit()
@@ -169,6 +214,7 @@ async def my_analyses(
                 "caption_preview": caption_preview,
                 "actual_views": a.actual_views,
                 "actual_likes": a.actual_likes,
+                "mode": a.mode or "quick",
                 "created_at": a.created_at,
             }
         )
@@ -212,6 +258,18 @@ async def submit_feedback(
     # Only the analysis owner can submit feedback
     if analysis.user_id != user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
+
+    # Hard sanity blocks — keep impossible numbers out of the channel-profile anchor.
+    if feedback.actual_views < 0:
+        raise HTTPException(status_code=400, detail="Views can't be negative.")
+    if feedback.actual_views > MAX_ACTUAL_VIEWS:
+        raise HTTPException(status_code=400, detail="That view count is too high to be real.")
+    if feedback.actual_likes is not None:
+        if feedback.actual_likes < 0:
+            raise HTTPException(status_code=400, detail="Likes can't be negative.")
+        if feedback.actual_likes > feedback.actual_views:
+            raise HTTPException(status_code=400, detail="Likes can't exceed views.")
+
     analysis.actual_views = feedback.actual_views
     if feedback.actual_likes is not None:
         analysis.actual_likes = feedback.actual_likes
@@ -250,6 +308,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "verdict": analysis.verdict,
         "actual_views": analysis.actual_views,
         "actual_likes": analysis.actual_likes,
+        "mode": analysis.mode or "quick",
         "created_at": analysis.created_at,
     }
 
@@ -276,5 +335,6 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "verdict": analysis.verdict,
         "actual_views": None,
         "actual_likes": None,
+        "mode": analysis.mode or "quick",
         "created_at": analysis.created_at,
     }

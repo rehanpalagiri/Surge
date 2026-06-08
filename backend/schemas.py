@@ -32,7 +32,6 @@ class SeedVideoCreate(BaseModel):
     niche: str
     view_count: int
     like_count: int
-    performed: bool
     notes: Optional[str] = None
 
 
@@ -43,7 +42,8 @@ class SeedVideoOut(BaseModel):
     niche: str
     view_count: int
     like_count: int
-    performed: bool
+    rating: Optional[int] = None
+    gemini_analysis: Optional[str] = None  # raw JSON string; admin panel parses seed_summary
     notes: Optional[str]
     posted_at: Optional[datetime] = None
     created_at: datetime
@@ -63,6 +63,7 @@ class AnalysisOut(BaseModel):
     verdict: str
     actual_views: Optional[int]
     actual_likes: Optional[int]
+    mode: Optional[str] = "quick"  # effective mode that ran
     created_at: datetime
 
     class Config:
@@ -108,6 +109,7 @@ class AnalysisSummaryOut(BaseModel):
     caption_preview: Optional[str] = None
     actual_views: Optional[int] = None
     actual_likes: Optional[int] = None
+    mode: Optional[str] = "quick"
     created_at: datetime
 
 

@@ -36,21 +36,24 @@ Browser → Next.js (Netlify) → FastAPI (Render) → Neon Postgres
 **Models (`models.py`):**
 - `users` — username + bcrypt password hash
 - `user_profiles` — one row per (user, platform). Stores `handle`, `display_name`, `bio`, `target_audience`, `niche`. Unique constraint on `(user_id, platform)`. Platform is `"tiktok"` or `"instagram"`.
-- `seed_videos` — reference TikTok/Instagram videos with `view_count`, `like_count`, `niche`, `posted_at` (original post date), `performed` flag
-- `user_analyses` — every analysis run. `user_id` nullable (anonymous). Has `platform` column (default `"tiktok"`).
+- `seed_videos` — reference TikTok/Instagram videos with `view_count`, `like_count`, `niche`, `posted_at` (original post date), `rating` (0–10 virality from Gemini seed analysis), `gemini_analysis` (full JSON writeup — the durable artifact; the video file is deleted after analysis). `performed` is a **deprecated vestigial column** (kept `nullable, default=False` so SQLAlchemy satisfies the old prod `NOT NULL` constraint on insert — do not read it).
+- `user_analyses` — every analysis run. `user_id` nullable (anonymous). Has `platform` column (default `"tiktok"`) and `mode` (the **effective** mode that ran: `"quick" | "thinking" | "deep_thinking"`).
 - `fetch_status` — log of yt-dlp auto-fetch attempts (success/fail)
 
 **Key files:**
 - **`main.py`** — FastAPI app, CORS, lifespan. Runs `Base.metadata.create_all` then `_ensure_columns` (SQLite-only migration shim). Registers all routers.
 - **`database.py`** — Async SQLAlchemy engine. SQLite locally (no config), Neon Postgres in prod. asyncpg requires: scheme normalisation, stripping `?sslmode=` from URL, SSL via `certifi` CA bundle in `connect_args`, `statement_cache_size=0` for pooler.
 - **`auth.py`** — `bcrypt` (direct, no passlib — passlib 4.x was incompatible), `PyJWT` 30-day tokens. Two deps: `require_user` (401) and `optional_user` (returns `None`).
-- **`routers/analyze.py`** — `POST /api/analyze` (optional auth, accepts `platform` form field, `ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}`). Loads user's `UserProfile` for that platform and builds `profile_context` injected into Gemini. `GET /api/analyses/{id}` returns `_to_locked()` (verdict + predicted_views only) for anonymous or `_to_out()` for auth. `POST /api/analyses/{id}/claim` transfers anon analysis to account.
+- **`routers/analyze.py`** — `POST /api/analyze` (optional auth; `platform` + `mode` form fields, `ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}`). **Three-mode engine:** `resolve_mode()` computes the *effective* mode server-side and degrades gracefully (guests→Quick; Deep without a channel profile→Thinking; Thinking/Deep without usable seed buckets→Quick) so the results badge can never overclaim. Quick = raw video + caption only; Thinking adds the global seed reference + `profile_context`; Deep adds the creator channel profile. `PATCH /api/analyses/{id}/feedback` enforces hard sanity blocks (views ≥0, likes ≥0, likes ≤ views, views ≤ 500M). `GET /api/analyses/{id}` returns `_to_locked()` (verdict + predicted_views only) for anonymous or `_to_out()` for auth. `POST /api/analyses/{id}/claim` transfers anon analysis to account.
+- **`services/channel_profile.py`** — `build_channel_profile(analyses)`: pure, unit-testable function over already-fetched `UserAnalysis` rows. Returns a prompt block (or `None` if <2 analyses). Two tiers: **A. Verified performance** (real `actual_views` rows — the prediction anchor) and **B. Self-assessment trends** (derived from past `scores_json`, framed explicitly as the system's own prior opinion). `recent_history` excludes past `predicted_views` to avoid the AI anchoring on its own guesses.
+- **`services/seed_analysis.py`** — `analyze_seed_video()`: runs an AI-consumption-only seed-analysis prompt on an uploaded reference video, returns JSON with `virality_rating` + `seed_summary`. Reuses the `client`/`_PLATFORM_CONTEXT`/upload-poll-generate-delete pattern from `gemini.py`. Admin rejects (no row) on bad JSON or missing rating.
 - **`routers/profile.py`** — `GET /api/me/profile/{platform}` and `PUT /api/me/profile/{platform}` (upsert). Requires auth.
 - **`routers/settings.py`** — `PATCH /api/me/username` and `PATCH /api/me/password`. Both require `current_password` in the request body for verification before applying the change.
-- **`routers/admin.py`** — `X-Admin-Password` header auth. Seed CRUD + `POST /api/admin/seed/from-url` (yt-dlp — works locally only, blocked on Render datacenter IPs).
-- **`services/gemini.py`** — Uploads video to Gemini Files API, polls until `ACTIVE`, calls `gemini-2.5-flash` with `response_mime_type="application/json"`. Two key behaviours:
-  1. **Recency weighting** — seeds sorted by `view_count × exp(-age_days/60)` so recent videos rank above old viral ones.
-  2. **Platform-aware prompt** — `_PLATFORM_CONTEXT` dict has separate algorithm descriptions, key signals, and tips for TikTok vs Instagram.
+- **`routers/admin.py`** — `X-Admin-Password` header auth. Seed CRUD + `POST /api/admin/seed/from-url` (yt-dlp — works locally only, blocked on Render datacenter IPs). Both upload paths run `analyze_seed_video` synchronously via `_analyze_and_persist_seed` (analyze → store `rating` + `gemini_analysis` → delete the file); a seed with no usable rating is **never** persisted (502, retry).
+- **`services/gemini.py`** — Uploads video to Gemini Files API, polls until `ACTIVE`, calls `gemini-2.5-flash` with `response_mime_type="application/json"`. Key behaviours:
+  1. **`select_seed_examples()`** — buckets seeds into HIGH (`rating ≥ 6`) / LOW (`rating ≤ 4`) by Gemini virality rating (disjoint, so no overlap; rating 5/None is dormant). The HIGH/LOW label is derived in code from the rating, never written by the model. Recency (`view_count × exp(-age_days/60)`) is only an intra-rating tiebreaker.
+  2. **`_build_system_prompt(..., mode)`** — assembles the prompt per effective mode: Quick (no reference), Thinking (+ seed buckets + numeric benchmark), Deep (+ channel profile). Mode-specific `predicted_views` guidance.
+  3. **Platform-aware** — `_PLATFORM_CONTEXT` dict has separate algorithm descriptions, key signals, and tips for TikTok vs Instagram (shared with `seed_analysis.py`).
 
 ### Frontend
 
@@ -61,7 +64,7 @@ Browser → Next.js (Netlify) → FastAPI (Render) → Neon Postgres
 - **`app/settings/page.tsx`** — Change username, change password, dark/light mode toggle. Theme is saved to `localStorage` as `surge_theme` and applied by `ThemeProvider`.
 - **`app/onboarding/page.tsx`** — Two-step profile setup after signup (TikTok → Instagram). Skippable.
 - **`app/profile/page.tsx`** — Tabbed TikTok/Instagram profile editor.
-- **`components/UploadZone.tsx`** — Accepts `platform` prop. Auto-fills bio from saved profile on platform change. Calls `wakeBackend()` before submitting to avoid cold-start "Load failed" on mobile. Passes `platform` to `analyzeVideo()`.
+- **`components/UploadZone.tsx`** — Accepts `platform` prop. Auto-fills bio from saved profile on platform change. Calls `wakeBackend()` before submitting to avoid cold-start "Load failed" on mobile. Logged-in users get a **Quick / Thinking / Deep** depth selector (remembered in `localStorage` key `surge_mode`); guests see an inline "sign in for Thinking & Deep" link and always send `quick`. Passes `platform` + `mode` to `analyzeVideo()`. The results page shows a badge of the *effective* mode (`analysis.mode`).
 - **`components/Nav.tsx`** — Hamburger menu on mobile (animated 3-bar → ✕ toggle, dropdown); full horizontal layout on desktop (`md+`). Listens to `surge-auth` + `storage` events. Auth links: My Projects, Profile, Settings, Log out.
 - **`components/ThemeProvider.tsx`** — Mounts in `layout.tsx`. Reads `localStorage` key `surge_theme`; adds/removes `html.light` class. Listens for `surge-theme` custom event and `storage` event to sync across tabs.
 - **`lib/auth.ts`** — Token in `localStorage` as `surge_token` (auto-migrates from old `viraliq_token`). `setToken`/`clearToken` dispatch `surge-auth` CustomEvent.
@@ -96,7 +99,7 @@ Platform gradient utilities (`gradient-text-tiktok`, `gradient-btn-tiktok`, `tik
 
 ## Key conventions
 
-**Database migrations:** No migration framework. Adding a column: update the model in `models.py` AND add a guard in `_ensure_columns()` in `main.py` (SQLite only). Existing Postgres DBs need a manual `ALTER TABLE` — new tables are created automatically by `create_all` on boot.
+**Database migrations:** No migration framework. Adding a column: update the model in `models.py` AND add a guard in `_ensure_columns()` in `main.py` (SQLite only). Existing Postgres DBs need a manual `ALTER TABLE` — new tables are created automatically by `create_all` on boot. **Run the Neon `ALTER TABLE` BEFORE deploying code that references the new column** — `create_all` never adds columns to existing tables, and a `select()` of the model will reference the missing column and 500. v1.13 added: `seed_videos.rating`, `seed_videos.gemini_analysis`, `user_analyses.mode`.
 
 **Adding a new platform:** Add it to `VALID_PLATFORMS` in `routers/profile.py` and add a `_PLATFORM_CONTEXT` entry in `services/gemini.py`. Then add an entry to `PLATFORM_CONFIG` in `app/page.tsx`.
 

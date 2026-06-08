@@ -32,6 +32,11 @@ async def _ensure_columns(conn):
             "ALTER TABLE user_analyses ADD COLUMN user_id INTEGER"
         )
 
+    if "mode" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN mode TEXT DEFAULT 'quick'"
+        )
+
     # --- seed_videos ---
     result = await conn.exec_driver_sql("PRAGMA table_info(seed_videos)")
     seed_cols = {row[1] for row in result.fetchall()}
@@ -42,6 +47,14 @@ async def _ensure_columns(conn):
     if "platform" not in seed_cols:
         await conn.exec_driver_sql(
             "ALTER TABLE seed_videos ADD COLUMN platform TEXT DEFAULT 'tiktok'"
+        )
+    if "rating" not in seed_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE seed_videos ADD COLUMN rating INTEGER"
+        )
+    if "gemini_analysis" not in seed_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE seed_videos ADD COLUMN gemini_analysis TEXT"
         )
 
     # --- user_analyses: platform column (default tiktok for existing rows) ---

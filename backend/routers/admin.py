@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 import hmac
 import asyncio
@@ -14,6 +15,7 @@ from yt_dlp.utils import DownloadError
 from database import get_db
 from models import SeedVideo, FetchStatus
 from schemas import SeedVideoOut
+from services.seed_analysis import analyze_seed_video
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -25,6 +27,62 @@ def check_admin(x_admin_password: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or missing admin password")
 
 
+async def _analyze_and_persist_seed(
+    db: AsyncSession,
+    file_path: str,
+    safe_name: str,
+    platform: str,
+    niche: str,
+    view_count: int,
+    like_count: int,
+    notes: Optional[str],
+    posted_at: Optional[datetime],
+) -> SeedVideo:
+    """Run the seed-analysis prompt, then persist the seed with its rating + JSON.
+    The local file is always deleted (the JSON is the durable artifact). If the
+    analysis fails or returns no usable rating, NOTHING is persisted and a 502 is
+    raised so the admin can retry — a seed with a null rating must never be created.
+    """
+    try:
+        result = await analyze_seed_video(file_path, platform, niche, view_count, like_count)
+    finally:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+
+    if not isinstance(result, dict) or "error" in result or "virality_rating" not in result:
+        detail = result.get("error", "invalid response") if isinstance(result, dict) else "invalid response"
+        raise HTTPException(
+            status_code=502,
+            detail=f"Seed analysis failed ({detail}). Seed was NOT saved — please try again.",
+        )
+
+    try:
+        rating = max(0, min(10, int(round(float(result["virality_rating"])))))
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=502,
+            detail="Seed analysis returned an invalid rating. Seed was NOT saved — please try again.",
+        )
+
+    seed = SeedVideo(
+        filename=safe_name,
+        platform=platform,
+        niche=niche,
+        view_count=view_count,
+        like_count=like_count,
+        rating=rating,
+        gemini_analysis=json.dumps(result),
+        notes=notes,
+        posted_at=posted_at,
+    )
+    db.add(seed)
+    await db.commit()
+    await db.refresh(seed)
+    return seed
+
+
 @router.post("/seed", response_model=SeedVideoOut)
 async def add_seed_video(
     file: UploadFile = File(...),
@@ -32,7 +90,6 @@ async def add_seed_video(
     niche: str = Form(...),
     view_count: int = Form(...),
     like_count: int = Form(...),
-    performed: bool = Form(...),
     notes: Optional[str] = Form(None),
     posted_at: Optional[str] = Form(None),  # ISO date string e.g. "2025-03-15"
     db: AsyncSession = Depends(get_db),
@@ -56,20 +113,11 @@ async def add_seed_video(
             pass  # ignore bad date — field is optional
 
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
-    seed = SeedVideo(
-        filename=safe_name,
-        platform=platform,
-        niche=niche,
-        view_count=view_count,
-        like_count=like_count,
-        performed=performed,
-        notes=notes,
-        posted_at=parsed_posted_at,
+    # Analyzes the video with Gemini, stores the causal writeup + rating, deletes the
+    # file. Raises 502 (and saves nothing) if the analysis can't produce a rating.
+    return await _analyze_and_persist_seed(
+        db, file_path, safe_name, platform, niche, view_count, like_count, notes, parsed_posted_at
     )
-    db.add(seed)
-    await db.commit()
-    await db.refresh(seed)
-    return seed
 
 
 @router.get("/seeds", response_model=list[SeedVideoOut])
@@ -167,11 +215,14 @@ async def seed_from_url(
             detail="Auto-fetch failed — TikTok may have changed. See the admin warning banner.",
         )
 
+    # The scraper itself succeeded — record health now, before the (separate) Gemini
+    # analysis step. A later Gemini failure is not a scraper failure.
+    await _record_status(db, ok=True, message="ok", url=url)
+
     view_count = info.get("view_count") or 0
     like_count = info.get("like_count") or 0
     description = (info.get("description") or "").strip()
     notes = f"Caption: {description}" if description else None
-    performed = view_count >= 10000
 
     # yt-dlp returns upload_date as "YYYYMMDD" string
     posted_at = None
@@ -183,22 +234,12 @@ async def seed_from_url(
             pass
 
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
-    seed = SeedVideo(
-        filename=os.path.basename(filepath) if filepath else f"{prefix}.mp4",
-        platform=platform,
-        niche=niche,
-        view_count=view_count,
-        like_count=like_count,
-        performed=performed,
-        notes=notes,
-        posted_at=posted_at,
+    safe_name = os.path.basename(filepath) if filepath else f"{prefix}.mp4"
+    analyze_path = filepath if filepath else os.path.join(uploads_dir, safe_name)
+    # Same pipeline as a manual upload: analyze → store rating + JSON → delete file.
+    return await _analyze_and_persist_seed(
+        db, analyze_path, safe_name, platform, niche, view_count, like_count, notes, posted_at
     )
-    db.add(seed)
-    await db.commit()
-    await db.refresh(seed)
-
-    await _record_status(db, ok=True, message="ok", url=url)
-    return seed
 
 
 @router.get("/fetch-status")

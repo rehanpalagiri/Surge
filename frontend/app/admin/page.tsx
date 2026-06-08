@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import {
   getAdminSeeds,
   addSeedVideo,
@@ -23,6 +23,16 @@ const NICHES = [
   "Other",
 ];
 
+function parseSeedSummary(raw: string | null): string {
+  if (!raw) return "";
+  try {
+    const d = JSON.parse(raw);
+    return typeof d?.seed_summary === "string" ? d.seed_summary : "";
+  } catch {
+    return "";
+  }
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -36,10 +46,10 @@ export default function AdminPage() {
   const [niche, setNiche] = useState("Fitness");
   const [viewCount, setViewCount] = useState("");
   const [likeCount, setLikeCount] = useState("");
-  const [performed, setPerformed] = useState(true);
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // URL fetch state
   const [fetchUrl, setFetchUrl] = useState("");
@@ -134,7 +144,6 @@ export default function AdminPage() {
       form.append("niche", niche);
       form.append("view_count", viewCount);
       form.append("like_count", likeCount);
-      form.append("performed", String(performed));
       if (notes) form.append("notes", notes);
       await addSeedVideo(form, password);
       setFile(null);
@@ -381,36 +390,11 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm text-text-muted mb-2">
-                Performance
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="performed"
-                    checked={performed}
-                    onChange={() => setPerformed(true)}
-                    className="accent-success"
-                  />
-                  <span className="text-success text-sm font-medium">
-                    🚀 Viral (10k+ views)
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="performed"
-                    checked={!performed}
-                    onChange={() => setPerformed(false)}
-                    className="accent-danger"
-                  />
-                  <span className="text-danger text-sm font-medium">
-                    📉 Flopped (&lt;1k views)
-                  </span>
-                </label>
-              </div>
+            <div className="bg-surface/60 border border-border rounded-xl px-4 py-3 text-xs text-text-muted">
+              On upload, Surge sends this video to Gemini and generates a causal
+              performance writeup + a 0–10 virality rating (used to bucket it as a
+              high/low reference). This takes ~20–30s and the video file is deleted
+              afterward. If the analysis fails, the seed is not saved — just retry.
             </div>
 
             <div>
@@ -435,7 +419,7 @@ export default function AdminPage() {
               disabled={uploading}
               className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl disabled:opacity-50"
             >
-              {uploading ? "Uploading..." : "Add Seed Video"}
+              {uploading ? "Analyzing with Gemini… (~20–30s)" : "Add & Analyze Seed Video"}
             </button>
           </form>
         </div>
@@ -468,59 +452,96 @@ export default function AdminPage() {
                     <th className="text-left py-2 pr-4">Niche</th>
                     <th className="text-right py-2 pr-4">Views</th>
                     <th className="text-right py-2 pr-4">Likes</th>
-                    <th className="text-left py-2 pr-4">Status</th>
-                    <th className="text-left py-2 pr-4">Notes</th>
+                    <th className="text-center py-2 pr-4">Rating</th>
+                    <th className="text-left py-2 pr-4">Summary</th>
                     <th className="text-left py-2 pr-4">Date</th>
                     <th className="text-right py-2">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {seeds.map((seed) => (
-                    <tr
-                      key={seed.id}
-                      className="border-b border-border/50 hover:bg-surface/50 transition-colors"
-                    >
-                      <td className="py-2.5 pr-4">
-                        <span className="text-text-muted text-xs font-medium bg-surface border border-border px-2 py-0.5 rounded-full capitalize">
-                          {seed.platform}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-text-primary font-medium">
-                        {seed.niche}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-text-primary">
-                        {seed.view_count.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-text-muted">
-                        {seed.like_count.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        {seed.performed ? (
-                          <span className="text-success text-xs font-medium bg-success/10 px-2 py-0.5 rounded-full">
-                            Viral
-                          </span>
-                        ) : (
-                          <span className="text-danger text-xs font-medium bg-danger/10 px-2 py-0.5 rounded-full">
-                            Flopped
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-4 text-text-muted max-w-[180px] truncate">
-                        {seed.notes || "—"}
-                      </td>
-                      <td className="py-2.5 pr-4 text-text-muted text-xs">
-                        {new Date(seed.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <button
-                          onClick={() => handleDelete(seed.id)}
-                          className="text-danger/60 hover:text-danger text-xs transition-colors"
+                  {seeds.map((seed) => {
+                    const summary = parseSeedSummary(seed.gemini_analysis);
+                    const isOpen = expandedId === seed.id;
+                    const ratingColor =
+                      seed.rating == null
+                        ? "text-text-muted bg-surface"
+                        : seed.rating >= 6
+                        ? "text-success bg-success/10"
+                        : seed.rating <= 4
+                        ? "text-danger bg-danger/10"
+                        : "text-text-muted bg-surface";
+                    return (
+                      <Fragment key={seed.id}>
+                        <tr
+                          className="border-b border-border/50 hover:bg-surface/50 transition-colors"
                         >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <td className="py-2.5 pr-4">
+                            <span className="text-text-muted text-xs font-medium bg-surface border border-border px-2 py-0.5 rounded-full capitalize">
+                              {seed.platform}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4 text-text-primary font-medium">
+                            {seed.niche}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right text-text-primary">
+                            {seed.view_count.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right text-text-muted">
+                            {seed.like_count.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 pr-4 text-center">
+                            <span
+                              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ratingColor}`}
+                            >
+                              {seed.rating == null ? "—" : `${seed.rating}/10`}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            {summary ? (
+                              <button
+                                onClick={() =>
+                                  setExpandedId(isOpen ? null : seed.id)
+                                }
+                                className="text-purple-to hover:underline text-xs"
+                              >
+                                {isOpen ? "Hide" : "View"}
+                              </button>
+                            ) : (
+                              <span className="text-text-muted text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-4 text-text-muted text-xs">
+                            {new Date(seed.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <button
+                              onClick={() => handleDelete(seed.id)}
+                              className="text-danger/60 hover:text-danger text-xs transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                        {isOpen && summary && (
+                          <tr className="border-b border-border/50">
+                            <td colSpan={8} className="py-3 px-4 bg-surface/40">
+                              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-1">
+                                AI seed summary (read by the scoring model)
+                              </p>
+                              <p className="text-text-primary text-sm whitespace-pre-wrap">
+                                {summary}
+                              </p>
+                              {seed.notes && (
+                                <p className="text-text-muted text-xs mt-2">
+                                  Notes: {seed.notes}
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

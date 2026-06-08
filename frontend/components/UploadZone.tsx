@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { analyzeVideo, getProfile, wakeBackend } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
@@ -15,6 +16,15 @@ const NICHES = [
   "Lifestyle",
   "Other",
 ];
+
+const MODES = [
+  { id: "quick", label: "Quick", desc: "Fast take on the video alone" },
+  { id: "thinking", label: "Thinking", desc: "Compared against viral benchmarks" },
+  { id: "deep_thinking", label: "Deep", desc: "Also weighs your channel history" },
+] as const;
+
+type ModeId = (typeof MODES)[number]["id"];
+const MODE_STORAGE_KEY = "surge_mode";
 
 const TIPS = [
   "Analyzing your hook strength...",
@@ -46,8 +56,35 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [tipIndex, setTipIndex] = useState(0);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [mode, setMode] = useState<ModeId>("quick");
 
   const pName = platform === "instagram" ? "Instagram" : "TikTok";
+
+  // Detect auth + restore the last-used mode (client-only to avoid hydration mismatch).
+  useEffect(() => {
+    const authed = !!getToken();
+    setLoggedIn(authed);
+    if (!authed) {
+      setMode("quick");
+      return;
+    }
+    const saved = localStorage.getItem(MODE_STORAGE_KEY);
+    if (saved && MODES.some((m) => m.id === saved)) {
+      setMode(saved as ModeId);
+    } else {
+      setMode("thinking"); // sensible default for logged-in creators
+    }
+  }, []);
+
+  const pickMode = (m: ModeId) => {
+    setMode(m);
+    try {
+      localStorage.setItem(MODE_STORAGE_KEY, m);
+    } catch {
+      // ignore storage failures (private mode etc.)
+    }
+  };
 
   // Accept a file pre-populated by the share page
   useEffect(() => {
@@ -115,7 +152,8 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       setWaking(false);
       if (!awake) throw new Error("load failed");
 
-      const { id } = await analyzeVideo(file, niche, caption, bio, platform);
+      const effectiveMode = loggedIn ? mode : "quick";
+      const { id } = await analyzeVideo(file, niche, caption, bio, platform, effectiveMode);
       router.push(`/results/${id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -256,6 +294,50 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to resize-none"
           />
         </div>
+
+        {/* ── Analysis depth ───────────────────────────────────────────────── */}
+        {loggedIn ? (
+          <div>
+            <label className="block text-sm font-medium text-text-muted mb-2">
+              Analysis depth
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => pickMode(m.id)}
+                  aria-pressed={mode === m.id}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+                    mode === m.id
+                      ? "border-purple-to bg-purple-from/10"
+                      : "border-border bg-card hover:border-purple-from/50"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-text-primary">
+                    {m.label}
+                  </span>
+                  <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
+                    {m.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {mode === "deep_thinking" && (
+              <p className="text-text-muted/70 text-xs mt-2">
+                Deep needs 2+ past analyses on {pName} — until then it runs as Thinking.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-text-muted text-xs text-center px-2">
+            Running a <span className="text-text-primary font-medium">Quick</span> analysis.{" "}
+            <Link href="/login" className="text-purple-to hover:underline">
+              Sign in
+            </Link>{" "}
+            for Thinking &amp; Deep modes.
+          </p>
+        )}
 
         {error && (
           <div className="bg-danger/10 border border-danger/30 rounded-xl px-4 py-3 text-danger text-sm">
