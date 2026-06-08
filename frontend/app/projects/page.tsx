@@ -163,7 +163,9 @@ export default function ProjectsPage() {
                 <p className="text-text-muted text-xs mt-3">
                   {new Date(a.created_at).toLocaleDateString()}
                   {a.actual_views !== null &&
-                    ` · ${a.actual_views.toLocaleString()} actual views`}
+                    ` · ${a.actual_views.toLocaleString()} views`}
+                  {a.actual_likes !== null &&
+                    ` · ${a.actual_likes.toLocaleString()} likes`}
                 </p>
               </Link>
             ))}

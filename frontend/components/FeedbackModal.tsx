@@ -9,21 +9,27 @@ interface FeedbackModalProps {
 
 export default function FeedbackModal({ analysisId }: FeedbackModalProps) {
   const [views, setViews] = useState("");
+  const [likes, setLikes] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const num = parseInt(views, 10);
-    if (isNaN(num) || num < 0) {
+    const viewNum = parseInt(views, 10);
+    if (isNaN(viewNum) || viewNum < 0) {
       setError("Please enter a valid view count.");
+      return;
+    }
+    const likeNum = likes.trim() ? parseInt(likes, 10) : undefined;
+    if (likeNum !== undefined && (isNaN(likeNum) || likeNum < 0)) {
+      setError("Please enter a valid like count.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await submitFeedback(analysisId, num);
+      await submitFeedback(analysisId, viewNum, likeNum);
       setSubmitted(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to submit feedback.");
@@ -50,17 +56,27 @@ export default function FeedbackModal({ analysisId }: FeedbackModalProps) {
         How did your video actually perform?
       </h3>
       <p className="text-text-muted text-sm mb-4">
-        Share your actual view count to help improve Surge&apos;s predictions.
+        Share your actual stats to help improve Surge&apos;s predictions.
       </p>
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-        <input
-          type="number"
-          min="0"
-          placeholder="e.g. 15000"
-          value={views}
-          onChange={(e) => setViews(e.target.value)}
-          className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
-        />
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="number"
+            min="0"
+            placeholder="Views (e.g. 15000)"
+            value={views}
+            onChange={(e) => setViews(e.target.value)}
+            className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+          />
+          <input
+            type="number"
+            min="0"
+            placeholder="Likes (optional)"
+            value={likes}
+            onChange={(e) => setLikes(e.target.value)}
+            className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+          />
+        </div>
         <button
           type="submit"
           disabled={loading}

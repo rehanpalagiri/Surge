@@ -60,6 +60,7 @@ class AnalysisOut(BaseModel):
     scores_json: Any
     verdict: str
     actual_views: Optional[int]
+    actual_likes: Optional[int]
     created_at: datetime
 
     class Config:
@@ -68,6 +69,7 @@ class AnalysisOut(BaseModel):
 
 class FeedbackIn(BaseModel):
     actual_views: int
+    actual_likes: Optional[int] = None
 
 
 class SignupIn(BaseModel):
@@ -102,6 +104,7 @@ class AnalysisSummaryOut(BaseModel):
     overall_score: Optional[int] = None
     caption_preview: Optional[str] = None
     actual_views: Optional[int] = None
+    actual_likes: Optional[int] = None
     created_at: datetime
 
 

@@ -51,6 +51,17 @@ async def analyze(
     seeds_result = await db.execute(select(SeedVideo))
     seeds = seeds_result.scalars().all()
 
+    # Fetch the user's last 3 analyses on this platform for historical context.
+    past_analyses = []
+    if user:
+        past_result = await db.execute(
+            select(UserAnalysis)
+            .where(UserAnalysis.user_id == user.id, UserAnalysis.platform == platform)
+            .order_by(UserAnalysis.created_at.desc())
+            .limit(3)
+        )
+        past_analyses = past_result.scalars().all()
+
     # Build profile context string from the user's saved platform profile (if any).
     profile_context = ""
     if user:
@@ -77,7 +88,7 @@ async def analyze(
 
     try:
         result = await analyze_video(
-            file_path, niche, seeds, caption, bio, platform, profile_context
+            file_path, niche, seeds, caption, bio, platform, profile_context, past_analyses
         )
     finally:
         # Remove the temp upload — the video has already been sent to Gemini,
@@ -154,6 +165,7 @@ async def my_analyses(
                 "overall_score": scores.get("overall_score"),
                 "caption_preview": caption_preview,
                 "actual_views": a.actual_views,
+                "actual_likes": a.actual_likes,
                 "created_at": a.created_at,
             }
         )
@@ -198,6 +210,8 @@ async def submit_feedback(
     if analysis.user_id != user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
     analysis.actual_views = feedback.actual_views
+    if feedback.actual_likes is not None:
+        analysis.actual_likes = feedback.actual_likes
     await db.commit()
     await db.refresh(analysis)
     return _to_out(analysis)
@@ -214,6 +228,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "scores_json": json.loads(analysis.scores_json),
         "verdict": analysis.verdict,
         "actual_views": analysis.actual_views,
+        "actual_likes": analysis.actual_likes,
         "created_at": analysis.created_at,
     }
 
@@ -239,5 +254,6 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         },
         "verdict": analysis.verdict,
         "actual_views": None,
+        "actual_likes": None,
         "created_at": analysis.created_at,
     }

@@ -57,6 +57,7 @@ export interface AnalysisOut {
   };
   verdict: string;
   actual_views: number | null;
+  actual_likes: number | null;
   created_at: string;
 }
 
@@ -68,6 +69,7 @@ export interface AnalysisSummary {
   overall_score: number | null;
   caption_preview: string | null;
   actual_views: number | null;
+  actual_likes: number | null;
   created_at: string;
 }
 
@@ -238,12 +240,16 @@ export async function claimAnalysis(
 
 export async function submitFeedback(
   id: string | number,
-  actualViews: number
+  actualViews: number,
+  actualLikes?: number
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/feedback`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ actual_views: actualViews }),
+    body: JSON.stringify({
+      actual_views: actualViews,
+      ...(actualLikes !== undefined ? { actual_likes: actualLikes } : {}),
+    }),
   });
   return handleResponse<AnalysisOut>(res);
 }

@@ -58,6 +58,7 @@ class UserAnalysis(Base):
     scores_json = Column(Text, nullable=False)
     verdict = Column(String, nullable=False)
     actual_views = Column(Integer, nullable=True)
+    actual_likes = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

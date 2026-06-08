@@ -52,6 +52,30 @@ _PLATFORM_CONTEXT = {
 }
 
 
+def _build_past_analyses_block(past_analyses: list) -> str:
+    if not past_analyses:
+        return ""
+    lines = []
+    for i, a in enumerate(past_analyses, 1):
+        try:
+            scores = json.loads(a.scores_json) if isinstance(a.scores_json, str) else (a.scores_json or {})
+        except Exception:
+            scores = {}
+        line = (
+            f"  #{i}: niche={a.niche}"
+            f" | overall={scores.get('overall_score', '?')}/10"
+            f" | predicted={scores.get('predicted_views', '?')}"
+        )
+        if a.actual_views is not None:
+            line += f" | actual views={a.actual_views:,}"
+        if a.actual_likes is not None:
+            line += f" | actual likes={a.actual_likes:,}"
+        lines.append(line)
+    return "\n\nCREATOR'S LAST {} UPLOAD(S) ON THIS PLATFORM (most recent first):\n{}".format(
+        len(lines), "\n".join(lines)
+    )
+
+
 def _build_system_prompt(
     niche: str,
     seed_examples: list,
@@ -59,6 +83,7 @@ def _build_system_prompt(
     bio: str = "",
     platform: str = "tiktok",
     profile_context: str = "",
+    past_analyses: list = [],
 ) -> str:
     # Prefer examples from the same niche; fall back to the global pool when the
     # niche isn't seeded enough yet (so the prompt is never empty or too sparse).
@@ -116,15 +141,26 @@ def _build_system_prompt(
         else ""
     )
 
-    return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh if the video deserves it.
+    past_block = _build_past_analyses_block(past_analyses)
 
-SCORING RULES (0–10):
-- 1–3: Poor. Significant fundamental problems. Unlikely to get meaningful reach.
-- 4–5: Below average. Some redeeming qualities but major issues holding it back.
-- 6–7: Solid. Above average with real potential. A few things to fix.
-- 8–9: Strong. Genuinely good content with minor improvements needed.
-- 10: Exceptional. Rare. Do not give 10 unless the video is truly outstanding.
-The AVERAGE creator video scores 4–5 overall. Do NOT inflate scores to be nice. If something deserves a 2, give it a 2. Dishonest scores help nobody.
+    return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh.
+
+SCORING RULES (0–10) — read carefully before scoring anything:
+- 0–2: Failing. Fundamental problems. Hook doesn't work, content is unwatchable or painfully generic.
+- 3–4: Poor to below-average. Some effort visible but major problems in multiple areas. Most first-time creators land here.
+- 5: Dead average. Forgettable. Nothing wrong enough to fail, nothing right enough to succeed. Most uploads from regular creators land here.
+- 6: Slightly above average. One or two genuine strengths but still has clear weaknesses.
+- 7: Solid. Real potential, likely to get decent reach if a few things are fixed.
+- 8: Strong. Genuinely competitive content. Only minor polish needed.
+- 9: Near-viral quality. Rare. Give this only when the video is clearly elite.
+- 10: Exceptional. Do not give this. Ever.
+
+CALIBRATION (internalize this before scoring):
+- A random person's first video upload = 2–3.
+- A creator who posts regularly but hasn't broken through = 4–5.
+- A video that gets 50k–200k views organically = 6–7.
+- A video that blows up (500k+) = 8–9.
+- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't.{past_block}
 
 {top_heading}:
 {top_str}
@@ -192,9 +228,10 @@ async def analyze_video(
     bio: str = "",
     platform: str = "tiktok",
     profile_context: str = "",
+    past_analyses: list = [],
 ) -> dict:
     try:
-        prompt = _build_system_prompt(niche, seed_examples, caption, bio, platform, profile_context)
+        prompt = _build_system_prompt(niche, seed_examples, caption, bio, platform, profile_context, past_analyses)
 
         uploaded = await client.aio.files.upload(file=video_path)
 

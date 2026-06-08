@@ -45,6 +45,10 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN platform TEXT DEFAULT 'tiktok'"
         )
+    if "actual_likes" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN actual_likes INTEGER"
+        )
 
 
 @asynccontextmanager
