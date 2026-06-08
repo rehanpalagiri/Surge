@@ -189,6 +189,7 @@ ANALYSIS INSTRUCTIONS:
 - For "caption_rewrite": rewrite their actual caption to maximize {pname} performance. If they gave no caption, write one from scratch that fits the video.
 - For "hook_rewrite": rewrite the exact first spoken line or on-screen text to stop the scroll.
 - "projected_verdict" and "projected_views" should be your honest estimate IF the creator applies every fix — don't be overly optimistic.
+- For predicted_views: most creator videos get under 5k views. Only predict more if the content is genuinely strong. Err on the side of lower predictions — a creator who gets more than predicted feels good; one who gets less feels misled.
 
 Return ONLY valid JSON with exactly this structure:
 {{
@@ -198,7 +199,7 @@ Return ONLY valid JSON with exactly this structure:
   "audio_score": <0-10>,
   "caption_score": <0-10>,
   "trend_alignment": <0-10>,
-  "predicted_views": "<realistic range like '500-2k views' or '50k-200k views'>",
+  "predicted_views": "<conservative view range — use the calibration table: score 0-3='under 500 views', score 4='500-2k views', score 5='1k-5k views', score 6='5k-30k views', score 7='30k-150k views', score 8='150k-500k views', score 9='500k+ views'. When in doubt predict LESS, not more.>",
   "strengths": ["<specific genuine strength 1>", "<specific genuine strength 2>"],
   "improvements": ["<blunt specific improvement 1>", "<blunt specific improvement 2>", "<blunt specific improvement 3>"],
   "verdict": "<exactly one of: High potential | Average potential | Needs work>",
@@ -216,7 +217,7 @@ Return ONLY valid JSON with exactly this structure:
   "caption_rewrite": "<rewritten caption optimized for {pname}>",
   "hook_rewrite": "<specific rewrite of the first 1-2 seconds>",
   "projected_verdict": "<honest verdict if they apply the full plan>",
-  "projected_views": "<realistic projected range after fixes>"
+  "projected_views": "<realistic projected range after fixes — use the same calibration table as predicted_views. Only go high if the fixes would genuinely move the score to 7+. Most creators max out at 6–7 even after improvements.>"
 }}"""
 
 

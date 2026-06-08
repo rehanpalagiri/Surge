@@ -67,6 +67,7 @@ export interface AnalysisSummary {
   niche: string;
   verdict: string;
   overall_score: number | null;
+  predicted_views: string | null;
   caption_preview: string | null;
   actual_views: number | null;
   actual_likes: number | null;
@@ -276,6 +277,20 @@ export async function changePassword(
     body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
   return handleResponse<{ ok: boolean }>(res);
+}
+
+export async function deleteAnalysis(
+  id: number,
+  token?: string | null
+): Promise<void> {
+  const res = await fetch(`${BASE}/api/analyses/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
 }
 
 export async function getAdminSeeds(password: string): Promise<SeedVideoOut[]> {

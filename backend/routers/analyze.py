@@ -163,6 +163,7 @@ async def my_analyses(
                 "niche": a.niche,
                 "verdict": a.verdict,
                 "overall_score": scores.get("overall_score"),
+                "predicted_views": scores.get("predicted_views"),
                 "caption_preview": caption_preview,
                 "actual_views": a.actual_views,
                 "actual_likes": a.actual_likes,
@@ -215,6 +216,24 @@ async def submit_feedback(
     await db.commit()
     await db.refresh(analysis)
     return _to_out(analysis)
+
+
+@router.delete("/analyses/{analysis_id}", status_code=204)
+async def delete_analysis(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    result = await db.execute(
+        select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+    )
+    analysis = result.scalar_one_or_none()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if analysis.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this analysis")
+    await db.delete(analysis)
+    await db.commit()
 
 
 def _to_out(analysis: UserAnalysis) -> dict:

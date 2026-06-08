@@ -102,6 +102,7 @@ class AnalysisSummaryOut(BaseModel):
     niche: str
     verdict: str
     overall_score: Optional[int] = None
+    predicted_views: Optional[str] = None
     caption_preview: Optional[str] = None
     actual_views: Optional[int] = None
     actual_likes: Optional[int] = None
