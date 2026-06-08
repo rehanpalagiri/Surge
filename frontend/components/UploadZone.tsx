@@ -111,8 +111,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       // drops the connection and throws a generic "Load failed". Warming it up
       // first keeps the heavy upload itself fast and reliable.
       setWaking(true);
-      await wakeBackend();
+      const awake = await wakeBackend();
       setWaking(false);
+      if (!awake) throw new Error("load failed");
 
       const { id } = await analyzeVideo(file, niche, caption, bio, platform);
       router.push(`/results/${id}`);

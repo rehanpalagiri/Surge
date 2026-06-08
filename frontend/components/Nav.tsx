@@ -50,9 +50,12 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
 
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="font-bold text-xl gradient-text">
-            Surge
-          </Link>
+          <div className="flex items-baseline gap-1.5">
+            <Link href="/" className="font-bold text-xl gradient-text">
+              Surge
+            </Link>
+            <span className="text-[10px] text-text-muted/40 font-mono select-none">v1.12</span>
+          </div>
           {subtitle && (
             <span className="text-text-muted text-sm capitalize">{subtitle}</span>
           )}
