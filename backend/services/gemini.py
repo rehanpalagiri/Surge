@@ -97,8 +97,13 @@ def select_seed_examples(pool_for_platform: list, niche: str):
     pool = niche_seeds if len(niche_seeds) >= 6 else pool_for_platform
     high = [s for s in pool if s.rating is not None and s.rating >= 6]
     low = [s for s in pool if s.rating is not None and s.rating <= 4]
-    high.sort(key=lambda s: (s.rating, s.view_count * _recency_multiplier(s)), reverse=True)
-    low.sort(key=lambda s: (s.rating, s.view_count * _recency_multiplier(s)))
+    # Recency tiebreaker. Instagram seeds have view_count=None — use like_count as proxy.
+    def _score(s):
+        base = s.view_count if s.view_count is not None else (s.like_count * 10)
+        return base * _recency_multiplier(s)
+
+    high.sort(key=lambda s: (s.rating, _score(s)), reverse=True)
+    low.sort(key=lambda s: (s.rating, _score(s)))
     return high[:10], low[:10]
 
 
@@ -127,8 +132,9 @@ def _build_system_prompt(
     if show_seeds and (high_seeds or low_seeds):
         def fmt_seed(s, label):
             summary = _seed_summary(s) or "(no summary available)"
+            views_str = f"{s.view_count:,} views | " if s.view_count is not None else ""
             return (
-                f"[{label} | {s.niche} | {s.view_count:,} views | "
+                f"[{label} | {s.niche} | {views_str}"
                 f"{s.like_count:,} likes | Rating {s.rating}/10]\n{summary}"
             )
 
@@ -152,18 +158,30 @@ def _build_system_prompt(
 
         bm = []
         if high_seeds:
-            hv = [s.view_count for s in high_seeds]
+            hv = [s.view_count for s in high_seeds if s.view_count is not None]
             hl = [s.like_count for s in high_seeds]
-            bm.append(
-                f"  High performers: avg {sum(hv) // len(hv):,} views / "
-                f"{sum(hl) // len(hl):,} likes (peak {max(hv):,} views)"
-            )
+            if hv:
+                bm.append(
+                    f"  High performers: avg {sum(hv) // len(hv):,} views / "
+                    f"{sum(hl) // len(hl):,} likes (peak {max(hv):,} views)"
+                )
+            else:
+                bm.append(
+                    f"  High performers: avg {sum(hl) // len(hl):,} likes "
+                    f"(peak {max(hl):,} likes — views not available for this platform)"
+                )
         if low_seeds:
-            lv = [s.view_count for s in low_seeds]
+            lv = [s.view_count for s in low_seeds if s.view_count is not None]
             ll = [s.like_count for s in low_seeds]
-            bm.append(
-                f"  Low performers: avg {sum(lv) // len(lv):,} views / {sum(ll) // len(ll):,} likes"
-            )
+            if lv:
+                bm.append(
+                    f"  Low performers: avg {sum(lv) // len(lv):,} views / "
+                    f"{sum(ll) // len(ll):,} likes"
+                )
+            else:
+                bm.append(
+                    f"  Low performers: avg {sum(ll) // len(ll):,} likes"
+                )
         benchmark_block = (
             f"\nREAL BENCHMARK DATA ({pname}):\n"
             + "\n".join(bm)

@@ -2,15 +2,13 @@ import os
 import json
 import uuid
 import hmac
-import asyncio
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update
 from typing import Optional
 
-import yt_dlp
-from yt_dlp.utils import DownloadError
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete, update, func
 
 from database import get_db
 from models import SeedVideo, FetchStatus
@@ -19,13 +17,19 @@ from services.seed_analysis import analyze_seed_video
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
 
 def check_admin(x_admin_password: Optional[str] = Header(None)):
     expected = os.getenv("ADMIN_PASSWORD", "viraliq-admin")
-    # Use constant-time comparison to prevent timing-based password enumeration
     if not x_admin_password or not hmac.compare_digest(x_admin_password, expected):
         raise HTTPException(status_code=401, detail="Invalid or missing admin password")
 
+
+# ---------------------------------------------------------------------------
+# Shared seed persist helper
+# ---------------------------------------------------------------------------
 
 async def _analyze_and_persist_seed(
     db: AsyncSession,
@@ -33,7 +37,7 @@ async def _analyze_and_persist_seed(
     safe_name: str,
     platform: str,
     niche: str,
-    view_count: int,
+    view_count: Optional[int],   # None for Instagram (platform hides views)
     like_count: int,
     notes: Optional[str],
     posted_at: Optional[datetime],
@@ -41,7 +45,7 @@ async def _analyze_and_persist_seed(
     """Run the seed-analysis prompt, then persist the seed with its rating + JSON.
     The local file is always deleted (the JSON is the durable artifact). If the
     analysis fails or returns no usable rating, NOTHING is persisted and a 502 is
-    raised so the admin can retry — a seed with a null rating must never be created.
+    raised so the admin can retry.
     """
     try:
         result = await analyze_seed_video(file_path, platform, niche, view_count, like_count)
@@ -83,18 +87,27 @@ async def _analyze_and_persist_seed(
     return seed
 
 
+# ---------------------------------------------------------------------------
+# Manual upload
+# ---------------------------------------------------------------------------
+
 @router.post("/seed", response_model=SeedVideoOut)
 async def add_seed_video(
     file: UploadFile = File(...),
     platform: str = Form("tiktok"),
     niche: str = Form(...),
-    view_count: int = Form(...),
+    view_count: Optional[int] = Form(None),   # required for TikTok, not for Instagram
     like_count: int = Form(...),
     notes: Optional[str] = Form(None),
-    posted_at: Optional[str] = Form(None),  # ISO date string e.g. "2025-03-15"
+    posted_at: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     _: None = Depends(check_admin),
 ):
+    platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
+
+    if platform == "tiktok" and view_count is None:
+        raise HTTPException(status_code=422, detail="view_count is required for TikTok seeds.")
+
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
 
@@ -110,15 +123,16 @@ async def add_seed_video(
         try:
             parsed_posted_at = datetime.fromisoformat(posted_at)
         except ValueError:
-            pass  # ignore bad date — field is optional
+            pass
 
-    platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
-    # Analyzes the video with Gemini, stores the causal writeup + rating, deletes the
-    # file. Raises 502 (and saves nothing) if the analysis can't produce a rating.
     return await _analyze_and_persist_seed(
         db, file_path, safe_name, platform, niche, view_count, like_count, notes, parsed_posted_at
     )
 
+
+# ---------------------------------------------------------------------------
+# Seed list + delete
+# ---------------------------------------------------------------------------
 
 @router.get("/seeds", response_model=list[SeedVideoOut])
 async def get_seeds(
@@ -145,32 +159,112 @@ async def delete_seed(
 
 
 # ---------------------------------------------------------------------------
-# Auto-fetch seed videos from a TikTok link (local use — TikTok blocks
-# datacenter IPs, so this is not reliable in production).
+# URL-based fetchers (tikwm.com for TikTok, EaseApi for Instagram)
 # ---------------------------------------------------------------------------
 
-def _looks_like_tiktok(url: str) -> bool:
+def _detect_platform(url: str) -> Optional[str]:
     u = (url or "").strip().lower()
-    return u.startswith(("http://", "https://")) and "tiktok.com" in u
+    if not u.startswith(("http://", "https://")):
+        return None
+    if "tiktok.com" in u:
+        return "tiktok"
+    if "instagram.com" in u or "instagr.am" in u:
+        return "instagram"
+    return None
 
 
-def _yt_download(url: str, uploads_dir: str, prefix: str):
-    """Synchronous yt-dlp download + metadata extraction. Run in a thread."""
-    outtmpl = os.path.join(uploads_dir, f"{prefix}_%(id)s.%(ext)s")
-    opts = {
-        "outtmpl": outtmpl,
-        "format": "mp4/bestvideo+bestaudio/best",
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
+async def _fetch_tiktok(url: str) -> dict:
+    """Fetch TikTok video via tikwm.com (free, no key, works from any IP)."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(
+            "https://www.tikwm.com/api/",
+            params={"url": url},
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        r.raise_for_status()
+        body = r.json()
+
+    if body.get("code") != 0:
+        raise ValueError(f"tikwm: {body.get('msg', 'unknown error')}")
+
+    data = body["data"]
+    posted_at = None
+    ts = data.get("create_time")
+    if ts:
+        try:
+            posted_at = datetime.fromtimestamp(int(ts))
+        except (ValueError, OSError, OverflowError):
+            pass
+
+    return {
+        "video_url": data["play"],
+        "view_count": int(data.get("play_count") or 0),
+        "like_count": int(data.get("digg_count") or 0),
+        "caption": str(data.get("title") or "").strip()[:2200],
+        "posted_at": posted_at,
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        if info.get("requested_downloads"):
-            filepath = info["requested_downloads"][0].get("filepath")
-        else:
-            filepath = ydl.prepare_filename(info)
-    return info, filepath
+
+
+async def _fetch_instagram(url: str) -> dict:
+    """Fetch Instagram Reel via EaseApi on RapidAPI.
+    view_count is always None — Instagram does not expose it publicly.
+    Requires RAPIDAPI_KEY env var. Host/path can be overridden with
+    RAPIDAPI_IG_HOST / RAPIDAPI_IG_PATH env vars.
+    """
+    api_key = os.getenv("RAPIDAPI_KEY")
+    if not api_key:
+        raise ValueError("RAPIDAPI_KEY is not configured. Add it to your environment variables.")
+
+    ig_host = os.getenv("RAPIDAPI_IG_HOST", "instagram-reels-downloader-api.p.rapidapi.com")
+    ig_path = os.getenv("RAPIDAPI_IG_PATH", "/downloadReel")
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(
+            f"https://{ig_host}{ig_path}",
+            params={"url": url},
+            headers={
+                "X-RapidAPI-Key": api_key,
+                "X-RapidAPI-Host": ig_host,
+            },
+        )
+        r.raise_for_status()
+        body = r.json()
+
+    if not body.get("success"):
+        raise ValueError(f"Instagram API: {body.get('message', 'unknown error')}")
+
+    data = body.get("data") or {}
+
+    # Find the video download URL in the medias array (type == "video")
+    video_url = None
+    for m in (data.get("medias") or []):
+        if isinstance(m, dict) and m.get("type") == "video" and m.get("url"):
+            video_url = m["url"]
+            break
+
+    if not video_url:
+        raise ValueError("Instagram API returned no video download URL")
+
+    return {
+        "video_url": video_url,
+        "view_count": None,   # Instagram never exposes views publicly
+        "like_count": int(data.get("like_count") or 0),
+        "caption": str(data.get("title") or "").strip()[:2200],
+        "posted_at": None,
+    }
+
+
+async def _download_video(video_url: str, file_path: str) -> None:
+    """Stream-download a video to disk."""
+    try:
+        async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+            async with client.stream("GET", video_url) as r:
+                r.raise_for_status()
+                with open(file_path, "wb") as f:
+                    async for chunk in r.aiter_bytes(chunk_size=65536):
+                        f.write(chunk)
+    except httpx.HTTPError as e:
+        raise ValueError(f"Video download failed: {e}") from e
 
 
 async def _record_status(db: AsyncSession, ok: bool, message: str, url: str):
@@ -178,19 +272,22 @@ async def _record_status(db: AsyncSession, ok: bool, message: str, url: str):
     await db.commit()
 
 
+# ---------------------------------------------------------------------------
+# Fetch from URL endpoint
+# ---------------------------------------------------------------------------
+
 @router.post("/seed/from-url", response_model=SeedVideoOut)
 async def seed_from_url(
     url: str = Form(...),
     niche: str = Form(...),
-    platform: str = Form("tiktok"),
     db: AsyncSession = Depends(get_db),
     _: None = Depends(check_admin),
 ):
-    if not _looks_like_tiktok(url):
-        # Clearly malformed/unsupported — user error, not a scraper failure.
+    platform = _detect_platform(url)
+    if not platform:
         raise HTTPException(
             status_code=400,
-            detail="Couldn't read that link — check it's a public TikTok URL",
+            detail="Couldn't read that link — check it's a public TikTok or Instagram URL.",
         )
 
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
@@ -198,57 +295,40 @@ async def seed_from_url(
     prefix = str(uuid.uuid4())
 
     try:
-        info, filepath = await asyncio.to_thread(
-            _yt_download, url, uploads_dir, prefix
-        )
-    except DownloadError as e:
-        # Scraper-broken: extractor error / 403 / 429 / "unable to extract".
+        if platform == "tiktok":
+            meta = await _fetch_tiktok(url)
+        else:
+            meta = await _fetch_instagram(url)
+    except Exception as e:
         await _record_status(db, ok=False, message=str(e), url=url)
-        raise HTTPException(
-            status_code=502,
-            detail="Auto-fetch failed — TikTok may have changed. See the admin warning banner.",
-        )
-    except Exception as e:  # noqa: BLE001 — any other extraction failure is scraper-broken too
-        await _record_status(db, ok=False, message=str(e), url=url)
-        raise HTTPException(
-            status_code=502,
-            detail="Auto-fetch failed — TikTok may have changed. See the admin warning banner.",
-        )
+        raise HTTPException(status_code=502, detail=f"Auto-fetch failed: {e}")
 
-    # The scraper itself succeeded — record health now, before the (separate) Gemini
-    # analysis step. A later Gemini failure is not a scraper failure.
     await _record_status(db, ok=True, message="ok", url=url)
 
-    view_count = info.get("view_count") or 0
-    like_count = info.get("like_count") or 0
-    description = (info.get("description") or "").strip()
-    notes = f"Caption: {description}" if description else None
+    safe_name = f"{prefix}.mp4"
+    file_path = os.path.join(uploads_dir, safe_name)
+    try:
+        await _download_video(meta["video_url"], file_path)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
-    # yt-dlp returns upload_date as "YYYYMMDD" string
-    posted_at = None
-    raw_date = info.get("upload_date")
-    if raw_date:
-        try:
-            posted_at = datetime.strptime(raw_date, "%Y%m%d")
-        except ValueError:
-            pass
+    notes = f"Caption: {meta['caption']}" if meta.get("caption") else None
 
-    platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
-    safe_name = os.path.basename(filepath) if filepath else f"{prefix}.mp4"
-    analyze_path = filepath if filepath else os.path.join(uploads_dir, safe_name)
-    # Same pipeline as a manual upload: analyze → store rating + JSON → delete file.
     return await _analyze_and_persist_seed(
-        db, analyze_path, safe_name, platform, niche, view_count, like_count, notes, posted_at
+        db, file_path, safe_name, platform, niche,
+        meta["view_count"], meta["like_count"], notes, meta["posted_at"],
     )
 
+
+# ---------------------------------------------------------------------------
+# Fetch-status banner
+# ---------------------------------------------------------------------------
 
 @router.get("/fetch-status")
 async def get_fetch_status(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(check_admin),
 ):
-    # Look at the single most recent attempt: a later success (or an ack)
-    # clears the broken state.
     result = await db.execute(
         select(FetchStatus).order_by(FetchStatus.created_at.desc(), FetchStatus.id.desc())
     )
@@ -275,3 +355,38 @@ async def ack_fetch_status(
     )
     await db.commit()
     return {"acknowledged": True}
+
+
+# ---------------------------------------------------------------------------
+# Instagram API usage counter (20 req/month on EaseApi free tier)
+# ---------------------------------------------------------------------------
+
+@router.get("/api-usage")
+async def get_api_usage(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Successful Instagram URL fetches this calendar month vs the 20/month free limit."""
+    now = datetime.utcnow()
+    month_start = datetime(now.year, now.month, 1)
+    resets_at = (
+        datetime(now.year + 1, 1, 1) if now.month == 12
+        else datetime(now.year, now.month + 1, 1)
+    )
+
+    result = await db.execute(
+        select(func.count()).select_from(FetchStatus).where(
+            FetchStatus.url.ilike("%instagram%"),
+            FetchStatus.ok == True,   # noqa: E712
+            FetchStatus.created_at >= month_start,
+        )
+    )
+    used = result.scalar() or 0
+
+    return {
+        "instagram": {
+            "used": used,
+            "limit": 20,
+            "resets_at": resets_at.strftime("%Y-%m-%d"),
+        }
+    }

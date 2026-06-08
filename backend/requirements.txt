@@ -8,6 +8,6 @@ python-multipart
 google-genai
 python-dotenv
 pydantic
-yt-dlp
+httpx
 passlib[bcrypt]
 PyJWT

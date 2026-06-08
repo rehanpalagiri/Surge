@@ -101,13 +101,21 @@ export interface SeedVideoOut {
   filename: string;
   platform: string;
   niche: string;
-  view_count: number;
+  view_count: number | null;   // null for Instagram seeds (platform hides views)
   like_count: number;
   rating: number | null;
   gemini_analysis: string | null; // raw JSON; parse for seed_summary
   notes: string | null;
   posted_at?: string | null;
   created_at: string;
+}
+
+export interface ApiUsage {
+  instagram: {
+    used: number;
+    limit: number;
+    resets_at: string; // "YYYY-MM-DD"
+  };
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -340,19 +348,25 @@ export interface FetchStatus {
 export async function seedFromUrl(
   url: string,
   niche: string,
-  platform: string,
   password: string
 ): Promise<SeedVideoOut> {
+  // Platform is auto-detected server-side from the URL domain.
   const form = new FormData();
   form.append("url", url);
   form.append("niche", niche);
-  form.append("platform", platform);
   const res = await fetch(`${BASE}/api/admin/seed/from-url`, {
     method: "POST",
     headers: { "X-Admin-Password": password },
     body: form,
   });
   return handleResponse<SeedVideoOut>(res);
+}
+
+export async function getApiUsage(password: string): Promise<ApiUsage> {
+  const res = await fetch(`${BASE}/api/admin/api-usage`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<ApiUsage>(res);
 }
 
 export async function getFetchStatus(password: string): Promise<FetchStatus> {

@@ -13,22 +13,45 @@ source of truth for how we talk to Gemini.
 
 import json
 import asyncio
+from typing import Optional
 
 from google.genai import types
 
 from services.gemini import client, _PLATFORM_CONTEXT
 
 
-def _build_seed_prompt(platform: str, niche: str, view_count: int, like_count: int) -> str:
+def _build_seed_prompt(
+    platform: str, niche: str, view_count: Optional[int], like_count: int
+) -> str:
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
+
+    # Instagram hides view counts — anchor on likes only when view_count is None.
+    if view_count is not None:
+        perf_line = f"It received {view_count:,} views and {like_count:,} likes."
+        rating_anchor = (
+            "virality_rating: anchor directly to the view/like count as evidence. "
+            "2M views = proof of 8–9. 800 views = proof of 1–3. Score what the data confirms."
+        )
+        perf_reason_ref = f"exactly why this got {view_count:,} views and {like_count:,} likes"
+    else:
+        perf_line = (
+            f"It received {like_count:,} likes "
+            f"(view count not available — {pname} does not expose it publicly)."
+        )
+        rating_anchor = (
+            "virality_rating: anchor to the like count as evidence since views are unavailable. "
+            "18M likes = proof of 8–9. 500 likes = proof of 1–3. Score what the data confirms."
+        )
+        perf_reason_ref = f"exactly why this got {like_count:,} likes"
+
     return f"""You are building a performance reference library for a video scoring AI.
 This analysis is NOT user-facing — it will be read by another AI instance when
 scoring new creator videos. Write everything with that reader in mind: specific,
 causal, pattern-focused. Never use vague descriptors.
 
 This is a {pname} video in the {niche} niche.
-It received {view_count:,} views and {like_count:,} likes.
+{perf_line}
 
 PLATFORM CONTEXT ({pname}):
 Distribution surface: {ctx["algorithm"]}
@@ -40,8 +63,7 @@ these results? What should a future AI look for — or warn against — when it 
 similar patterns in a new video?
 
 SCORING RULES (0–10):
-- virality_rating: anchor directly to the view/like count as evidence. 2M views =
-  proof of 8–9. 800 views = proof of 1–3. Score what the data confirms.
+- {rating_anchor}
 - hook_strength: did the first 1–3 seconds eliminate the viewer's reason to scroll?
 - pacing_score: do cuts and energy sustain watch time to the end?
 - audio_score: does the sound serve the content or fight it?
@@ -68,7 +90,7 @@ Return ONLY valid JSON with exactly this structure:
   "visual_score": <0-10>,
   "trend_alignment": <0-10>,
   "what_happens": "<2-3 sentences: literal events start to finish, no evaluation>",
-  "performance_reason": "<3-4 sentences: causal explanation for exactly why this got {view_count:,} views and {like_count:,} likes. Name the elements that drove or killed distribution.>",
+  "performance_reason": "<3-4 sentences: causal explanation for {perf_reason_ref}. Name the elements that drove or killed distribution.>",
   "patterns": {{
     "replicate": ["<pattern worth copying, as an instruction>", "<pattern 2>"],
     "avoid": ["<pattern to warn against, as a flag>", "<pattern 2>"]
@@ -81,7 +103,7 @@ async def analyze_seed_video(
     video_path: str,
     platform: str,
     niche: str,
-    view_count: int,
+    view_count: Optional[int],
     like_count: int,
 ) -> dict:
     """Run the seed-analysis prompt against a video. Returns the parsed JSON dict

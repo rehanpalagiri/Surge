@@ -21,7 +21,7 @@ class SeedVideo(Base):
     filename = Column(String, nullable=False)
     platform = Column(String, nullable=False, default="tiktok")  # "tiktok" | "instagram"
     niche = Column(String, nullable=False)
-    view_count = Column(Integer, nullable=False)
+    view_count = Column(Integer, nullable=True)   # NULL for Instagram (platform hides views)
     like_count = Column(Integer, nullable=False)
     # Virality rating (0–10) extracted from the Gemini seed analysis. Nullable so
     # pre-1.13 seeds (no rating) are simply ignored by the bucketer until reseeded.

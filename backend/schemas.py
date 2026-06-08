@@ -30,7 +30,7 @@ class UserProfileOut(BaseModel):
 class SeedVideoCreate(BaseModel):
     platform: str = "tiktok"
     niche: str
-    view_count: int
+    view_count: Optional[int] = None  # NULL for Instagram (platform hides views)
     like_count: int
     notes: Optional[str] = None
 
@@ -40,7 +40,7 @@ class SeedVideoOut(BaseModel):
     filename: str
     platform: str
     niche: str
-    view_count: int
+    view_count: Optional[int] = None  # NULL for Instagram seeds
     like_count: int
     rating: Optional[int] = None
     gemini_analysis: Optional[str] = None  # raw JSON string; admin panel parses seed_summary

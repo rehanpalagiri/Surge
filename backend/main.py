@@ -57,6 +57,36 @@ async def _ensure_columns(conn):
             "ALTER TABLE seed_videos ADD COLUMN gemini_analysis TEXT"
         )
 
+    # --- seed_videos: drop NOT NULL from view_count (needed for Instagram seeds) ---
+    # SQLite can't ALTER COLUMN, so we do a table swap if view_count is still NOT NULL.
+    result3 = await conn.exec_driver_sql("PRAGMA table_info(seed_videos)")
+    seed_col_detail = {row[1]: row[3] for row in result3.fetchall()}  # name -> notnull
+    if seed_col_detail.get("view_count") == 1:
+        await conn.exec_driver_sql("""
+            CREATE TABLE seed_videos_tmp (
+                id INTEGER PRIMARY KEY,
+                filename TEXT NOT NULL,
+                platform TEXT NOT NULL DEFAULT 'tiktok',
+                niche TEXT NOT NULL,
+                view_count INTEGER,
+                like_count INTEGER NOT NULL,
+                rating INTEGER,
+                gemini_analysis TEXT,
+                performed BOOLEAN DEFAULT 0,
+                notes TEXT,
+                posted_at DATETIME,
+                created_at DATETIME
+            )
+        """)
+        await conn.exec_driver_sql(
+            "INSERT INTO seed_videos_tmp "
+            "SELECT id, filename, platform, niche, view_count, like_count, "
+            "rating, gemini_analysis, performed, notes, posted_at, created_at "
+            "FROM seed_videos"
+        )
+        await conn.exec_driver_sql("DROP TABLE seed_videos")
+        await conn.exec_driver_sql("ALTER TABLE seed_videos_tmp RENAME TO seed_videos")
+
     # --- user_analyses: platform column (default tiktok for existing rows) ---
     if "platform" not in existing:
         await conn.exec_driver_sql(
