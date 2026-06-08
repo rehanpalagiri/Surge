@@ -114,6 +114,9 @@ def _build_system_prompt(
     top_str = "\n".join(fmt(s) for s in top) or "  (no data yet)"
     bottom_str = "\n".join(fmt(s) for s in bottom) or "  (no data yet)"
 
+    ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
+    pname = ctx["name"]
+
     # Compute real benchmark stats from the seed pool for this platform+niche
     if top:
         avg_top_views = int(sum(s.view_count for s in top) / len(top))
@@ -137,9 +140,6 @@ def _build_system_prompt(
         )
     else:
         benchmark_block = ""
-
-    ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
-    pname = ctx["name"]
 
     # Label by niche only when we're actually using same-niche examples.
     if use_niche:
