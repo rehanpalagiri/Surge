@@ -54,39 +54,39 @@ const TIPS = [
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
 function TikTokIcon() {
-  // Note head: circle at (24,51) r=9
-  // Stem: rect x=27 y=15 w=6 h=38
-  // Flag: solid filled shape off the top-right of the stem
-  const headCx = 24, headCy = 51, headR = 9;
-  const stemX = 27, stemY = 15, stemW = 6, stemH = 38;
-  const flag = "M33 15 L50 15 Q57 15 57 24 L57 35 Q57 43 47 43 L33 43 Z";
+  // Real TikTok note shape:
+  // - Ring (outer circle r=13 minus inner hole r=7) via fill-rule evenodd
+  // - Vertical stem rect connecting ring to flag
+  // - Rounded rectangular flag at top-right
+  //
+  // Note head center: (22, 50)
+  // Two-arc trick for full circles (SVG can't do a full circle in one arc):
+  const ring =
+    "M22 37 A13 13 0 1 1 22 63 A13 13 0 1 1 22 37 Z " + // outer circle
+    "M22 43 A7 7 0 1 0 22 57 A7 7 0 1 0 22 43 Z";       // inner hole (opposite winding = evenodd cuts it out)
+
+  const stemX = 29, stemY = 13, stemW = 6, stemH = 38; // stem: right side of ring → top
+  const flag = "M35 13 L50 13 Q57 13 57 23 L57 35 Q57 43 47 43 L35 43 Z";
 
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <clipPath id="tt-clip">
-          <rect width="72" height="72" rx="16" />
-        </clipPath>
-      </defs>
-      <rect width="72" height="72" rx="16" fill="#010101" />
-      <g clipPath="url(#tt-clip)">
-        {/* Cyan shadow — shifted left+down */}
-        <g transform="translate(-2 2)">
-          <circle cx={headCx} cy={headCy} r={headR} fill="#25f4ee" />
-          <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#25f4ee" />
-          <path d={flag} fill="#25f4ee" />
-        </g>
-        {/* Red shadow — shifted right+up */}
-        <g transform="translate(2 -2)">
-          <circle cx={headCx} cy={headCy} r={headR} fill="#fe2c55" />
-          <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#fe2c55" />
-          <path d={flag} fill="#fe2c55" />
-        </g>
-        {/* White main */}
-        <circle cx={headCx} cy={headCy} r={headR} fill="white" />
-        <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="white" />
-        <path d={flag} fill="white" />
+      {/* Transparent background — note color adapts via .tt-note-fill CSS class */}
+      {/* Cyan shadow layer */}
+      <g transform="translate(-2 2)">
+        <path fillRule="evenodd" d={ring} fill="#25f4ee" />
+        <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#25f4ee" />
+        <path d={flag} fill="#25f4ee" />
       </g>
+      {/* Red shadow layer */}
+      <g transform="translate(2 -2)">
+        <path fillRule="evenodd" d={ring} fill="#fe2c55" />
+        <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#fe2c55" />
+        <path d={flag} fill="#fe2c55" />
+      </g>
+      {/* Main note — white in dark mode, black in light mode via CSS */}
+      <path fillRule="evenodd" d={ring} className="tt-note-fill" />
+      <rect x={stemX} y={stemY} width={stemW} height={stemH} className="tt-note-fill" />
+      <path d={flag} className="tt-note-fill" />
     </svg>
   );
 }
@@ -135,7 +135,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [mode, setMode] = useState<ModeId>("quick");
 
   const pName = platform === "instagram" ? "Instagram" : "TikTok";
-  const textGradient = platform === "instagram" ? "gradient-text-instagram" : "tiktok-glitch";
+  const textGradient = platform === "instagram" ? "gradient-text-instagram" : "tiktok-glitch-sm";
 
   // Detect auth + restore the last-used mode (client-only to avoid hydration mismatch).
   useEffect(() => {

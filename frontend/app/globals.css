@@ -83,6 +83,17 @@ body {
        3px  2px 0 #fe2c55,
       -3px -2px 0 #25f4ee;
   }
+  /* Smaller glitch for inline text (half the offset of the full glitch) */
+  .tiktok-glitch-sm {
+    color: #ffffff;
+    text-shadow:
+       1.5px  1px 0 #fe2c55,
+      -1.5px -1px 0 #25f4ee;
+  }
+
+  /* TikTok note icon fill — white in dark mode, black in light mode */
+  .tt-note-fill { fill: white; }
+  html.light .tt-note-fill { fill: #010101; }
 
   /* Solid TikTok accent colours for individual elements */
   .tiktok-cyan  { color: #25f4ee; }
