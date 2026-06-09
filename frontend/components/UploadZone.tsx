@@ -54,25 +54,30 @@ const TIPS = [
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
 function TikTokIcon() {
+  // Reusable note shape using currentColor — rendered 3× (cyan offset, red offset, white)
+  const Note = () => (
+    <>
+      <ellipse cx="22" cy="51" rx="10" ry="8.5" fill="currentColor" transform="rotate(-8 22 51)" />
+      <rect x="30" y="13" width="5.5" height="40" fill="currentColor" />
+      <path
+        d="M35.5 13 L51 13 Q56 13 56 25 L56 36 Q56 43 46 43 L35.5 43 L35.5 35 L44 35 Q48 33 48 27 Q48 19 35.5 17 Z"
+        fill="currentColor"
+      />
+    </>
+  );
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="tt-clip">
+          <rect width="72" height="72" rx="16" />
+        </clipPath>
+      </defs>
       <rect width="72" height="72" rx="16" fill="#010101" />
-      {/* Cyan shadow */}
-      <g transform="translate(-1.5, 1.5)">
-        <circle cx="25" cy="51" r="9" fill="#25f4ee" />
-        <rect x="32" y="14" width="6" height="39" fill="#25f4ee" />
-        <path d="M38 14 L51 14 Q54 14 54 24 L54 33 Q54 40 44 40 L38 40 L38 32 L43 32 Q46 30 46 25 Q46 18 38 18 Z" fill="#25f4ee" />
+      <g clipPath="url(#tt-clip)">
+        <g color="#25f4ee" transform="translate(-2 2)"><Note /></g>
+        <g color="#fe2c55" transform="translate(2 -2)"><Note /></g>
+        <g color="white"><Note /></g>
       </g>
-      {/* Red shadow */}
-      <g transform="translate(1.5, -1.5)">
-        <circle cx="25" cy="51" r="9" fill="#fe2c55" />
-        <rect x="32" y="14" width="6" height="39" fill="#fe2c55" />
-        <path d="M38 14 L51 14 Q54 14 54 24 L54 33 Q54 40 44 40 L38 40 L38 32 L43 32 Q46 30 46 25 Q46 18 38 18 Z" fill="#fe2c55" />
-      </g>
-      {/* White main */}
-      <circle cx="25" cy="51" r="9" fill="white" />
-      <rect x="32" y="14" width="6" height="39" fill="white" />
-      <path d="M38 14 L51 14 Q54 14 54 24 L54 33 Q54 40 44 40 L38 40 L38 32 L43 32 Q46 30 46 25 Q46 18 38 18 Z" fill="white" />
     </svg>
   );
 }
@@ -89,12 +94,12 @@ function InstagramIcon() {
         </linearGradient>
       </defs>
       <rect width="72" height="72" rx="16" fill="url(#ig-bg)" />
-      {/* Camera body */}
-      <rect x="13" y="13" width="46" height="46" rx="13" stroke="white" strokeWidth="4" fill="none" />
+      {/* Camera body — inset 10px each side */}
+      <rect x="10" y="10" width="52" height="52" rx="14" stroke="white" strokeWidth="3.5" fill="none" />
       {/* Lens */}
-      <circle cx="36" cy="36" r="12" stroke="white" strokeWidth="4" fill="none" />
-      {/* Viewfinder dot */}
-      <circle cx="52" cy="20" r="3.5" fill="white" />
+      <circle cx="36" cy="37" r="12" stroke="white" strokeWidth="3.5" fill="none" />
+      {/* Viewfinder dot — top-right of camera body */}
+      <circle cx="51" cy="21" r="3.5" fill="white" />
     </svg>
   );
 }
@@ -300,12 +305,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             <>
               {platform === "instagram" ? <InstagramIcon /> : <TikTokIcon />}
               {/* Mobile copy */}
-              <p className={`text-xl font-bold ${textGradient} sm:hidden`}>
-                Tap to add your {pName} video
+              <p className="text-xl font-bold text-white sm:hidden">
+                Tap to add your{" "}
+                <span className={textGradient}>{pName}</span>{" "}
+                video
               </p>
               {/* Desktop copy */}
-              <p className={`text-xl font-bold ${textGradient} hidden sm:block`}>
-                Drop your {pName} video here
+              <p className="text-xl font-bold text-white hidden sm:block">
+                Drop your{" "}
+                <span className={textGradient}>{pName}</span>{" "}
+                video here
               </p>
               <p className="text-white/50 text-sm">
                 .mp4 or .mov · up to 100MB
