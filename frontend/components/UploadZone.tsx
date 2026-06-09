@@ -18,9 +18,24 @@ const NICHES = [
 ];
 
 const MODES = [
-  { id: "quick", label: "Quick", desc: "Fast take on the video alone" },
-  { id: "thinking", label: "Thinking", desc: "Compared against viral benchmarks" },
-  { id: "deep_thinking", label: "Deep", desc: "Also weighs your channel history" },
+  {
+    id: "quick",
+    label: "Lite",
+    time: "~15 sec",
+    desc: "Fast take on the video alone — no benchmarks or history.",
+  },
+  {
+    id: "thinking",
+    label: "Thinking",
+    time: "~30 sec",
+    desc: "Compared against real viral benchmarks for your niche.",
+  },
+  {
+    id: "deep_thinking",
+    label: "Deep",
+    time: "~45 sec",
+    desc: "Benchmarks plus your channel history for a personalized read.",
+  },
 ] as const;
 
 type ModeId = (typeof MODES)[number]["id"];
@@ -318,14 +333,14 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
                     {m.label}
                   </span>
                   <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
-                    {m.desc}
+                    {m.time}
                   </span>
                 </button>
               ))}
             </div>
-            {mode === "deep_thinking" && (
+            {MODES.find((m) => m.id === mode) && (
               <p className="text-text-muted/70 text-xs mt-2">
-                Deep needs 2+ past analyses on {pName} — until then it runs as Thinking.
+                {MODES.find((m) => m.id === mode)!.desc}
               </p>
             )}
           </div>
