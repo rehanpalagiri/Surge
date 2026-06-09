@@ -133,6 +133,12 @@ export default function ImprovePage() {
                 {s.projected_verdict && s.projected_views && " · "}
                 {s.projected_views}
               </p>
+              {s.projected_likes && s.projected_likes !== "Unknown" && (
+                <p className="text-text-muted text-sm mt-1">
+                  Projected likes:{" "}
+                  <span className="text-text-primary font-semibold">{s.projected_likes}</span>
+                </p>
+              )}
             </div>
           </div>
         )}

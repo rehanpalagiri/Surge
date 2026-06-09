@@ -43,6 +43,7 @@ export interface AnalysisOut {
     caption_score: number;
     trend_alignment: number;
     predicted_views: string;
+    predicted_likes?: string;
     strengths: string[];
     improvements: string[];
     verdict: string;
@@ -52,6 +53,7 @@ export interface AnalysisOut {
     hook_rewrite?: string;
     projected_verdict?: string;
     projected_views?: string;
+    projected_likes?: string;
     locked?: boolean;
     error?: string;
   };

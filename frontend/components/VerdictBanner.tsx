@@ -1,11 +1,13 @@
 interface VerdictBannerProps {
   verdict: string;
   predictedViews: string;
+  predictedLikes?: string;
 }
 
 export default function VerdictBanner({
   verdict,
   predictedViews,
+  predictedLikes,
 }: VerdictBannerProps) {
   const isHigh = verdict === "High potential";
   const isAvg = verdict === "Average potential";
@@ -33,9 +35,15 @@ export default function VerdictBanner({
         {verdict}
       </h1>
       <p className="text-text-muted text-lg">
-        Predicted performance:{" "}
+        Predicted views:{" "}
         <span className="text-text-primary font-semibold">{predictedViews}</span>
       </p>
+      {predictedLikes && predictedLikes !== "Unknown" && (
+        <p className="text-text-muted text-base mt-1">
+          Predicted likes:{" "}
+          <span className="text-text-primary font-semibold">{predictedLikes}</span>
+        </p>
+      )}
     </div>
   );
 }

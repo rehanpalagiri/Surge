@@ -262,6 +262,7 @@ Return ONLY valid JSON with exactly this structure:
   "caption_score": <0-10>,
   "trend_alignment": <0-10>,
   "predicted_views": "<realistic view range. {predicted_guidance} When in doubt, predict LESS.>",
+  "predicted_likes": "<realistic like range for this video. Likes are typically 3–10% of views on TikTok; for Instagram anchor entirely to like benchmarks since views are unavailable. Give a range and err LOW.>",
   "strengths": ["<specific genuine strength 1>", "<specific genuine strength 2>"],
   "improvements": ["<blunt specific improvement 1>", "<blunt specific improvement 2>", "<blunt specific improvement 3>"],
   "verdict": "<exactly one of: High potential | Average potential | Needs work>",
@@ -279,7 +280,8 @@ Return ONLY valid JSON with exactly this structure:
   "caption_rewrite": "<rewritten caption optimized for {pname}>",
   "hook_rewrite": "<specific rewrite of the first 1-2 seconds>",
   "projected_verdict": "<honest verdict if they apply the full plan>",
-  "projected_views": "<realistic projected range after fixes. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer numbers even after improvements.>"
+  "projected_views": "<realistic projected range after fixes. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer numbers even after improvements.>",
+  "projected_likes": "<realistic like range after fixes, same logic as projected_views. Err LOW.>"
 }}"""
 
 
@@ -354,6 +356,7 @@ def _error_dict(msg: str) -> dict:
         "caption_score": 0,
         "trend_alignment": 0,
         "predicted_views": "Unknown",
+        "predicted_likes": "Unknown",
         "strengths": [],
         "improvements": [],
         "verdict": "Needs work",
@@ -363,5 +366,6 @@ def _error_dict(msg: str) -> dict:
         "hook_rewrite": "",
         "projected_verdict": "",
         "projected_views": "",
+        "projected_likes": "",
         "error": msg,
     }
