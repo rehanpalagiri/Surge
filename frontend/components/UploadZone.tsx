@@ -54,17 +54,13 @@ const TIPS = [
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
 function TikTokIcon() {
-  // Reusable note shape using currentColor — rendered 3× (cyan offset, red offset, white)
-  const Note = () => (
-    <>
-      <ellipse cx="22" cy="51" rx="10" ry="8.5" fill="currentColor" transform="rotate(-8 22 51)" />
-      <rect x="30" y="13" width="5.5" height="40" fill="currentColor" />
-      <path
-        d="M35.5 13 L51 13 Q56 13 56 25 L56 36 Q56 43 46 43 L35.5 43 L35.5 35 L44 35 Q48 33 48 27 Q48 19 35.5 17 Z"
-        fill="currentColor"
-      />
-    </>
-  );
+  // Note head: circle at (24,51) r=9
+  // Stem: rect x=27 y=15 w=6 h=38
+  // Flag: solid filled shape off the top-right of the stem
+  const headCx = 24, headCy = 51, headR = 9;
+  const stemX = 27, stemY = 15, stemW = 6, stemH = 38;
+  const flag = "M33 15 L50 15 Q57 15 57 24 L57 35 Q57 43 47 43 L33 43 Z";
+
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -74,9 +70,22 @@ function TikTokIcon() {
       </defs>
       <rect width="72" height="72" rx="16" fill="#010101" />
       <g clipPath="url(#tt-clip)">
-        <g color="#25f4ee" transform="translate(-2 2)"><Note /></g>
-        <g color="#fe2c55" transform="translate(2 -2)"><Note /></g>
-        <g color="white"><Note /></g>
+        {/* Cyan shadow — shifted left+down */}
+        <g transform="translate(-2 2)">
+          <circle cx={headCx} cy={headCy} r={headR} fill="#25f4ee" />
+          <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#25f4ee" />
+          <path d={flag} fill="#25f4ee" />
+        </g>
+        {/* Red shadow — shifted right+up */}
+        <g transform="translate(2 -2)">
+          <circle cx={headCx} cy={headCy} r={headR} fill="#fe2c55" />
+          <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#fe2c55" />
+          <path d={flag} fill="#fe2c55" />
+        </g>
+        {/* White main */}
+        <circle cx={headCx} cy={headCy} r={headR} fill="white" />
+        <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="white" />
+        <path d={flag} fill="white" />
       </g>
     </svg>
   );
@@ -126,7 +135,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [mode, setMode] = useState<ModeId>("quick");
 
   const pName = platform === "instagram" ? "Instagram" : "TikTok";
-  const textGradient = platform === "instagram" ? "gradient-text-instagram" : "gradient-text-tiktok";
+  const textGradient = platform === "instagram" ? "gradient-text-instagram" : "tiktok-glitch";
 
   // Detect auth + restore the last-used mode (client-only to avoid hydration mismatch).
   useEffect(() => {
