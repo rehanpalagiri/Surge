@@ -21,7 +21,7 @@ const MODES = [
   {
     id: "quick",
     label: "Lite",
-    time: "~15 sec",
+    time: "~20 sec",
     desc: "Fast take on the video alone — no benchmarks or history.",
   },
   {
@@ -33,7 +33,7 @@ const MODES = [
   {
     id: "deep_thinking",
     label: "Deep",
-    time: "~45 sec",
+    time: "~60 sec",
     desc: "Benchmarks plus your channel history for a personalized read.",
   },
 ] as const;
