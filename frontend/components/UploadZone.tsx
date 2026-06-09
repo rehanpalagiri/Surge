@@ -82,7 +82,7 @@ function TikTokIcon() {
       <g transform="translate(2 -2)">
         <path fillRule="evenodd" d={d} fill="#fe2c55" />
       </g>
-      <path fillRule="evenodd" d={d} className="tt-note-fill" />
+      <path fillRule="evenodd" d={d} style={{ fill: 'var(--tt-note-fill)' }} />
     </svg>
   );
 }

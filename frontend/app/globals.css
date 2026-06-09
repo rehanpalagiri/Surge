@@ -17,6 +17,7 @@
   --color-success: #22c55e;
   --color-warning: #eab308;
   --color-danger:  #ef4444;
+  --tt-note-fill:  #ffffff;
 }
 
 /* ─── Light mode overrides ─────────────────────────────────────────────────── */
@@ -34,6 +35,7 @@ html.light {
   --color-success: #16a34a;
   --color-warning: #ca8a04;
   --color-danger:  #dc2626;
+  --tt-note-fill:  #010101;
 }
 
 body {
@@ -90,10 +92,6 @@ body {
        1.5px  1px 0 #fe2c55,
       -1.5px -1px 0 #25f4ee;
   }
-
-  /* TikTok note icon fill — white in dark mode, black in light mode */
-  .tt-note-fill { fill: white; }
-  html.light .tt-note-fill { fill: #010101; }
 
   /* Solid TikTok accent colours for individual elements */
   .tiktok-cyan  { color: #25f4ee; }
