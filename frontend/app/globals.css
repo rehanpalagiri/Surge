@@ -20,24 +20,6 @@
   --tt-note-fill:  #ffffff;
 }
 
-/* ─── Light mode overrides ─────────────────────────────────────────────────── */
-html.light {
-  --color-background:   #f4f4ff;
-  --color-surface:      #ffffff;
-  --color-card:         #ededf8;
-  --color-border:       #d8d8ee;
-  --color-text-primary: #0c0c1e;
-  --color-text-muted:   #5a5a80;
-  --color-purple-from:  #7c3aed;
-  --color-purple-to:    #a855f7;
-  --color-blue-from:    #2563eb;
-  --color-blue-to:      #3b82f6;
-  --color-success: #16a34a;
-  --color-warning: #ca8a04;
-  --color-danger:  #dc2626;
-  --tt-note-fill:  #010101;
-}
-
 body {
   background-color: var(--color-background);
   color: var(--color-text-primary);
