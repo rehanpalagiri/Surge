@@ -54,39 +54,35 @@ const TIPS = [
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
 function TikTokIcon() {
-  // Real TikTok note shape:
-  // - Ring (outer circle r=13 minus inner hole r=7) via fill-rule evenodd
-  // - Vertical stem rect connecting ring to flag
-  // - Rounded rectangular flag at top-right
+  // Single connected path tracing the real TikTok note shape:
+  //   M33 7        — top-left of stem / outer-left of flag
+  //   L50 7        — right along the flag top
+  //   Q58 7 58 18  — round the top-right corner of the flag
+  //   L58 30       — down the flag's right side
+  //   Q58 38 48 38 — round the flag's bottom-right corner
+  //   L40 38       — left along flag bottom back to stem width
+  //   L40 50       — down stem right side to where it meets the note head
+  //   A18 18 0 1 0 33 36 — big CCW arc: sweeps through bottom-left of the ring
+  //   Z            — straight line back up the stem left edge to M (33 7)
   //
-  // Note head center: (22, 50)
-  // Two-arc trick for full circles (SVG can't do a full circle in one arc):
-  const ring =
-    "M22 37 A13 13 0 1 1 22 63 A13 13 0 1 1 22 37 Z " + // outer circle
-    "M22 43 A7 7 0 1 0 22 57 A7 7 0 1 0 22 43 Z";       // inner hole (opposite winding = evenodd cuts it out)
+  // Inner hole (fill-rule evenodd subtracts it):
+  //   M22 40  A10 10 0 1 1 22 60  A10 10 0 1 1 22 40 Z
+  //   — full circle CW at note-head centre (22,50) r=10
 
-  const stemX = 29, stemY = 13, stemW = 6, stemH = 38; // stem: right side of ring → top
-  const flag = "M35 13 L50 13 Q57 13 57 23 L57 35 Q57 43 47 43 L35 43 Z";
+  const d =
+    "M33 7 L50 7 Q58 7 58 18 L58 30 Q58 38 48 38 L40 38 L40 50 " +
+    "A18 18 0 1 0 33 36 Z " +
+    "M22 40 A10 10 0 1 1 22 60 A10 10 0 1 1 22 40 Z";
 
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Transparent background — note color adapts via .tt-note-fill CSS class */}
-      {/* Cyan shadow layer */}
       <g transform="translate(-2 2)">
-        <path fillRule="evenodd" d={ring} fill="#25f4ee" />
-        <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#25f4ee" />
-        <path d={flag} fill="#25f4ee" />
+        <path fillRule="evenodd" d={d} fill="#25f4ee" />
       </g>
-      {/* Red shadow layer */}
       <g transform="translate(2 -2)">
-        <path fillRule="evenodd" d={ring} fill="#fe2c55" />
-        <rect x={stemX} y={stemY} width={stemW} height={stemH} fill="#fe2c55" />
-        <path d={flag} fill="#fe2c55" />
+        <path fillRule="evenodd" d={d} fill="#fe2c55" />
       </g>
-      {/* Main note — white in dark mode, black in light mode via CSS */}
-      <path fillRule="evenodd" d={ring} className="tt-note-fill" />
-      <rect x={stemX} y={stemY} width={stemW} height={stemH} className="tt-note-fill" />
-      <path d={flag} className="tt-note-fill" />
+      <path fillRule="evenodd" d={d} className="tt-note-fill" />
     </svg>
   );
 }
