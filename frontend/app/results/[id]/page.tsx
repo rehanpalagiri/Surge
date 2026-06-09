@@ -121,9 +121,9 @@ export default function ResultsPage() {
   ];
 
   const MODE_LABEL: Record<string, string> = {
-    quick: "⚡ Lite",
-    thinking: "🧠 Thinking",
-    deep_thinking: "🔬 Deep — Personalized",
+    quick: "Lite",
+    thinking: "Thinking",
+    deep_thinking: "Deep — Personalized",
   };
   const modeLabel = MODE_LABEL[analysis.mode ?? "quick"] ?? MODE_LABEL.quick;
 
@@ -140,7 +140,7 @@ export default function ResultsPage() {
         </div>
 
         {/* Verdict banner — always shown */}
-        <VerdictBanner verdict={analysis.verdict} predictedViews={s.predicted_views} predictedLikes={s.predicted_likes} />
+        <VerdictBanner verdict={analysis.verdict} predictedViews={s.predicted_views} predictedLikes={s.predicted_likes} platform={analysis.platform ?? "tiktok"} />
 
         {locked ? (
           /* ---------- FREE TIER (anonymous): locked teaser ---------- */

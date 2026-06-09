@@ -20,6 +20,7 @@ const NICHES = [
 ];
 
 type Tab = "url" | "manual";
+type Platform = "tiktok" | "instagram";
 
 function parseSeedSummary(raw: string | null): string {
   if (!raw) return "";
@@ -27,14 +28,6 @@ function parseSeedSummary(raw: string | null): string {
     const d = JSON.parse(raw);
     return typeof d?.seed_summary === "string" ? d.seed_summary : "";
   } catch { return ""; }
-}
-
-/** Detect platform from URL string (mirrors backend logic). */
-function detectPlatform(url: string): "tiktok" | "instagram" | null {
-  const u = url.trim().toLowerCase();
-  if (u.includes("tiktok.com")) return "tiktok";
-  if (u.includes("instagram.com") || u.includes("instagr.am")) return "instagram";
-  return null;
 }
 
 function UsageBar({ used, limit, resetsAt }: { used: number; limit: number; resetsAt: string }) {
@@ -73,6 +66,7 @@ export default function AdminPage() {
   const [seeds, setSeeds] = useState<SeedVideoOut[]>([]);
   const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState<Tab>("url");
+  const [activePlatform, setActivePlatform] = useState<Platform>("tiktok");
 
   // URL fetch state
   const [fetchUrl, setFetchUrl] = useState("");
@@ -84,7 +78,6 @@ export default function AdminPage() {
 
   // Manual upload state
   const [file, setFile] = useState<File | null>(null);
-  const [platform, setPlatform] = useState("tiktok");
   const [niche, setNiche] = useState("Fitness");
   const [viewCount, setViewCount] = useState("");
   const [likeCount, setLikeCount] = useState("");
@@ -93,7 +86,10 @@ export default function AdminPage() {
   const [uploadError, setUploadError] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const detectedPlatform = detectPlatform(fetchUrl);
+  const igUsed = apiUsage?.instagram.used ?? 0;
+  const igLimit = apiUsage?.instagram.limit ?? 20;
+  const igResetsAt = apiUsage?.instagram.resets_at ?? "";
+  const igAtLimit = igUsed >= igLimit;
 
   const refreshFetchStatus = useCallback(async (pw: string) => {
     try { setFetchStatus(await getFetchStatus(pw)); } catch { /* non-fatal */ }
@@ -122,6 +118,11 @@ export default function AdminPage() {
       refreshApiUsage(saved);
     }
   }, [loadSeeds, refreshFetchStatus, refreshApiUsage]);
+
+  // Reset view count when switching platforms
+  useEffect(() => {
+    setViewCount("");
+  }, [activePlatform]);
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -166,9 +167,9 @@ export default function AdminPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("platform", platform);
+      form.append("platform", activePlatform);
       form.append("niche", niche);
-      if (platform === "tiktok") form.append("view_count", viewCount);
+      if (activePlatform === "tiktok") form.append("view_count", viewCount);
       form.append("like_count", likeCount);
       if (notes) form.append("notes", notes);
       await addSeedVideo(form, password);
@@ -228,11 +229,6 @@ export default function AdminPage() {
     );
   }
 
-  const igUsed = apiUsage?.instagram.used ?? 0;
-  const igLimit = apiUsage?.instagram.limit ?? 20;
-  const igResetsAt = apiUsage?.instagram.resets_at ?? "";
-  const igAtLimit = igUsed >= igLimit;
-
   return (
     <main className="min-h-screen bg-background">
       <nav className="border-b border-border bg-surface/50 sticky top-0 z-10">
@@ -265,21 +261,40 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Add seed — two tabs */}
+        {/* Add seed card */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
-          {/* Tab bar */}
+
+          {/* Platform selector */}
+          <div className="flex items-center gap-1 px-4 pt-4 pb-3 border-b border-border">
+            <span className="text-text-muted text-xs font-medium mr-2 uppercase tracking-widest">Platform</span>
+            {(["tiktok", "instagram"] as Platform[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setActivePlatform(p)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  activePlatform === p
+                    ? "bg-purple-from/15 border border-purple-to/40 text-text-primary"
+                    : "text-text-muted hover:text-text-primary hover:bg-surface/60"
+                }`}
+              >
+                {p === "tiktok" ? "TikTok" : "Instagram"}
+              </button>
+            ))}
+          </div>
+
+          {/* URL / Manual tab bar */}
           <div className="flex border-b border-border">
             {(["url", "manual"] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 py-3.5 text-sm font-medium transition-colors ${
+                className={`flex-1 py-3 text-sm font-medium transition-colors ${
                   tab === t
                     ? "text-text-primary border-b-2 border-purple-to bg-card"
                     : "text-text-muted hover:text-text-primary bg-surface/40"
                 }`}
               >
-                {t === "url" ? "📎 Add from URL" : "📁 Manual Upload"}
+                {t === "url" ? "Add from URL" : "Manual Upload"}
               </button>
             ))}
           </div>
@@ -288,23 +303,24 @@ export default function AdminPage() {
             {/* ── URL tab ── */}
             {tab === "url" && (
               <div className="space-y-4">
-                <div>
-                  <h2 className="text-text-primary font-semibold text-lg mb-1">Add from URL</h2>
-                  <p className="text-text-muted text-sm">
-                    Paste a TikTok or Instagram Reel URL — the platform is detected automatically.
-                    TikTok fetches are unlimited; Instagram uses the EaseApi (20/month free).
-                  </p>
-                </div>
+                <p className="text-text-muted text-sm">
+                  {activePlatform === "tiktok"
+                    ? "Paste a TikTok video URL — fetched via tikwm.com, unlimited."
+                    : "Paste an Instagram Reel URL — fetched via EaseApi (20/month free). Likes only; views are hidden by Instagram."}
+                </p>
 
-                {/* Instagram usage counter — shown when URL looks like Instagram */}
-                {detectedPlatform === "instagram" && apiUsage && (
+                {/* Instagram usage counter */}
+                {activePlatform === "instagram" && apiUsage && (
                   <UsageBar used={igUsed} limit={igLimit} resetsAt={igResetsAt} />
                 )}
 
                 {/* Limit reached warning */}
-                {detectedPlatform === "instagram" && igAtLimit && (
+                {activePlatform === "instagram" && igAtLimit && (
                   <div className="bg-warning/10 border border-warning/30 rounded-xl px-4 py-3 text-sm text-warning">
-                    Monthly limit reached — switch to the <button onClick={() => setTab("manual")} className="underline font-medium">Manual Upload</button> tab.
+                    Monthly limit reached — switch to{" "}
+                    <button onClick={() => setTab("manual")} className="underline font-medium">
+                      Manual Upload
+                    </button>.
                   </div>
                 )}
 
@@ -313,17 +329,16 @@ export default function AdminPage() {
                     <label className="block text-sm text-text-muted mb-1">URL</label>
                     <input
                       type="url"
-                      placeholder="https://www.tiktok.com/@user/video/... or https://www.instagram.com/reel/..."
+                      placeholder={
+                        activePlatform === "tiktok"
+                          ? "https://www.tiktok.com/@user/video/..."
+                          : "https://www.instagram.com/reel/..."
+                      }
                       value={fetchUrl}
                       onChange={(e) => setFetchUrl(e.target.value)}
                       required
                       className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
                     />
-                    {detectedPlatform && (
-                      <p className="text-text-muted/60 text-xs mt-1">
-                        Detected: {detectedPlatform === "tiktok" ? "🎵 TikTok" : "📸 Instagram"}
-                      </p>
-                    )}
                   </div>
                   <div>
                     <label className="block text-sm text-text-muted mb-1">Niche</label>
@@ -338,11 +353,11 @@ export default function AdminPage() {
                   {fetchError && <p className="text-danger text-sm">{fetchError}</p>}
                   <button
                     type="submit"
-                    disabled={fetching || (detectedPlatform === "instagram" && igAtLimit)}
+                    disabled={fetching || (activePlatform === "instagram" && igAtLimit)}
                     className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl disabled:opacity-50 whitespace-nowrap"
                   >
                     {fetching
-                      ? detectedPlatform === "instagram"
+                      ? activePlatform === "instagram"
                         ? "Fetching from Instagram…"
                         : "Fetching from TikTok…"
                       : "Fetch & Analyze"}
@@ -354,13 +369,11 @@ export default function AdminPage() {
             {/* ── Manual upload tab ── */}
             {tab === "manual" && (
               <div className="space-y-4">
-                <div>
-                  <h2 className="text-text-primary font-semibold text-lg mb-1">Manual Upload</h2>
-                  <p className="text-text-muted text-sm">
-                    Upload a saved video file directly. Use this when the URL fetch fails or as an
-                    unlimited fallback for Instagram.
-                  </p>
-                </div>
+                <p className="text-text-muted text-sm">
+                  Upload a saved video file directly. Use this when the URL fetch fails or as an
+                  unlimited fallback.
+                  {activePlatform === "instagram" && " Instagram hides view counts — only likes are used."}
+                </p>
                 <form onSubmit={handleUpload} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -374,17 +387,6 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-text-muted mb-1">Platform</label>
-                      <select
-                        value={platform}
-                        onChange={(e) => { setPlatform(e.target.value); setViewCount(""); }}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
-                      >
-                        <option value="tiktok" className="bg-card">TikTok</option>
-                        <option value="instagram" className="bg-card">Instagram</option>
-                      </select>
-                    </div>
-                    <div>
                       <label className="block text-sm text-text-muted mb-1">Niche</label>
                       <select
                         value={niche}
@@ -392,11 +394,11 @@ export default function AdminPage() {
                         className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
                       >
                         {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
-                      </select>
+                    </select>
                     </div>
 
                     {/* View count — TikTok only */}
-                    {platform === "tiktok" && (
+                    {activePlatform === "tiktok" && (
                       <div>
                         <label className="block text-sm text-text-muted mb-1">View count</label>
                         <input
@@ -414,8 +416,8 @@ export default function AdminPage() {
                     <div>
                       <label className="block text-sm text-text-muted mb-1">
                         Like count
-                        {platform === "instagram" && (
-                          <span className="ml-1 text-text-muted/60 font-normal">(from the reel)</span>
+                        {activePlatform === "instagram" && (
+                          <span className="ml-1 text-text-muted/60 font-normal">(primary metric)</span>
                         )}
                       </label>
                       <input
@@ -430,16 +432,10 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {platform === "instagram" && (
-                    <div className="bg-surface/60 border border-border rounded-xl px-4 py-3 text-xs text-text-muted">
-                      Instagram hides view counts — only likes are used to anchor the Gemini virality rating for Instagram seeds.
-                    </div>
-                  )}
-
                   <div className="bg-surface/60 border border-border rounded-xl px-4 py-3 text-xs text-text-muted">
-                    On upload, Surge sends this video to Gemini and generates a causal
-                    performance writeup + a 0–10 virality rating (~20–30s). The video file is
-                    deleted afterward. If analysis fails, the seed is not saved — just retry.
+                    Surge sends this video to Gemini and generates a causal performance writeup
+                    + a 0–10 virality rating (~20–30s). The video file is deleted afterward. If
+                    analysis fails, the seed is not saved — just retry.
                   </div>
 
                   <div>
