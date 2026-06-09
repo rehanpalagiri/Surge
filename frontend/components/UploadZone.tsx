@@ -53,6 +53,52 @@ const TIPS = [
 
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
+function TikTokIcon() {
+  return (
+    <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="16" fill="#010101" />
+      {/* Cyan shadow */}
+      <g transform="translate(-1.5, 1.5)">
+        <circle cx="25" cy="51" r="9" fill="#25f4ee" />
+        <rect x="32" y="14" width="6" height="39" fill="#25f4ee" />
+        <path d="M38 14 L51 14 Q54 14 54 24 L54 33 Q54 40 44 40 L38 40 L38 32 L43 32 Q46 30 46 25 Q46 18 38 18 Z" fill="#25f4ee" />
+      </g>
+      {/* Red shadow */}
+      <g transform="translate(1.5, -1.5)">
+        <circle cx="25" cy="51" r="9" fill="#fe2c55" />
+        <rect x="32" y="14" width="6" height="39" fill="#fe2c55" />
+        <path d="M38 14 L51 14 Q54 14 54 24 L54 33 Q54 40 44 40 L38 40 L38 32 L43 32 Q46 30 46 25 Q46 18 38 18 Z" fill="#fe2c55" />
+      </g>
+      {/* White main */}
+      <circle cx="25" cy="51" r="9" fill="white" />
+      <rect x="32" y="14" width="6" height="39" fill="white" />
+      <path d="M38 14 L51 14 Q54 14 54 24 L54 33 Q54 40 44 40 L38 40 L38 32 L43 32 Q46 30 46 25 Q46 18 38 18 Z" fill="white" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ig-bg" x1="0" y1="72" x2="72" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#fcaf45" />
+          <stop offset="35%" stopColor="#fd1d1d" />
+          <stop offset="70%" stopColor="#e1306c" />
+          <stop offset="100%" stopColor="#833ab4" />
+        </linearGradient>
+      </defs>
+      <rect width="72" height="72" rx="16" fill="url(#ig-bg)" />
+      {/* Camera body */}
+      <rect x="13" y="13" width="46" height="46" rx="13" stroke="white" strokeWidth="4" fill="none" />
+      {/* Lens */}
+      <circle cx="36" cy="36" r="12" stroke="white" strokeWidth="4" fill="none" />
+      {/* Viewfinder dot */}
+      <circle cx="52" cy="20" r="3.5" fill="white" />
+    </svg>
+  );
+}
+
 interface Props {
   platform?: string;
   /** Pre-populate with a file (e.g. from the Web Share Target) */
@@ -75,6 +121,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [mode, setMode] = useState<ModeId>("quick");
 
   const pName = platform === "instagram" ? "Instagram" : "TikTok";
+  const textGradient = platform === "instagram" ? "gradient-text-instagram" : "gradient-text-tiktok";
 
   // Detect auth + restore the last-used mode (client-only to avoid hydration mismatch).
   useEffect(() => {
@@ -242,39 +289,31 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             className="hidden"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />
-          <div className="text-4xl">{file ? "✅" : "🎥"}</div>
           {file ? (
             <>
+              <div className="text-4xl">✅</div>
               <p className="text-text-primary font-semibold">{file.name}</p>
               <p className="text-text-muted text-sm">{formatSize(file.size)}</p>
               <p className="text-text-muted text-xs">Tap to change file</p>
             </>
           ) : (
             <>
+              {platform === "instagram" ? <InstagramIcon /> : <TikTokIcon />}
               {/* Mobile copy */}
-              <p className="text-text-primary font-semibold sm:hidden">
-                Tap to choose from Camera Roll
+              <p className={`text-xl font-bold ${textGradient} sm:hidden`}>
+                Tap to add your {pName} video
               </p>
               {/* Desktop copy */}
-              <p className="text-text-primary font-semibold hidden sm:block">
+              <p className={`text-xl font-bold ${textGradient} hidden sm:block`}>
                 Drop your {pName} video here
               </p>
-              <p className="text-text-muted text-sm hidden sm:block">
-                or click to browse — video files up to 100MB
-              </p>
-              <p className="text-text-muted text-sm sm:hidden">
-                Video files up to 100MB
+              <p className="text-white/50 text-sm">
+                .mp4 or .mov · up to 100MB
               </p>
             </>
           )}
         </div>
 
-        {/* TikTok/Instagram save helper — mobile only */}
-        {!file && (
-          <p className="sm:hidden text-text-muted/60 text-xs text-center -mt-1 px-2">
-            On {pName}: tap ··· → Save video → come back here and tap above
-          </p>
-        )}
 
         {/* ── Niche ────────────────────────────────────────────────────────── */}
         <div>
@@ -364,7 +403,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           type="submit"
           disabled={!file || loading}
           className={`w-full ${
-            platform === "instagram" ? "gradient-btn-instagram" : "gradient-btn-tiktok"
+            platform === "instagram" ? "gradient-btn-instagram" : "gradient-btn"
           } text-white font-bold py-4 rounded-xl text-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]`}
         >
           {loading ? "Analyzing..." : "Analyze My Video"}

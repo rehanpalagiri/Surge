@@ -39,7 +39,7 @@ function LoginForm() {
           // Already owned / belongs to someone else — non-fatal.
         }
       }
-      router.push(next || "/projects");
+      router.push(next || "/");
     } catch {
       setError("Invalid username or password.");
       setLoading(false);
