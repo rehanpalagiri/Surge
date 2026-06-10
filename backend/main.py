@@ -120,15 +120,54 @@ async def _ensure_columns(conn):
         )
 
 
+async def _ensure_columns_pg(conn):
+    """Postgres self-migration (v1.21): additive-only, idempotent statements run on
+    every boot. `ADD COLUMN IF NOT EXISTS` is a catalog no-op once applied, so the
+    cost is microseconds per boot — and deploys become self-migrating (no manual
+    Neon ALTER TABLE step).
+
+    RULES for this list:
+      - ADDITIVE ONLY: new nullable/defaulted columns. Never DROP / RENAME /
+        ALTER TYPE here — destructive changes stay manual and deliberate.
+      - Append, never reorder: each statement must stay valid forever against
+        any historical schema state.
+    `create_all` above handles brand-new TABLES; this handles new COLUMNS on
+    existing tables (create_all never alters existing tables).
+    """
+    statements = [
+        # --- user_analyses ---
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS user_id INTEGER",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS platform VARCHAR DEFAULT 'tiktok'",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS caption TEXT",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS actual_likes INTEGER",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS mode VARCHAR DEFAULT 'quick'",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS video_url VARCHAR",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS counts_fetched_at TIMESTAMP",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS promoted_seed_id INTEGER",
+        # --- seed_videos ---
+        "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS platform VARCHAR DEFAULT 'tiktok'",
+        "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS rating INTEGER",
+        "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS gemini_analysis TEXT",
+        "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS posted_at TIMESTAMP",
+        "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS source VARCHAR DEFAULT 'admin'",
+        # Instagram seeds have no public view count (no-op once already nullable)
+        "ALTER TABLE seed_videos ALTER COLUMN view_count DROP NOT NULL",
+    ]
+    for stmt in statements:
+        await conn.exec_driver_sql(stmt)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # _ensure_columns uses SQLite-only PRAGMA syntax — skip on Postgres.
-        # On a fresh Postgres DB, create_all above already creates every column
-        # from the model definition, so the shim is unnecessary there.
+        # _ensure_columns uses SQLite-only PRAGMA syntax; _ensure_columns_pg is
+        # its Postgres twin. Together: every deploy migrates its own schema.
         if engine.dialect.name == "sqlite":
             await _ensure_columns(conn)
+        else:
+            await _ensure_columns_pg(conn)
     yield
 
 

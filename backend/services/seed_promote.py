@@ -38,10 +38,16 @@ async def _download(video_url: str, path: str) -> None:
                     f.write(chunk)
 
 
-async def promote_analysis_to_seed(analysis_id: int) -> None:
+async def promote_analysis_to_seed(analysis_id: int, meta: dict | None = None) -> None:
     """Background task. Idempotent and self-contained (opens its own DB session,
     since the request's session is already closed by the time this runs). Any
-    failure is logged and swallowed — it must never surface to the user."""
+    failure is logged and swallowed — it must never surface to the user.
+
+    ``meta``: the tikwm payload link_video just fetched. Passing it through avoids
+    a second tikwm call <1s after the first — the free tier is rate-limited to
+    ~1 req/sec, so the back-to-back re-fetch would risk a 429 on every promotion.
+    Falls back to fetching when not supplied.
+    """
     file_path = None
     try:
         # --- Read phase: snapshot what we need, then release the session before
@@ -58,10 +64,11 @@ async def promote_analysis_to_seed(analysis_id: int) -> None:
             page_url = a.video_url
             raw_niche = a.niche
 
-        # --- Heavy phase (no open session): re-fetch fresh metadata (gives us the
-        #     downloadable play URL + current counts) and classify the niche. ---
+        # --- Heavy phase (no open session): classify the niche and (if not handed
+        #     to us) fetch metadata for the downloadable play URL + counts. ---
         canonical = await classify_niche(raw_niche or "")
-        meta = await fetch_tiktok(page_url)
+        if meta is None:
+            meta = await fetch_tiktok(page_url)
         view_count = meta["view_count"]
         like_count = meta["like_count"]
 

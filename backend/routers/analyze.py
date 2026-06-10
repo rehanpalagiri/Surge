@@ -344,8 +344,9 @@ async def link_video(
     # Door B (v1.20): a verified, posted video is the best seed signal there is.
     # Promote it into the reference library in the background so the user's
     # stat-sync stays instant. Idempotent — skipped once already promoted.
+    # meta is passed through so the task doesn't hit tikwm again (~1 req/sec cap).
     if analysis.promoted_seed_id is None:
-        background_tasks.add_task(promote_analysis_to_seed, analysis.id)
+        background_tasks.add_task(promote_analysis_to_seed, analysis.id, meta)
 
     return _to_out(analysis)
 

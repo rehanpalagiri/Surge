@@ -145,7 +145,10 @@ export function apiErrorDetail(err: unknown, fallback: string): string {
       // not JSON — fall through
     }
   }
-  return msg || fallback;
+  // Non-JSON bodies (e.g. a gateway's HTML error page when the backend is
+  // down) aren't fit to show users — only pass through short plain messages.
+  if (msg && msg.length <= 160 && !msg.includes("<")) return msg;
+  return fallback;
 }
 
 /**
