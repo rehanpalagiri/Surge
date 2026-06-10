@@ -60,6 +60,8 @@ export interface AnalysisOut {
   verdict: string;
   actual_views: number | null;
   actual_likes: number | null;
+  video_url?: string | null;          // posted TikTok link (counts auto-fetched)
+  counts_fetched_at?: string | null;
   mode?: string;
   created_at: string;
 }
@@ -74,6 +76,8 @@ export interface AnalysisSummary {
   caption_preview: string | null;
   actual_views: number | null;
   actual_likes: number | null;
+  video_url?: string | null;
+  counts_fetched_at?: string | null;
   mode?: string;
   created_at: string;
 }
@@ -126,6 +130,21 @@ async function handleResponse<T>(res: Response): Promise<T> {
     throw new Error(`API error ${res.status}: ${text}`);
   }
   return res.json();
+}
+
+/** Pull the human-readable `detail` out of an API error for display. */
+export function apiErrorDetail(err: unknown, fallback: string): string {
+  const msg = err instanceof Error ? err.message : "";
+  const jsonPart = msg.match(/\{.*\}$/);
+  if (jsonPart) {
+    try {
+      const detail = JSON.parse(jsonPart[0])?.detail;
+      if (typeof detail === "string") return detail;
+    } catch {
+      // not JSON — fall through
+    }
+  }
+  return msg || fallback;
 }
 
 /**
@@ -263,11 +282,28 @@ export async function submitFeedback(
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/feedback`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
       actual_views: actualViews,
       ...(actualLikes !== undefined ? { actual_likes: actualLikes } : {}),
     }),
+  });
+  return handleResponse<AnalysisOut>(res);
+}
+
+/**
+ * Attach the user's posted TikTok link to an analysis and auto-fetch its real
+ * view/like counts. Omit `url` to refresh counts from the already-stored link
+ * (backend throttles refreshes to once per 24h). TikTok only.
+ */
+export async function linkTikTokVideo(
+  id: string | number,
+  url?: string
+): Promise<AnalysisOut> {
+  const res = await fetch(`${BASE}/api/analyses/${id}/video-link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ url: url ?? null }),
   });
   return handleResponse<AnalysisOut>(res);
 }

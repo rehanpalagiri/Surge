@@ -37,6 +37,15 @@ async def _ensure_columns(conn):
             "ALTER TABLE user_analyses ADD COLUMN mode TEXT DEFAULT 'quick'"
         )
 
+    if "video_url" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN video_url TEXT"
+        )
+    if "counts_fetched_at" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN counts_fetched_at DATETIME"
+        )
+
     # --- seed_videos ---
     result = await conn.exec_driver_sql("PRAGMA table_info(seed_videos)")
     seed_cols = {row[1] for row in result.fetchall()}

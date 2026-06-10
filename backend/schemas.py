@@ -63,6 +63,8 @@ class AnalysisOut(BaseModel):
     verdict: str
     actual_views: Optional[int]
     actual_likes: Optional[int]
+    video_url: Optional[str] = None          # posted TikTok link (counts auto-fetched)
+    counts_fetched_at: Optional[datetime] = None
     mode: Optional[str] = "quick"  # effective mode that ran
     created_at: datetime
 
@@ -73,6 +75,11 @@ class AnalysisOut(BaseModel):
 class FeedbackIn(BaseModel):
     actual_views: int
     actual_likes: Optional[int] = None
+
+
+class VideoLinkIn(BaseModel):
+    # None = refresh counts from the already-stored video_url
+    url: Optional[str] = None
 
 
 class SignupIn(BaseModel):
@@ -109,6 +116,8 @@ class AnalysisSummaryOut(BaseModel):
     caption_preview: Optional[str] = None
     actual_views: Optional[int] = None
     actual_likes: Optional[int] = None
+    video_url: Optional[str] = None
+    counts_fetched_at: Optional[datetime] = None
     mode: Optional[str] = "quick"
     created_at: datetime
 

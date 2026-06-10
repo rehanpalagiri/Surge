@@ -313,7 +313,7 @@ export default function ResultsPage() {
             )}
 
             {/* Feedback */}
-            <FeedbackModal analysisId={analysis.id} />
+            <FeedbackModal analysisId={analysis.id} platform={analysis.platform} />
 
             {/* CTA */}
             <div className="text-center pb-4">

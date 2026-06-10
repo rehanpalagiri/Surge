@@ -14,6 +14,7 @@ from database import get_db
 from models import SeedVideo, FetchStatus
 from schemas import SeedVideoOut
 from services.seed_analysis import analyze_seed_video
+from services.tiktok_fetch import fetch_tiktok
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -173,38 +174,6 @@ def _detect_platform(url: str) -> Optional[str]:
     return None
 
 
-async def _fetch_tiktok(url: str) -> dict:
-    """Fetch TikTok video via tikwm.com (free, no key, works from any IP)."""
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.get(
-            "https://www.tikwm.com/api/",
-            params={"url": url},
-            headers={"User-Agent": "Mozilla/5.0"},
-        )
-        r.raise_for_status()
-        body = r.json()
-
-    if body.get("code") != 0:
-        raise ValueError(f"tikwm: {body.get('msg', 'unknown error')}")
-
-    data = body["data"]
-    posted_at = None
-    ts = data.get("create_time")
-    if ts:
-        try:
-            posted_at = datetime.fromtimestamp(int(ts))
-        except (ValueError, OSError, OverflowError):
-            pass
-
-    return {
-        "video_url": data["play"],
-        "view_count": int(data.get("play_count") or 0),
-        "like_count": int(data.get("digg_count") or 0),
-        "caption": str(data.get("title") or "").strip()[:2200],
-        "posted_at": posted_at,
-    }
-
-
 async def _fetch_instagram(url: str) -> dict:
     """Fetch Instagram Reel via EaseApi on RapidAPI.
     view_count is always None — Instagram does not expose it publicly.
@@ -296,7 +265,7 @@ async def seed_from_url(
 
     try:
         if platform == "tiktok":
-            meta = await _fetch_tiktok(url)
+            meta = await fetch_tiktok(url)
         else:
             meta = await _fetch_instagram(url)
     except Exception as e:

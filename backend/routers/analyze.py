@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,16 +9,18 @@ from sqlalchemy import select
 
 from database import get_db
 from models import SeedVideo, UserAnalysis, UserProfile, User
-from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut
+from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn
 from services.gemini import analyze_video, select_seed_examples
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
+from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
 from auth import optional_user, require_user
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
 VALID_MODES = {"quick", "thinking", "deep_thinking"}
 MAX_ACTUAL_VIEWS = 500_000_000  # sanity ceiling for feedback (no real video tops this)
+REFRESH_COOLDOWN = timedelta(hours=24)  # min gap between video-link count refreshes
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
@@ -223,6 +226,8 @@ async def my_analyses(
                 "caption_preview": caption_preview,
                 "actual_views": a.actual_views,
                 "actual_likes": a.actual_likes,
+                "video_url": a.video_url,
+                "counts_fetched_at": a.counts_fetched_at,
                 "mode": a.mode or "quick",
                 "created_at": a.created_at,
             }
@@ -248,6 +253,91 @@ async def claim_analysis(
         await db.refresh(analysis)
     elif analysis.user_id != user.id:
         raise HTTPException(status_code=403, detail="This analysis belongs to another account")
+    return _to_out(analysis)
+
+
+def _normalize_handle(h: str) -> str:
+    return (h or "").strip().lstrip("@").lower()
+
+
+@router.post("/analyses/{analysis_id}/video-link", response_model=AnalysisOut)
+async def link_video(
+    analysis_id: int,
+    payload: VideoLinkIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    """Attach the user's posted TikTok link to an analysis and auto-fetch its
+    real view/like counts via tikwm. Call with url=None to refresh counts from
+    the already-stored link (throttled to once per 24h). TikTok only —
+    Instagram has no free uncapped metadata API, so it stays manual entry.
+    """
+    result = await db.execute(
+        select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+    )
+    analysis = result.scalar_one_or_none()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if analysis.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
+    if (analysis.platform or "tiktok") != "tiktok":
+        raise HTTPException(
+            status_code=400,
+            detail="Auto-fetch only works for TikTok videos — enter Instagram stats manually.",
+        )
+
+    new_url = (payload.url or "").strip() or None
+    if new_url and not is_tiktok_url(new_url):
+        raise HTTPException(
+            status_code=400,
+            detail="That doesn't look like a TikTok link — paste the URL of your posted video.",
+        )
+    url = new_url or analysis.video_url
+    if not url:
+        raise HTTPException(status_code=400, detail="Paste the link to your posted TikTok first.")
+
+    # Throttle pure refreshes (no new link supplied) — counts don't move that fast.
+    if not new_url and analysis.counts_fetched_at:
+        elapsed = datetime.utcnow() - analysis.counts_fetched_at
+        if elapsed < REFRESH_COOLDOWN:
+            raise HTTPException(
+                status_code=429,
+                detail="Stats were refreshed less than 24 hours ago — check back tomorrow.",
+            )
+
+    try:
+        meta = await fetch_tiktok(url)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Couldn't fetch that video: {e}")
+
+    # Soft ownership check: only enforced when BOTH a saved handle and the
+    # video's author handle are known. Keeps Deep mode's "verified performance"
+    # anchor honest without walling the feature behind profile setup.
+    author = _normalize_handle(meta.get("author_handle", ""))
+    if author:
+        prof_result = await db.execute(
+            select(UserProfile).where(
+                UserProfile.user_id == user.id,
+                UserProfile.platform == "tiktok",
+            )
+        )
+        prof = prof_result.scalar_one_or_none()
+        saved = _normalize_handle(prof.handle if prof else "")
+        if saved and saved != author:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"That video belongs to @{author}, but your profile handle is @{saved}. "
+                    "If that's your account, update your TikTok handle in your profile first."
+                ),
+            )
+
+    analysis.video_url = url
+    analysis.actual_views = meta["view_count"]
+    analysis.actual_likes = meta["like_count"]
+    analysis.counts_fetched_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(analysis)
     return _to_out(analysis)
 
 
@@ -317,6 +407,8 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "verdict": analysis.verdict,
         "actual_views": analysis.actual_views,
         "actual_likes": analysis.actual_likes,
+        "video_url": analysis.video_url,
+        "counts_fetched_at": analysis.counts_fetched_at,
         "mode": analysis.mode or "quick",
         "created_at": analysis.created_at,
     }

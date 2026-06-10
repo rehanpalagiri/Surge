@@ -70,6 +70,10 @@ class UserAnalysis(Base):
     verdict = Column(String, nullable=False)
     actual_views = Column(Integer, nullable=True)
     actual_likes = Column(Integer, nullable=True)
+    # Link to the user's posted TikTok video (v1.19). When set, actual_views /
+    # actual_likes were auto-fetched from the platform and can be refreshed.
+    video_url = Column(String, nullable=True)
+    counts_fetched_at = Column(DateTime, nullable=True)
     # The EFFECTIVE mode that actually ran ("quick" | "thinking" | "deep_thinking").
     # May differ from what the user requested if the run degraded (e.g. Deep with
     # no channel profile → Thinking). The results badge reads this.
