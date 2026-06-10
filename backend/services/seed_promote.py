@@ -1,0 +1,124 @@
+"""Door B (v1.20): auto-promote a user's verified, posted video into the seed library.
+
+When a user links their posted TikTok (`analyze.link_video`), the view/like counts
+are pulled live from tikwm — real, un-fakeable evidence, strictly better than a
+hand-picked admin seed. We run that video through the SAME seed-analysis pipeline the
+admin uses (the rating is anchored to the real counts, so a verified flop lands in the
+LOW bucket and a verified hit in HIGH, automatically). The result is persisted as a
+SeedVideo with ``source="user"``.
+
+Runs as a FastAPI BackgroundTask so the user's stat-sync stays instant — seed analysis
+uploads the video to Gemini and can take 30–120s. Every failure path is swallowed and
+logged: promotion is a best-effort nicety, never part of the user's request guarantee.
+"""
+
+import os
+import json
+import uuid
+import logging
+
+import httpx
+from sqlalchemy import select
+
+from database import AsyncSessionLocal
+from models import SeedVideo, UserAnalysis
+from services.seed_analysis import analyze_seed_video
+from services.niche_classifier import classify_niche
+from services.tiktok_fetch import fetch_tiktok
+
+logger = logging.getLogger("seed_promote")
+
+
+async def _download(video_url: str, path: str) -> None:
+    async with httpx.AsyncClient(timeout=120, follow_redirects=True) as c:
+        async with c.stream("GET", video_url) as r:
+            r.raise_for_status()
+            with open(path, "wb") as f:
+                async for chunk in r.aiter_bytes(chunk_size=65536):
+                    f.write(chunk)
+
+
+async def promote_analysis_to_seed(analysis_id: int) -> None:
+    """Background task. Idempotent and self-contained (opens its own DB session,
+    since the request's session is already closed by the time this runs). Any
+    failure is logged and swallowed — it must never surface to the user."""
+    file_path = None
+    try:
+        # --- Read phase: snapshot what we need, then release the session before
+        #     the long Gemini round-trip (don't hold a txn open for minutes). ---
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(
+                select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+            )
+            a = res.scalar_one_or_none()
+            if a is None or a.promoted_seed_id is not None:
+                return  # gone or already promoted
+            if (a.platform or "tiktok") != "tiktok" or not a.video_url:
+                return  # only verified TikTok links are promotable
+            page_url = a.video_url
+            raw_niche = a.niche
+
+        # --- Heavy phase (no open session): re-fetch fresh metadata (gives us the
+        #     downloadable play URL + current counts) and classify the niche. ---
+        canonical = await classify_niche(raw_niche or "")
+        meta = await fetch_tiktok(page_url)
+        view_count = meta["view_count"]
+        like_count = meta["like_count"]
+
+        uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        file_path = os.path.join(uploads_dir, f"seed_{uuid.uuid4()}.mp4")
+        await _download(meta["video_url"], file_path)
+
+        result = await analyze_seed_video(
+            file_path, "tiktok", canonical, view_count, like_count
+        )
+        if not isinstance(result, dict) or "virality_rating" not in result:
+            logger.warning(
+                "promote %s: seed analysis failed: %s",
+                analysis_id,
+                result.get("error") if isinstance(result, dict) else result,
+            )
+            return
+        try:
+            rating = max(0, min(10, int(round(float(result["virality_rating"])))))
+        except (ValueError, TypeError):
+            logger.warning("promote %s: non-numeric rating, skipping", analysis_id)
+            return
+
+        # --- Write phase: re-check idempotency inside the write txn (guards against
+        #     two refreshes racing), persist the seed, stamp the analysis. ---
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(
+                select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+            )
+            a = res.scalar_one_or_none()
+            if a is None or a.promoted_seed_id is not None:
+                return
+            seed = SeedVideo(
+                filename=f"user-{analysis_id}-{uuid.uuid4().hex[:8]}",
+                platform="tiktok",
+                niche=canonical,
+                view_count=view_count,
+                like_count=like_count,
+                rating=rating,
+                gemini_analysis=json.dumps(result),
+                notes="Auto-promoted from a verified user-posted video.",
+                source="user",
+            )
+            db.add(seed)
+            await db.flush()  # populate seed.id
+            a.promoted_seed_id = seed.id
+            await db.commit()
+            logger.info(
+                "promote %s -> seed %s (rating %s, niche %s, %s views)",
+                analysis_id, seed.id, rating, canonical, view_count,
+            )
+    except Exception as e:  # noqa: BLE001 — promotion must never crash the request
+        logger.warning("promote %s: failed: %s", analysis_id, e)
+    finally:
+        if file_path:
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass

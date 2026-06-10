@@ -525,9 +525,19 @@ export default function AdminPage() {
                       <Fragment key={seed.id}>
                         <tr className="border-b border-border/50 hover:bg-surface/50 transition-colors">
                           <td className="py-2.5 pr-4">
-                            <span className="text-text-muted text-xs font-medium bg-surface border border-border px-2 py-0.5 rounded-full capitalize">
-                              {seed.platform}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-text-muted text-xs font-medium bg-surface border border-border px-2 py-0.5 rounded-full capitalize">
+                                {seed.platform}
+                              </span>
+                              {seed.source === "user" && (
+                                <span
+                                  title="Auto-promoted from a verified user-posted video"
+                                  className="text-[10px] font-semibold text-purple-to bg-purple-to/10 px-1.5 py-0.5 rounded-full"
+                                >
+                                  👤 user
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 pr-4 text-text-primary font-medium">{seed.niche}</td>
                           <td className="py-2.5 pr-4 text-right text-text-primary">

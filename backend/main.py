@@ -45,6 +45,10 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN counts_fetched_at DATETIME"
         )
+    if "promoted_seed_id" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN promoted_seed_id INTEGER"
+        )
 
     # --- seed_videos ---
     result = await conn.exec_driver_sql("PRAGMA table_info(seed_videos)")
@@ -95,6 +99,15 @@ async def _ensure_columns(conn):
         )
         await conn.exec_driver_sql("DROP TABLE seed_videos")
         await conn.exec_driver_sql("ALTER TABLE seed_videos_tmp RENAME TO seed_videos")
+
+    # --- seed_videos: source/provenance (v1.20) — added AFTER the swap above so
+    # the legacy table-rebuild can't drop it. "admin" default backfills old rows.
+    result4 = await conn.exec_driver_sql("PRAGMA table_info(seed_videos)")
+    seed_cols2 = {row[1] for row in result4.fetchall()}
+    if "source" not in seed_cols2:
+        await conn.exec_driver_sql(
+            "ALTER TABLE seed_videos ADD COLUMN source TEXT DEFAULT 'admin'"
+        )
 
     # --- user_analyses: platform column (default tiktok for existing rows) ---
     if "platform" not in existing:

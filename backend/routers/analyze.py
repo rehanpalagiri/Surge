@@ -3,7 +3,7 @@ import uuid
 import json
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -14,6 +14,7 @@ from services.gemini import analyze_video, select_seed_examples
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
+from services.seed_promote import promote_analysis_to_seed
 from auth import optional_user, require_user
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -264,6 +265,7 @@ def _normalize_handle(h: str) -> str:
 async def link_video(
     analysis_id: int,
     payload: VideoLinkIn,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -338,6 +340,13 @@ async def link_video(
     analysis.counts_fetched_at = datetime.utcnow()
     await db.commit()
     await db.refresh(analysis)
+
+    # Door B (v1.20): a verified, posted video is the best seed signal there is.
+    # Promote it into the reference library in the background so the user's
+    # stat-sync stays instant. Idempotent — skipped once already promoted.
+    if analysis.promoted_seed_id is None:
+        background_tasks.add_task(promote_analysis_to_seed, analysis.id)
+
     return _to_out(analysis)
 
 

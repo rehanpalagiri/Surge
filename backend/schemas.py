@@ -46,6 +46,7 @@ class SeedVideoOut(BaseModel):
     gemini_analysis: Optional[str] = None  # raw JSON string; admin panel parses seed_summary
     notes: Optional[str]
     posted_at: Optional[datetime] = None
+    source: Optional[str] = "admin"  # "admin" | "user" (auto-promoted from a verified link)
     created_at: datetime
 
     class Config:

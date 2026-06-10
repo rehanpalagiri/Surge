@@ -113,6 +113,7 @@ export interface SeedVideoOut {
   gemini_analysis: string | null; // raw JSON; parse for seed_summary
   notes: string | null;
   posted_at?: string | null;
+  source?: string | null; // "admin" | "user" (auto-promoted from a verified link)
   created_at: string;
 }
 

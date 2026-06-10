@@ -36,6 +36,11 @@ class SeedVideo(Base):
     performed = Column(Boolean, nullable=True, default=False)
     notes = Column(Text, nullable=True)
     posted_at = Column(DateTime, nullable=True)
+    # Provenance (v1.20): "admin" = hand-curated via /admin, "user" = auto-promoted
+    # from a verified user-posted video (real tikwm-fetched counts). User seeds are
+    # the better signal — real outcomes, not a curator's guess — and this column lets
+    # the bucketer weight them higher later. Defaults to "admin" for pre-1.20 rows.
+    source = Column(String, nullable=True, default="admin")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -74,6 +79,9 @@ class UserAnalysis(Base):
     # actual_likes were auto-fetched from the platform and can be refreshed.
     video_url = Column(String, nullable=True)
     counts_fetched_at = Column(DateTime, nullable=True)
+    # Set once this analysis's verified video has been auto-promoted into the seed
+    # library (v1.20). Idempotency guard — a non-NULL value means "already a seed".
+    promoted_seed_id = Column(Integer, nullable=True)
     # The EFFECTIVE mode that actually ran ("quick" | "thinking" | "deep_thinking").
     # May differ from what the user requested if the run degraded (e.g. Deep with
     # no channel profile → Thinking). The results badge reads this.
