@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 import InstallBanner from "@/components/InstallBanner";
-import ThemeProvider from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -38,7 +37,6 @@ export default function RootLayout({
       <body
         className={`${inter.className} antialiased bg-background text-text-primary min-h-screen`}
       >
-        <ThemeProvider />
         <RegisterSW />
         {children}
         <InstallBanner />

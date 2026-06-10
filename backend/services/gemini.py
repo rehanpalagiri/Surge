@@ -117,6 +117,7 @@ def _build_system_prompt(
     profile_context: str = "",
     channel_profile: str | None = None,
     mode: str = "quick",
+    niche_raw: str = "",
 ) -> str:
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
@@ -211,6 +212,16 @@ def _build_system_prompt(
         mode, _PREDICTED_VIEWS_GUIDANCE["quick"]
     ).format(pname=pname)
 
+    # Canonical niche drives seed matching; the creator's own words add
+    # specificity for the model. Cap raw text so an essay can't bloat the prompt.
+    niche_line = f"The user's video is a **{pname} video** in the **{niche}** niche."
+    raw = (niche_raw or "").strip()[:80]
+    if raw and raw.lower() != niche.lower():
+        niche_line = (
+            f"The user's video is a **{pname} video** in the **{niche}** niche "
+            f'(creator describes their content as: "{raw}").'
+        )
+
     return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh.
 {benchmark_block}
 
@@ -232,7 +243,7 @@ CALIBRATION (internalize this before scoring):
 - When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't.
 {profile_perf_block}{seed_block}
 
-The user's video is a **{pname} video** in the **{niche}** niche.
+{niche_line}
 {caption_block}{bio_block}{profile_block}
 
 PLATFORM CONTEXT ({pname}):
@@ -296,6 +307,7 @@ async def analyze_video(
     profile_context: str = "",
     channel_profile: str | None = None,
     mode: str = "quick",
+    niche_raw: str = "",
 ) -> dict:
     try:
         prompt = _build_system_prompt(
@@ -308,6 +320,7 @@ async def analyze_video(
             profile_context,
             channel_profile,
             mode,
+            niche_raw=niche_raw,
         )
 
         uploaded = await client.aio.files.upload(file=video_path)

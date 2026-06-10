@@ -11,6 +11,7 @@ from models import SeedVideo, UserAnalysis, UserProfile, User
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut
 from services.gemini import analyze_video, select_seed_examples
 from services.channel_profile import build_channel_profile
+from services.niche_classifier import classify_niche
 from auth import optional_user, require_user
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -51,6 +52,13 @@ async def analyze(
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
     requested_mode = mode if mode in VALID_MODES else "quick"
 
+    # Free-text niche: store what the user typed, classify to a canonical
+    # niche for seed matching. Truncate before any processing.
+    raw_niche = niche.strip()[:200]
+    if not raw_niche:
+        raise HTTPException(status_code=400, detail="Please provide your content niche.")
+    canonical_niche = await classify_niche(raw_niche)
+
     # Validate content type (client-declared; best-effort guard)
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
@@ -77,7 +85,7 @@ async def analyze(
             select(SeedVideo).where(SeedVideo.platform == platform)
         )
         seeds = seeds_result.scalars().all()
-        high_seeds, low_seeds = select_seed_examples(seeds, niche)
+        high_seeds, low_seeds = select_seed_examples(seeds, canonical_niche)
     has_usable_seeds = bool(high_seeds or low_seeds)
 
     # --- Creator channel profile (Deep only, needs >= 2 prior analyses) ---
@@ -126,7 +134,7 @@ async def analyze(
     try:
         result = await analyze_video(
             file_path,
-            niche,
+            canonical_niche,
             seeds_high,
             seeds_low,
             caption,
@@ -135,6 +143,7 @@ async def analyze(
             profile_context,
             profile_arg,
             effective_mode,
+            niche_raw=raw_niche,
         )
     finally:
         # Remove the temp upload — the video has already been sent to Gemini,
@@ -148,7 +157,7 @@ async def analyze(
         user_id=user.id if user else None,
         platform=platform,
         filename=safe_name,
-        niche=niche,
+        niche=raw_niche,  # the user's own words — what they see in My Projects
         caption=caption or None,
         bio=bio or None,
         scores_json=json.dumps(result),

@@ -47,6 +47,7 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 - **`routers/analyze.py`** — `POST /api/analyze` (optional auth; `platform` + `mode` form fields, `ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}`). **Three-mode engine:** `resolve_mode()` computes the *effective* mode server-side and degrades gracefully (guests→Quick; Deep without a channel profile→Thinking; Thinking/Deep without usable seed buckets→Quick) so the results badge can never overclaim. Quick = raw video + caption only; Thinking adds the global seed reference + `profile_context`; Deep adds the creator channel profile. `PATCH /api/analyses/{id}/feedback` enforces hard sanity blocks (views ≥0, likes ≥0, likes ≤ views, views ≤ 500M). `GET /api/analyses/{id}` returns `_to_locked()` (verdict + predicted_views only) for anonymous or `_to_out()` for auth. `POST /api/analyses/{id}/claim` transfers anon analysis to account.
 - **`services/channel_profile.py`** — `build_channel_profile(analyses)`: pure, unit-testable function over already-fetched `UserAnalysis` rows. Returns a prompt block (or `None` if <2 analyses). Two tiers: **A. Verified performance** (real `actual_views` rows — the prediction anchor) and **B. Self-assessment trends** (derived from past `scores_json`, framed explicitly as the system's own prior opinion). `recent_history` excludes past `predicted_views` to avoid the AI anchoring on its own guesses.
 - **`services/seed_analysis.py`** — `analyze_seed_video()`: runs an AI-consumption-only seed-analysis prompt on an uploaded reference video, returns JSON with `virality_rating` + `seed_summary`. Reuses the `client`/`_PLATFORM_CONTEXT`/upload-poll-generate-delete pattern from `gemini.py`. Admin rejects (no row) on bad JSON or missing rating.
+- **`services/niche_classifier.py`** — `classify_niche(raw)`: maps the user's free-text niche to one of `CANONICAL_NICHES` (20 labels) via a small text-only Gemini call. Exact case-insensitive matches skip the API call; any failure/timeout (10s) falls back to `"Lifestyle & Vlogs"` — classification can never block an analysis. The canonical label drives seed matching (`select_seed_examples` is an exact string compare); the raw text is stored on `user_analyses.niche` and passed to the prompt as `niche_raw` for specificity. **The admin seed form's `NICHES` list (`frontend/app/admin/page.tsx`) must stay in sync with `CANONICAL_NICHES`.**
 - **`routers/profile.py`** — `GET /api/me/profile/{platform}` and `PUT /api/me/profile/{platform}` (upsert). Requires auth.
 - **`routers/settings.py`** — `PATCH /api/me/username` and `PATCH /api/me/password`. Both require `current_password` in the request body for verification before applying the change.
 - **`routers/admin.py`** — `X-Admin-Password` header auth. Seed CRUD + `POST /api/admin/seed/from-url` (yt-dlp — works locally only, blocked on Render datacenter IPs). Both upload paths run `analyze_seed_video` synchronously via `_analyze_and_persist_seed` (analyze → store `rating` + `gemini_analysis` → delete the file); a seed with no usable rating is **never** persisted (502, retry).
@@ -61,12 +62,11 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 
 **Key files:**
 - **`app/page.tsx`** — `"use client"`. Platform switcher (TikTok / Instagram). `PLATFORM_CONFIG` drives all platform-specific visuals: `pageBg`, `badgeClass`, `accentClass`, `statColors`, `btnGradient`, etc. TikTok tab uses near-black bg + glitch text-shadow; Instagram uses purple-orange gradient.
-- **`app/settings/page.tsx`** — Change username, change password, dark/light mode toggle. Theme is saved to `localStorage` as `surge_theme` and applied by `ThemeProvider`.
+- **`app/settings/page.tsx`** — Change username, change password. (Light mode was removed in v1.18 — the app is dark-only.)
 - **`app/onboarding/page.tsx`** — Two-step profile setup after signup (TikTok → Instagram). Skippable.
 - **`app/profile/page.tsx`** — Tabbed TikTok/Instagram profile editor.
-- **`components/UploadZone.tsx`** — Accepts `platform` prop. Auto-fills bio from saved profile on platform change. Calls `wakeBackend()` before submitting to avoid cold-start "Load failed" on mobile. Logged-in users get a **Quick / Thinking / Deep** depth selector (remembered in `localStorage` key `surge_mode`); guests see an inline "sign in for Thinking & Deep" link and always send `quick`. Passes `platform` + `mode` to `analyzeVideo()`. The results page shows a badge of the *effective* mode (`analysis.mode`).
-- **`components/Nav.tsx`** — Hamburger menu on mobile (animated 3-bar → ✕ toggle, dropdown); full horizontal layout on desktop (`md+`). Listens to `surge-auth` + `storage` events. Auth links: My Projects, Profile, Settings, Log out.
-- **`components/ThemeProvider.tsx`** — Mounts in `layout.tsx`. Reads `localStorage` key `surge_theme`; adds/removes `html.light` class. Listens for `surge-theme` custom event and `storage` event to sync across tabs.
+- **`components/UploadZone.tsx`** — Accepts `platform` prop. Auto-fills bio from saved profile on platform change. Calls `wakeBackend()` before submitting to avoid cold-start "Load failed" on mobile. **Niche is free text** (max 80 chars, required — client blocks submit and server 400s on empty) with quick-tap suggestion chips; the backend classifies it to a canonical niche. Logged-in users get a **Quick / Thinking / Deep** depth selector (remembered in `localStorage` key `surge_mode`); guests see an inline "sign in for Thinking & Deep" link and always send `quick`. Passes `platform` + `mode` to `analyzeVideo()`. The results page shows a badge of the *effective* mode (`analysis.mode`).
+- **`components/Nav.tsx`** — Hamburger menu on mobile (animated 3-bar → ✕ toggle, dropdown); full horizontal layout on desktop (`md+`). Listens to `surge-auth` + `storage` events. Auth links: My Projects, Profile, Settings, Log out. Carries the version badge (e.g. `v1.18`) — bump it on each release.
 - **`lib/auth.ts`** — Token in `localStorage` as `surge_token` (auto-migrates from old `viraliq_token`). `setToken`/`clearToken` dispatch `surge-auth` CustomEvent.
 - **`lib/api.ts`** — All API calls. `wakeBackend()` pings `/health` in a retry loop (up to 90s) before the heavy video upload to avoid mobile Safari "Load failed" errors on Render cold starts. `changeUsername` / `changePassword` call the settings endpoints.
 - **`components/UpsellModal.tsx`** — Shown to anonymous users on locked results.
@@ -79,11 +79,9 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 
 ### Theme / colour system
 
-All colours are CSS variables defined in `globals.css`:
-- Dark mode (default): defined on `:root`
-- Light mode: defined on `html.light`
+The app is **dark-only** (light mode was removed in v1.18). All colours are CSS variables defined on `:root` in `globals.css`.
 
-`tailwind.config.ts` maps every colour token (e.g. `background`, `card`, `text-primary`) to its CSS variable so Tailwind classes like `bg-card` automatically respect the active theme. To add a new colour: add CSS variable in both `:root` and `html.light`, add entry in `tailwind.config.ts`.
+`tailwind.config.ts` maps every colour token (e.g. `background`, `card`, `text-primary`) to its CSS variable. To add a new colour: add the CSS variable on `:root`, add an entry in `tailwind.config.ts`.
 
 Platform gradient utilities (`gradient-text-tiktok`, `gradient-btn-tiktok`, `tiktok-glitch`, `gradient-text-instagram`, `gradient-btn-instagram`) are in `globals.css`.
 
@@ -93,7 +91,7 @@ Platform gradient utilities (`gradient-text-tiktok`, `gradient-btn-tiktok`, `tik
 - **`public/sw.js`** — Cache-first for `/_next/static/` assets only. No share interception.
 - **`components/InstallBanner.tsx`** — Mobile "Add to Home Screen" nudge, dismissable.
 - **`components/RegisterSW.tsx`** — Registers `/sw.js` on mount (placed in `layout.tsx`).
-- `netlify.toml` sets `Cache-Control: no-cache` for both `sw.js` and `manifest.json`.
+- `next.config.mjs` `headers()` sets `Cache-Control: no-cache` for both `sw.js` and `manifest.json` (CDN must never cache the service worker).
 
 ---
 

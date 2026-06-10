@@ -14,9 +14,29 @@ import {
   ApiUsage,
 } from "@/lib/api";
 
+// Must stay in sync with CANONICAL_NICHES in backend/services/niche_classifier.py —
+// seed matching is an exact string compare against the classified user niche.
 const NICHES = [
-  "Fitness", "Comedy", "Food", "Fashion",
-  "Education", "Gaming", "Lifestyle", "Other",
+  "Fitness & Gym",
+  "Comedy & Skits",
+  "Food & Cooking",
+  "Fashion & Style",
+  "Beauty & Makeup",
+  "Education & Tutorials",
+  "Gaming",
+  "Music & Dance",
+  "Tech & Gadgets",
+  "Finance & Investing",
+  "Health & Wellness",
+  "Travel & Adventure",
+  "Lifestyle & Vlogs",
+  "Motivation & Mindset",
+  "Sports & Athletics",
+  "Relationships & Dating",
+  "Art & Creativity",
+  "Business & Entrepreneurship",
+  "Pets & Animals",
+  "Parenting & Family",
 ];
 
 type Tab = "url" | "manual";
@@ -70,7 +90,7 @@ export default function AdminPage() {
 
   // URL fetch state
   const [fetchUrl, setFetchUrl] = useState("");
-  const [fetchNiche, setFetchNiche] = useState("Fitness");
+  const [fetchNiche, setFetchNiche] = useState("Fitness & Gym");
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [fetchStatus, setFetchStatus] = useState<FetchStatus | null>(null);
@@ -78,7 +98,7 @@ export default function AdminPage() {
 
   // Manual upload state
   const [file, setFile] = useState<File | null>(null);
-  const [niche, setNiche] = useState("Fitness");
+  const [niche, setNiche] = useState("Fitness & Gym");
   const [viewCount, setViewCount] = useState("");
   const [likeCount, setLikeCount] = useState("");
   const [notes, setNotes] = useState("");

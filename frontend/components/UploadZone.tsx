@@ -6,15 +6,19 @@ import Link from "next/link";
 import { analyzeVideo, getProfile, wakeBackend } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
-const NICHES = [
+// Quick-tap suggestions — the field itself is free text and the backend maps
+// whatever the user types onto its canonical niche list.
+const NICHE_SUGGESTIONS = [
   "Fitness",
   "Comedy",
+  "Gaming",
   "Food",
   "Fashion",
-  "Education",
-  "Gaming",
+  "Beauty",
+  "Finance",
+  "Music",
   "Lifestyle",
-  "Other",
+  "Tech",
 ];
 
 const MODES = [
@@ -101,7 +105,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [niche, setNiche] = useState("Fitness");
+  const [niche, setNiche] = useState("");
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -187,6 +191,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
+    if (!niche.trim()) {
+      setError("Tell us your content niche — type it or tap a suggestion below.");
+      return;
+    }
     setError("");
     setLoading(true);
     setTipIndex(0);
@@ -207,7 +215,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       if (!awake) throw new Error("load failed");
 
       const effectiveMode = loggedIn ? mode : "quick";
-      const { id } = await analyzeVideo(file, niche, caption, bio, platform, effectiveMode);
+      const { id } = await analyzeVideo(file, niche.trim(), caption, bio, platform, effectiveMode);
       router.push(`/results/${id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -316,17 +324,30 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           <label className="block text-sm font-medium text-text-muted mb-2">
             Content Niche
           </label>
-          <select
+          <input
+            type="text"
             value={niche}
             onChange={(e) => setNiche(e.target.value)}
-            className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to appearance-none cursor-pointer"
-          >
-            {NICHES.map((n) => (
-              <option key={n} value={n} className="bg-card">
+            maxLength={80}
+            placeholder='e.g. "Dark humor skits", "Calisthenics", "Day trading"…'
+            className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+          />
+          <div className="flex flex-wrap gap-2 mt-2">
+            {NICHE_SUGGESTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setNiche(n)}
+                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                  niche === n
+                    ? "border-purple-to bg-purple-from/10 text-text-primary"
+                    : "border-border bg-card text-text-muted hover:border-purple-from/50 hover:text-text-primary"
+                }`}
+              >
                 {n}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         {/* ── Caption ──────────────────────────────────────────────────────── */}
