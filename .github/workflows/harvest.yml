@@ -1,0 +1,38 @@
+name: Weekly Seed Harvest
+
+on:
+  schedule:
+    # Every Monday at 6am UTC (keeps seeds fresh as the algorithm shifts)
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      min_views:
+        description: "Minimum view count filter"
+        default: "500000"
+      max_per_niche:
+        description: "Max seeds to add per niche"
+        default: "3"
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake backend
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://viraliq-api.onrender.com/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend awake (attempt $i)"
+              break
+            fi
+            echo "Attempt $i: status=$STATUS — waiting 20s"
+            sleep 20
+          done
+
+      - name: Trigger harvest
+        run: |
+          curl -s -X POST \
+            -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -d '{"min_views": ${{ github.event.inputs.min_views || 500000 }}, "max_per_niche": ${{ github.event.inputs.max_per_niche || 3 }}}' \
+            https://viraliq-api.onrender.com/api/admin/harvest

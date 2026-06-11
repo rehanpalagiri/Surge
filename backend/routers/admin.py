@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, UploadFile, File, Form
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, func
 
@@ -15,6 +16,7 @@ from models import SeedVideo, FetchStatus
 from schemas import SeedVideoOut
 from services.seed_analysis import analyze_seed_video
 from services.tiktok_fetch import fetch_tiktok
+from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -329,6 +331,34 @@ async def ack_fetch_status(
 # ---------------------------------------------------------------------------
 # Instagram API usage counter (20 req/month on EaseApi free tier)
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Door A: automated seed harvest
+# ---------------------------------------------------------------------------
+
+class HarvestRequest(BaseModel):
+    niches: Optional[list[str]] = None       # None = all 50
+    min_views: int = 500_000
+    max_per_niche: int = 3
+
+
+@router.post("/harvest")
+async def trigger_harvest(
+    background_tasks: BackgroundTasks,
+    req: HarvestRequest = HarvestRequest(),
+    _: None = Depends(check_admin),
+):
+    target = req.niches or list(NICHE_KEYWORDS.keys())
+    background_tasks.add_task(harvest_all, target, req.min_views, req.max_per_niche)
+    return {"status": "harvest started", "niches": len(target)}
+
+
+@router.get("/harvest/status")
+async def get_harvest_status(
+    _: None = Depends(check_admin),
+):
+    return get_last_harvest() or {"status": "never_run"}
+
 
 @router.get("/api-usage")
 async def get_api_usage(

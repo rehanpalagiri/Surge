@@ -1,4 +1,4 @@
-"""Maps a creator's free-text niche description to one of the 20 canonical
+"""Maps a creator's free-text niche description to one of the canonical
 niches used for seed matching. The canonical label keeps seed bucketing
 deterministic; the raw text still goes to the analysis prompt for specificity.
 """
@@ -10,6 +10,7 @@ from google.genai import types
 from services.gemini import client
 
 CANONICAL_NICHES = [
+    # Original 20
     "Fitness & Gym",
     "Comedy & Skits",
     "Food & Cooking",
@@ -30,6 +31,37 @@ CANONICAL_NICHES = [
     "Business & Entrepreneurship",
     "Pets & Animals",
     "Parenting & Family",
+    # Extended 30
+    "Skincare & Glow",
+    "Weight Loss Journey",
+    "Yoga & Meditation",
+    "Baking & Desserts",
+    "Vegan & Plant-Based",
+    "DIY & Crafts",
+    "Home Decor & Interior",
+    "Cleaning & Organization",
+    "Career & Job Tips",
+    "Real Estate",
+    "Side Hustles",
+    "Crypto & Web3",
+    "Outdoor & Hiking",
+    "True Crime & Mystery",
+    "Books & Reading",
+    "Astrology & Spirituality",
+    "Movies & TV",
+    "Cars & Automotive",
+    "Photography & Editing",
+    "Sustainability & Eco",
+    "Mental Health",
+    "Cooking on a Budget",
+    "Couples & Romance",
+    "College & Student Life",
+    "Luxury & Wealth",
+    "Street Style & Thrift",
+    "Hair Care & Styling",
+    "Kids & Baby",
+    "ASMR & Relaxation",
+    "News & Commentary",
 ]
 
 FALLBACK_NICHE = "Lifestyle & Vlogs"

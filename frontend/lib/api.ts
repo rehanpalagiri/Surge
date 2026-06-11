@@ -425,3 +425,33 @@ export async function ackFetchStatus(password: string): Promise<void> {
   });
   await handleResponse<unknown>(res);
 }
+
+export interface HarvestStatus {
+  status: "never_run" | "running" | "done";
+  started_at?: string;
+  finished_at?: string;
+  niches_processed?: number;
+  total_added?: number;
+  total_skipped?: number;
+  total_errors?: number;
+  detail?: { niche: string; added: number; skipped: number; errors: number }[];
+}
+
+export async function triggerHarvest(
+  password: string,
+  options?: { niches?: string[]; min_views?: number; max_per_niche?: number }
+): Promise<{ status: string; niches: number }> {
+  const res = await fetch(`${BASE}/api/admin/harvest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Admin-Password": password },
+    body: JSON.stringify(options ?? {}),
+  });
+  return handleResponse<{ status: string; niches: number }>(res);
+}
+
+export async function getHarvestStatus(password: string): Promise<HarvestStatus> {
+  const res = await fetch(`${BASE}/api/admin/harvest/status`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<HarvestStatus>(res);
+}

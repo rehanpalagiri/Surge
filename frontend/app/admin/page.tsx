@@ -9,14 +9,18 @@ import {
   getFetchStatus,
   ackFetchStatus,
   getApiUsage,
+  triggerHarvest,
+  getHarvestStatus,
   SeedVideoOut,
   FetchStatus,
   ApiUsage,
+  HarvestStatus,
 } from "@/lib/api";
 
 // Must stay in sync with CANONICAL_NICHES in backend/services/niche_classifier.py —
 // seed matching is an exact string compare against the classified user niche.
 const NICHES = [
+  // Original 20
   "Fitness & Gym",
   "Comedy & Skits",
   "Food & Cooking",
@@ -37,6 +41,37 @@ const NICHES = [
   "Business & Entrepreneurship",
   "Pets & Animals",
   "Parenting & Family",
+  // Extended 30
+  "Skincare & Glow",
+  "Weight Loss Journey",
+  "Yoga & Meditation",
+  "Baking & Desserts",
+  "Vegan & Plant-Based",
+  "DIY & Crafts",
+  "Home Decor & Interior",
+  "Cleaning & Organization",
+  "Career & Job Tips",
+  "Real Estate",
+  "Side Hustles",
+  "Crypto & Web3",
+  "Outdoor & Hiking",
+  "True Crime & Mystery",
+  "Books & Reading",
+  "Astrology & Spirituality",
+  "Movies & TV",
+  "Cars & Automotive",
+  "Photography & Editing",
+  "Sustainability & Eco",
+  "Mental Health",
+  "Cooking on a Budget",
+  "Couples & Romance",
+  "College & Student Life",
+  "Luxury & Wealth",
+  "Street Style & Thrift",
+  "Hair Care & Styling",
+  "Kids & Baby",
+  "ASMR & Relaxation",
+  "News & Commentary",
 ];
 
 type Tab = "url" | "manual";
@@ -96,6 +131,13 @@ export default function AdminPage() {
   const [fetchStatus, setFetchStatus] = useState<FetchStatus | null>(null);
   const [apiUsage, setApiUsage] = useState<ApiUsage | null>(null);
 
+  // Harvest state
+  const [harvestStatus, setHarvestStatus] = useState<HarvestStatus | null>(null);
+  const [harvesting, setHarvesting] = useState(false);
+  const [harvestError, setHarvestError] = useState("");
+  const [harvestMinViews, setHarvestMinViews] = useState("500000");
+  const [harvestMaxPer, setHarvestMaxPer] = useState("3");
+
   // Manual upload state
   const [file, setFile] = useState<File | null>(null);
   const [niche, setNiche] = useState("Fitness & Gym");
@@ -119,6 +161,10 @@ export default function AdminPage() {
     try { setApiUsage(await getApiUsage(pw)); } catch { /* non-fatal */ }
   }, []);
 
+  const refreshHarvestStatus = useCallback(async (pw: string) => {
+    try { setHarvestStatus(await getHarvestStatus(pw)); } catch { /* non-fatal */ }
+  }, []);
+
   const loadSeeds = useCallback(async (pw: string) => {
     try {
       setSeeds(await getAdminSeeds(pw));
@@ -136,8 +182,9 @@ export default function AdminPage() {
       loadSeeds(saved);
       refreshFetchStatus(saved);
       refreshApiUsage(saved);
+      refreshHarvestStatus(saved);
     }
-  }, [loadSeeds, refreshFetchStatus, refreshApiUsage]);
+  }, [loadSeeds, refreshFetchStatus, refreshApiUsage, refreshHarvestStatus]);
 
   // Reset view count when switching platforms
   useEffect(() => {
@@ -154,6 +201,7 @@ export default function AdminPage() {
       loadSeeds(password);
       refreshFetchStatus(password);
       refreshApiUsage(password);
+      refreshHarvestStatus(password);
     } catch { setAuthError("Invalid password."); }
   }
 
@@ -212,6 +260,36 @@ export default function AdminPage() {
       setSeeds((prev) => prev.filter((s) => s.id !== id));
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  async function handleHarvest() {
+    setHarvesting(true);
+    setHarvestError("");
+    try {
+      await triggerHarvest(password, {
+        min_views: parseInt(harvestMinViews) || 500_000,
+        max_per_niche: parseInt(harvestMaxPer) || 3,
+      });
+      // Poll until done (harvest runs as a BackgroundTask)
+      const poll = async () => {
+        try {
+          const s = await getHarvestStatus(password);
+          setHarvestStatus(s);
+          if (s.status === "running") {
+            setTimeout(poll, 8000);
+          } else {
+            setHarvesting(false);
+            loadSeeds(password);
+          }
+        } catch {
+          setHarvesting(false);
+        }
+      };
+      setTimeout(poll, 5000);
+    } catch (err: unknown) {
+      setHarvestError(err instanceof Error ? err.message : "Harvest failed");
+      setHarvesting(false);
     }
   }
 
@@ -484,6 +562,75 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Door A: Auto-harvest card */}
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-text-primary font-semibold text-lg">Auto-Harvest Seeds</h2>
+              <p className="text-text-muted text-sm mt-1">
+                Searches TikTok for top-performing videos across all 50 niches via tikwm, analyzes each with Gemini, and auto-adds to the seed pool. Runs in the background — keep this tab open or trigger via the weekly GitHub Actions cron.
+              </p>
+            </div>
+            <span className="flex-shrink-0 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full whitespace-nowrap">
+              🤖 Door A
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Min views</label>
+              <input
+                type="number"
+                value={harvestMinViews}
+                onChange={(e) => setHarvestMinViews(e.target.value)}
+                className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Max per niche</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={harvestMaxPer}
+                onChange={(e) => setHarvestMaxPer(e.target.value)}
+                className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
+              />
+            </div>
+            <button
+              onClick={handleHarvest}
+              disabled={harvesting}
+              className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm"
+            >
+              {harvesting ? "Harvesting…" : "Run Harvest"}
+            </button>
+          </div>
+
+          {harvestError && <p className="text-danger text-sm">{harvestError}</p>}
+
+          {harvestStatus && harvestStatus.status !== "never_run" && (
+            <div className={`rounded-xl px-4 py-3 text-sm border ${
+              harvestStatus.status === "running"
+                ? "bg-yellow-400/5 border-yellow-400/20 text-yellow-400"
+                : "bg-success/5 border-success/20 text-text-primary"
+            }`}>
+              {harvestStatus.status === "running" ? (
+                <p>Harvest in progress — checking every 8s…</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-medium text-success">
+                    Harvest complete · +{harvestStatus.total_added} seeds added
+                  </p>
+                  <p className="text-text-muted text-xs">
+                    {harvestStatus.niches_processed} niches · {harvestStatus.total_skipped} skipped · {harvestStatus.total_errors} errors
+                    {harvestStatus.finished_at && ` · ${new Date(harvestStatus.finished_at).toLocaleString()}`}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Seed table */}
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex justify-between items-center mb-5">
@@ -535,6 +682,14 @@ export default function AdminPage() {
                                   className="text-[10px] font-semibold text-purple-to bg-purple-to/10 px-1.5 py-0.5 rounded-full"
                                 >
                                   👤 user
+                                </span>
+                              )}
+                              {seed.source === "harvest" && (
+                                <span
+                                  title="Auto-harvested via keyword search"
+                                  className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full"
+                                >
+                                  🤖 auto
                                 </span>
                               )}
                             </div>
