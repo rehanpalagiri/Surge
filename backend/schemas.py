@@ -121,6 +121,15 @@ class SeedConsentDecisionIn(BaseModel):
     remember: Optional[str] = None
 
 
+class ForgotPasswordIn(BaseModel):
+    email: str
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    new_password: str
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

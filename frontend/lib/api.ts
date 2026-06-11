@@ -357,6 +357,27 @@ export async function seedConsentDecision(
   return handleResponse<AnalysisOut>(res);
 }
 
+export async function forgotPassword(email: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse<{ ok: boolean }>(res);
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  return handleResponse<{ ok: boolean }>(res);
+}
+
 export async function changeUsername(
   newUsername: string,
   currentPassword: string

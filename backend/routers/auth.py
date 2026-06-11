@@ -1,14 +1,22 @@
+import os
 import re
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
 
 from database import get_db
-from models import User
-from schemas import SignupIn, LoginIn, UserOut, TokenOut
+from models import User, PasswordResetToken
+from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn
 from auth import hash_password, verify_password, create_access_token, require_user
+
+_RESET_TTL = timedelta(hours=1)
+_RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+_RESEND_FROM = os.getenv("RESEND_FROM", "Surge <onboarding@resend.dev>")
+_FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -100,3 +108,100 @@ async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(require_user)):
     return user_to_out(user)
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordIn, db: AsyncSession = Depends(get_db)):
+    email = payload.email.strip().lower()
+    result = await db.execute(select(User).where(func.lower(User.email) == email))
+    user = result.scalar_one_or_none()
+    # Always return 200 — never reveal whether the email exists.
+    if not user or not user.email:
+        return {"ok": True}
+
+    # Invalidate any existing unused tokens for this user.
+    existing = await db.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used == False,  # noqa: E712
+        )
+    )
+    for tok in existing.scalars().all():
+        tok.used = True
+
+    token = secrets.token_urlsafe(32)
+    reset = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=datetime.utcnow() + _RESET_TTL,
+    )
+    db.add(reset)
+    await db.commit()
+
+    reset_url = f"{_FRONTEND_URL}/reset-password?token={token}"
+    await _send_reset_email(user.email, user.username, reset_url)
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+async def reset_password(payload: ResetPasswordIn, db: AsyncSession = Depends(get_db)):
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
+    )
+    reset = result.scalar_one_or_none()
+
+    if not reset or reset.used or reset.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+
+    user_result = await db.execute(select(User).where(User.id == reset.user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found.")
+
+    user.password_hash = hash_password(payload.new_password)
+    reset.used = True
+    await db.commit()
+
+    return {"ok": True}
+
+
+async def _send_reset_email(to_email: str, username: str, reset_url: str) -> None:
+    if not _RESEND_API_KEY:
+        return  # dev: no key — skip silently
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#6d28d9">Surge — Password Reset</h2>
+      <p>Hi <strong>{username}</strong>,</p>
+      <p>Someone requested a password reset for your Surge account.</p>
+      <p style="margin:24px 0">
+        <a href="{reset_url}"
+           style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:8px;
+                  text-decoration:none;font-weight:bold">
+          Reset my password
+        </a>
+      </p>
+      <p style="color:#888;font-size:13px">
+        This link expires in 1 hour. If you didn't request this, ignore this email —
+        your password won't change.
+      </p>
+      <p style="color:#888;font-size:12px">— The Surge team</p>
+    </div>
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {_RESEND_API_KEY}"},
+                json={
+                    "from": _RESEND_FROM,
+                    "to": [to_email],
+                    "subject": "Reset your Surge password",
+                    "html": html,
+                },
+                timeout=10,
+            )
+    except Exception:
+        pass  # email failure must never break the HTTP response

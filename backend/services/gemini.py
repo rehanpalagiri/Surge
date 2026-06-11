@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timezone
 from google import genai
 from google.genai import types
+from google.api_core.exceptions import ResourceExhausted, PermissionDenied
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -354,6 +355,8 @@ async def analyze_video(
 
         return json.loads(response.text)
 
+    except (ResourceExhausted, PermissionDenied):
+        raise  # quota or bad key — router returns 503 without storing broken data
     except json.JSONDecodeError as e:
         return _error_dict(f"Failed to parse Gemini response as JSON: {e}")
     except Exception as e:

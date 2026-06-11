@@ -84,15 +84,22 @@ function LoginForm() {
             {loading ? "Logging in…" : "Log in"}
           </button>
         </form>
-        <p className="text-text-muted text-sm text-center">
-          No account?{" "}
-          <Link
-            href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`}
-            className="text-purple-to hover:underline"
-          >
-            Sign up free
-          </Link>
-        </p>
+        <div className="space-y-2 text-center text-sm">
+          <p className="text-text-muted">
+            No account?{" "}
+            <Link
+              href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`}
+              className="text-purple-to hover:underline"
+            >
+              Sign up free
+            </Link>
+          </p>
+          <p>
+            <Link href="/forgot-password" className="text-text-muted/60 hover:text-text-muted transition-colors">
+              Forgot your password?
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   );
