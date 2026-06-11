@@ -6,9 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { upsertProfile } from "@/lib/api";
 import { Suspense } from "react";
 
-const NICHES = [
-  "Fitness", "Comedy", "Food", "Fashion", "Education",
-  "Gaming", "Lifestyle", "Beauty", "Travel", "Business", "Other",
+const NICHE_SUGGESTIONS = [
+  "Fitness", "Comedy", "Food", "Beauty", "Gaming",
+  "Music", "Finance", "Tech", "Travel", "Lifestyle", "Fashion", "Mental Health",
 ];
 
 interface ProfileForm {
@@ -24,7 +24,7 @@ const EMPTY: ProfileForm = {
   display_name: "",
   bio: "",
   target_audience: "",
-  niche: "Fitness",
+  niche: "",
 };
 
 const STEPS: { platform: "tiktok" | "instagram"; icon: string; label: string }[] = [
@@ -155,18 +155,32 @@ function OnboardingForm() {
             className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
           />
           <div>
-            <label className="block text-sm font-medium text-text-muted mb-2">
+            <label className="block text-sm font-medium text-text-muted mb-1.5">
               Primary niche
             </label>
-            <select
+            <input
+              type="text"
+              placeholder="e.g. Fitness, Comedy, Beauty…"
               value={form.niche}
               onChange={(e) => update("niche", e.target.value)}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary focus:outline-none focus:border-purple-to appearance-none cursor-pointer"
-            >
-              {NICHES.map((n) => (
-                <option key={n} value={n} className="bg-card">{n}</option>
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {NICHE_SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => update("niche", s)}
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                    form.niche === s
+                      ? "bg-purple-to/15 border-purple-to/40 text-text-primary"
+                      : "border-border text-text-muted hover:text-text-primary hover:border-text-muted"
+                  }`}
+                >
+                  {s}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
           <textarea
             placeholder={`Your ${current.label} bio (the text on your profile)`}

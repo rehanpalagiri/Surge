@@ -6,9 +6,9 @@ import Nav from "@/components/Nav";
 import { getProfile, upsertProfile, UserProfileIn } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
-const NICHES = [
-  "Fitness", "Comedy", "Food", "Fashion", "Education",
-  "Gaming", "Lifestyle", "Beauty", "Travel", "Business", "Other",
+const NICHE_SUGGESTIONS = [
+  "Fitness", "Comedy", "Food", "Beauty", "Gaming",
+  "Music", "Finance", "Tech", "Travel", "Lifestyle", "Fashion", "Mental Health",
 ];
 
 type Platform = "tiktok" | "instagram";
@@ -27,7 +27,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  handle: "", display_name: "", bio: "", target_audience: "", niche: "Fitness",
+  handle: "", display_name: "", bio: "", target_audience: "", niche: "",
 };
 
 export default function ProfilePage() {
@@ -59,14 +59,14 @@ export default function ProfilePage() {
           display_name: ttProf?.display_name || "",
           bio: ttProf?.bio || "",
           target_audience: ttProf?.target_audience || "",
-          niche: ttProf?.niche || "Fitness",
+          niche: ttProf?.niche || "",
         },
         instagram: {
           handle: igProf?.handle || "",
           display_name: igProf?.display_name || "",
           bio: igProf?.bio || "",
           target_audience: igProf?.target_audience || "",
-          niche: igProf?.niche || "Fitness",
+          niche: igProf?.niche || "",
         },
       });
       setLoading(false);
@@ -174,15 +174,29 @@ export default function ProfilePage() {
               <label className="block text-sm font-medium text-text-muted mb-1.5">
                 Primary niche
               </label>
-              <select
+              <input
+                type="text"
+                placeholder="e.g. Fitness, Comedy, Beauty…"
                 value={form.niche}
                 onChange={(e) => update("niche", e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary focus:outline-none focus:border-purple-to appearance-none cursor-pointer"
-              >
-                {NICHES.map((n) => (
-                  <option key={n} value={n} className="bg-card">{n}</option>
+                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {NICHE_SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => update("niche", s)}
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                      form.niche === s
+                        ? "bg-purple-to/15 border-purple-to/40 text-text-primary"
+                        : "border-border text-text-muted hover:text-text-primary hover:border-text-muted"
+                    }`}
+                  >
+                    {s}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
             <div>
