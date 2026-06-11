@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { analyzeVideo, getProfile, wakeBackend } from "@/lib/api";
+import { analyzeVideo, getProfile, wakeBackend, getRateLimit, RateLimitStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 // Quick-tap suggestions — the field itself is free text and the backend maps
@@ -115,6 +115,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [dragging, setDragging] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [mode, setMode] = useState<ModeId>("quick");
+  const [rateLimit, setRateLimit] = useState<RateLimitStatus | null>(null);
 
   const pName = platform === "instagram" ? "Instagram" : "TikTok";
   const textGradient = platform === "instagram" ? "gradient-text-instagram" : "tiktok-glitch-sm";
@@ -133,6 +134,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
     } else {
       setMode("thinking"); // sensible default for logged-in creators
     }
+    getRateLimit().then(setRateLimit).catch(() => {});
   }, []);
 
   const pickMode = (m: ModeId) => {
@@ -216,14 +218,20 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
 
       const effectiveMode = loggedIn ? mode : "quick";
       const { id } = await analyzeVideo(file, niche.trim(), caption, bio, platform, effectiveMode);
+      getRateLimit().then(setRateLimit).catch(() => {});
       router.push(`/results/${id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
-      setError(
-        msg.toLowerCase().includes("load failed") || msg.toLowerCase().includes("failed to fetch")
-          ? "Couldn't reach the server. Check your connection and try again — if you're on cellular, switching to Wi-Fi can help."
-          : msg || "Analysis failed. Please try again."
-      );
+      if (msg.includes("429")) {
+        getRateLimit().then(setRateLimit).catch(() => {});
+        setError(msg.replace(/^API error 429: /, "") || "Upload limit reached. Link a posted video to earn more credits.");
+      } else {
+        setError(
+          msg.toLowerCase().includes("load failed") || msg.toLowerCase().includes("failed to fetch")
+            ? "Couldn't reach the server. Check your connection and try again — if you're on cellular, switching to Wi-Fi can help."
+            : msg || "Analysis failed. Please try again."
+        );
+      }
       setLoading(false);
       setWaking(false);
     } finally {
@@ -410,6 +418,41 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           </p>
         )}
 
+        {/* ── Rate limit bar (logged-in only) ─────────────────────────────── */}
+        {loggedIn && rateLimit && (
+          <div className="bg-surface border border-border rounded-xl px-4 py-3 space-y-1.5">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-text-muted">
+                {rateLimit.remaining} of {rateLimit.effective_limit} analyses left
+                <span className="text-text-muted/50"> · {rateLimit.window_hours}h window</span>
+              </span>
+              {rateLimit.bonus > 0 && (
+                <span className="text-emerald-400 font-medium">+{rateLimit.bonus} link bonus</span>
+              )}
+            </div>
+            <div className="w-full h-1 bg-border rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  rateLimit.remaining === 0 ? "bg-danger" :
+                  rateLimit.remaining <= 3 ? "bg-yellow-400" : "bg-purple-to"
+                }`}
+                style={{ width: `${Math.round((rateLimit.used / rateLimit.effective_limit) * 100)}%` }}
+              />
+            </div>
+            {rateLimit.remaining === 0 ? (
+              <p className="text-danger text-[11px]">
+                Limit reached.{" "}
+                {rateLimit.bonus < 10 && "Link a posted video below to earn +1 credit. "}
+                {rateLimit.resets_at && `Resets ${new Date(rateLimit.resets_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`}
+              </p>
+            ) : rateLimit.bonus < 10 ? (
+              <p className="text-text-muted/60 text-[11px]">
+                Link a posted video on your results page to earn +1 credit (up to +10 total).
+              </p>
+            ) : null}
+          </div>
+        )}
+
         {error && (
           <div className="bg-danger/10 border border-danger/30 rounded-xl px-4 py-3 text-danger text-sm">
             {error}
@@ -418,7 +461,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
 
         <button
           type="submit"
-          disabled={!file || loading}
+          disabled={!file || loading || (rateLimit?.remaining === 0)}
           className={`w-full ${
             platform === "instagram" ? "gradient-btn-instagram" : "gradient-btn"
           } text-white font-bold py-4 rounded-xl text-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]`}

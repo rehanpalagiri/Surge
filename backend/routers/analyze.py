@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from database import get_db
 from models import SeedVideo, UserAnalysis, UserProfile, User
@@ -15,6 +15,7 @@ from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
 from services.seed_promote import promote_analysis_to_seed
+from services.rate_limit import get_rate_limit
 from auth import optional_user, require_user
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -62,6 +63,20 @@ async def analyze(
     if not raw_niche:
         raise HTTPException(status_code=400, detail="Please provide your content niche.")
     canonical_niche = await classify_niche(raw_niche)
+
+    # Rate limit authenticated users (guests are unmetered)
+    if user:
+        rl = await get_rate_limit(user.id, db)
+        if not rl["allowed"]:
+            bonus_tip = " Link a posted video to earn +1 credit." if rl["bonus"] < 10 else ""
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Upload limit reached ({rl['effective_limit']} per {rl['window_hours']}h)."
+                    f"{bonus_tip}"
+                    + (f" Resets at {rl['resets_at']}." if rl["resets_at"] else "")
+                ),
+            )
 
     # Validate content type (client-declared; best-effort guard)
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -194,6 +209,14 @@ async def get_analysis(
     if user is None or (analysis.user_id is not None and analysis.user_id != user.id):
         return _to_locked(analysis)
     return _to_out(analysis)
+
+
+@router.get("/me/rate-limit")
+async def my_rate_limit(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    return await get_rate_limit(user.id, db)
 
 
 @router.get("/me/analyses", response_model=list[AnalysisSummaryOut])

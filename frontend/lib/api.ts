@@ -449,6 +449,24 @@ export async function triggerHarvest(
   return handleResponse<{ status: string; niches: number }>(res);
 }
 
+export interface RateLimitStatus {
+  allowed: boolean;
+  used: number;
+  base_limit: number;
+  bonus: number;
+  effective_limit: number;
+  remaining: number;
+  resets_at: string | null;
+  window_hours: number;
+}
+
+export async function getRateLimit(): Promise<RateLimitStatus> {
+  const res = await fetch(`${BASE}/api/me/rate-limit`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<RateLimitStatus>(res);
+}
+
 export async function getHarvestStatus(password: string): Promise<HarvestStatus> {
   const res = await fetch(`${BASE}/api/admin/harvest/status`, {
     headers: { "X-Admin-Password": password },
