@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signup, claimAnalysis } from "@/lib/api";
+import { signup, claimAnalysis, apiErrorDetail } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 
 function extractAnalysisId(next: string | null): string | null {
@@ -17,21 +17,39 @@ function SignupForm() {
   const search = useSearchParams();
   const next = search.get("next");
 
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const currentYear = new Date().getFullYear();
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    const year = parseInt(birthYear, 10);
+    if (!year || year < 1900 || year > currentYear) {
+      setError("Please enter a valid birth year.");
+      return;
+    }
+    if (currentYear - year < 13) {
+      setError("You must be 13 or older to use Surge.");
+      return;
+    }
+    if (!agreed) {
+      setError("Please agree to the Terms of Service and Privacy Policy.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const { access_token } = await signup(username.trim(), password);
+      const { access_token } = await signup(email.trim(), username.trim(), password, year);
       setToken(access_token);
 
       // Save the just-analyzed video to the brand-new account.
@@ -50,12 +68,7 @@ function SignupForm() {
         router.push("/onboarding");
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("409")) {
-        setError("That username is already taken.");
-      } else {
-        setError("Could not create your account. Try a different username.");
-      }
+      setError(apiErrorDetail(err, "Could not create your account. Please try again."));
       setLoading(false);
     }
   }
@@ -76,6 +89,15 @@ function SignupForm() {
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+          />
+          <input
             type="text"
             placeholder="Username"
             value={username}
@@ -86,13 +108,49 @@ function SignupForm() {
           />
           <input
             type="password"
-            placeholder="Password (6+ chars)"
+            placeholder="Password (8+ chars)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="new-password"
             className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
           />
+          <div>
+            <input
+              type="number"
+              placeholder="Birth year (e.g. 1998)"
+              value={birthYear}
+              onChange={(e) => setBirthYear(e.target.value)}
+              required
+              min={1900}
+              max={currentYear}
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+            />
+            {birthYear.length === 4 && currentYear - parseInt(birthYear, 10) < 13 && (
+              <p className="text-danger text-xs mt-1.5">
+                You must be 13 or older to use Surge.
+              </p>
+            )}
+          </div>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              required
+              className="mt-0.5 accent-purple-500"
+            />
+            <span className="text-text-muted text-xs leading-relaxed">
+              I agree to Surge&apos;s{" "}
+              <Link href="/terms" target="_blank" className="text-purple-to hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" target="_blank" className="text-purple-to hover:underline">
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
           {error && <p className="text-danger text-sm">{error}</p>}
           <button
             type="submit"

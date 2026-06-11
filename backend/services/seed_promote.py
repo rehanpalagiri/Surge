@@ -20,13 +20,21 @@ import logging
 import httpx
 from sqlalchemy import select
 
+from datetime import datetime
+
 from database import AsyncSessionLocal
-from models import SeedVideo, UserAnalysis
+from models import SeedVideo, UserAnalysis, User
 from services.seed_analysis import analyze_seed_video
 from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok
 
 logger = logging.getLogger("seed_promote")
+
+
+def _is_minor(user: User) -> bool:
+    if user.birth_year is None:
+        return False
+    return (datetime.utcnow().year - user.birth_year) < 18
 
 
 async def _download(video_url: str, path: str) -> None:
@@ -38,7 +46,9 @@ async def _download(video_url: str, path: str) -> None:
                     f.write(chunk)
 
 
-async def promote_analysis_to_seed(analysis_id: int, meta: dict | None = None) -> None:
+async def promote_analysis_to_seed(
+    analysis_id: int, meta: dict | None = None, consent_override: bool = False
+) -> None:
     """Background task. Idempotent and self-contained (opens its own DB session,
     since the request's session is already closed by the time this runs). Any
     failure is logged and swallowed — it must never surface to the user.
@@ -47,6 +57,10 @@ async def promote_analysis_to_seed(analysis_id: int, meta: dict | None = None) -
     a second tikwm call <1s after the first — the free tier is rate-limited to
     ~1 req/sec, so the back-to-back re-fetch would risk a 429 on every promotion.
     Falls back to fetching when not supplied.
+
+    ``consent_override``: True only from the explicit consent endpoint — the user
+    just clicked "Yes" on the banner, so the "ask" gate is satisfied. Minors and
+    "no" are still hard blocks even with the override.
     """
     file_path = None
     try:
@@ -61,6 +75,26 @@ async def promote_analysis_to_seed(analysis_id: int, meta: dict | None = None) -
                 return  # gone or already promoted
             if (a.platform or "tiktok") != "tiktok" or not a.video_url:
                 return  # only verified TikTok links are promotable
+
+            # --- Consent gate (v1.24) ---
+            consent = "ask"
+            if a.user_id is not None:
+                ures = await db.execute(select(User).where(User.id == a.user_id))
+                owner = ures.scalar_one_or_none()
+                if owner is None:
+                    return
+                if _is_minor(owner):
+                    return  # minors are excluded unconditionally
+                consent = owner.seed_consent or "ask"
+            if consent == "no":
+                return
+            if consent == "ask" and not consent_override:
+                # Park it — the results page shows the consent banner and the
+                # explicit decision endpoint re-runs us with the override.
+                a.pending_seed_consent = True
+                await db.commit()
+                return
+
             page_url = a.video_url
             raw_niche = a.niche
 
@@ -116,6 +150,7 @@ async def promote_analysis_to_seed(analysis_id: int, meta: dict | None = None) -
             db.add(seed)
             await db.flush()  # populate seed.id
             a.promoted_seed_id = seed.id
+            a.pending_seed_consent = False
             await db.commit()
             logger.info(
                 "promote %s -> seed %s (rating %s, niche %s, %s views)",

@@ -118,6 +118,25 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN actual_likes INTEGER"
         )
+    if "pending_seed_consent" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN pending_seed_consent BOOLEAN DEFAULT 0"
+        )
+
+    # --- users: email auth + age gate + seed consent (v1.24) ---
+    # NOTE: SQLite forbids adding a UNIQUE column via ALTER TABLE, so email
+    # uniqueness on legacy SQLite DBs is enforced at the app layer (signup
+    # checks). Fresh DBs get the real constraint from create_all.
+    result5 = await conn.exec_driver_sql("PRAGMA table_info(users)")
+    user_cols = {row[1] for row in result5.fetchall()}
+    if "email" not in user_cols:
+        await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN email TEXT")
+    if "birth_year" not in user_cols:
+        await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN birth_year INTEGER")
+    if "seed_consent" not in user_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE users ADD COLUMN seed_consent TEXT DEFAULT 'ask'"
+        )
 
 
 async def _ensure_columns_pg(conn):
@@ -153,6 +172,11 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS source VARCHAR DEFAULT 'admin'",
         # Instagram seeds have no public view count (no-op once already nullable)
         "ALTER TABLE seed_videos ALTER COLUMN view_count DROP NOT NULL",
+        # --- v1.24: email auth + age gate + seed consent ---
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR UNIQUE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
     ]
     for stmt in statements:
         await conn.exec_driver_sql(stmt)

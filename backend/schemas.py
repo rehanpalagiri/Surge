@@ -66,6 +66,8 @@ class AnalysisOut(BaseModel):
     actual_likes: Optional[int]
     video_url: Optional[str] = None          # posted TikTok link (counts auto-fetched)
     counts_fetched_at: Optional[datetime] = None
+    # v1.24: owner's seed_consent was "ask" — results page shows the consent banner
+    pending_seed_consent: bool = False
     mode: Optional[str] = "quick"  # effective mode that ran
     created_at: datetime
 
@@ -84,11 +86,14 @@ class VideoLinkIn(BaseModel):
 
 
 class SignupIn(BaseModel):
+    email: str
     username: str
     password: str
+    birth_year: int
 
 
 class LoginIn(BaseModel):
+    # Accepts EITHER a username or an email in the same field (v1.24).
     username: str
     password: str
 
@@ -96,10 +101,24 @@ class LoginIn(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
+    email: Optional[str] = None
+    birth_year: Optional[int] = None
+    seed_consent: Optional[str] = "ask"
+    is_minor: bool = False  # computed: birth_year makes the user under 18
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class ConsentIn(BaseModel):
+    seed_consent: str  # "yes" | "no" | "ask"
+
+
+class SeedConsentDecisionIn(BaseModel):
+    allow: bool
+    # Optional: persist the choice as the account-wide setting ("yes" | "no").
+    remember: Optional[str] = None
 
 
 class TokenOut(BaseModel):

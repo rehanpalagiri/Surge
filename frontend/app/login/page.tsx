@@ -59,7 +59,7 @@ function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
-            placeholder="Username"
+            placeholder="Username or email"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required

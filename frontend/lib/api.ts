@@ -62,6 +62,7 @@ export interface AnalysisOut {
   actual_likes: number | null;
   video_url?: string | null;          // posted TikTok link (counts auto-fetched)
   counts_fetched_at?: string | null;
+  pending_seed_consent?: boolean;     // owner's consent is "ask" — show the banner
   mode?: string;
   created_at: string;
 }
@@ -90,6 +91,10 @@ export interface TokenOut {
 export interface UserOut {
   id: number;
   username: string;
+  email?: string | null;
+  birth_year?: number | null;
+  seed_consent?: "yes" | "no" | "ask";
+  is_minor?: boolean;
   created_at: string;
 }
 
@@ -229,13 +234,15 @@ export async function getAnalysis(
 }
 
 export async function signup(
+  email: string,
   username: string,
-  password: string
+  password: string,
+  birthYear: number
 ): Promise<TokenOut> {
   const res = await fetch(`${BASE}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, username, password, birth_year: birthYear }),
   });
   return handleResponse<TokenOut>(res);
 }
@@ -308,6 +315,44 @@ export async function linkTikTokVideo(
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ url: url ?? null }),
+  });
+  return handleResponse<AnalysisOut>(res);
+}
+
+export interface ConsentStatus {
+  seed_consent: "yes" | "no" | "ask";
+  is_minor: boolean;
+}
+
+export async function getConsent(): Promise<ConsentStatus> {
+  const res = await fetch(`${BASE}/api/me/consent`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<ConsentStatus>(res);
+}
+
+export async function updateConsent(
+  seedConsent: "yes" | "no" | "ask"
+): Promise<ConsentStatus> {
+  const res = await fetch(`${BASE}/api/me/consent`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ seed_consent: seedConsent }),
+  });
+  return handleResponse<ConsentStatus>(res);
+}
+
+/** Answer the results-page seed consent banner. `remember` also saves the
+ *  choice as the account-wide setting. */
+export async function seedConsentDecision(
+  id: string | number,
+  allow: boolean,
+  remember?: "yes" | "no"
+): Promise<AnalysisOut> {
+  const res = await fetch(`${BASE}/api/analyses/${id}/seed-consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ allow, ...(remember ? { remember } : {}) }),
   });
   return handleResponse<AnalysisOut>(res);
 }

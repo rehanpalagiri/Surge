@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
-import { changeUsername, changePassword } from "@/lib/api";
+import { changeUsername, changePassword, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -19,8 +20,96 @@ export default function SettingsPage() {
       <div className="max-w-2xl mx-auto w-full px-4 py-10 space-y-6">
         <ChangeUsernameCard />
         <ChangePasswordCard />
+        <DataPrivacyCard />
+        <p className="text-center text-text-muted/60 text-xs pt-2">
+          <Link href="/privacy" className="hover:text-text-muted transition-colors">Privacy Policy</Link>
+          <span className="mx-2">·</span>
+          <Link href="/terms" className="hover:text-text-muted transition-colors">Terms of Service</Link>
+        </p>
       </div>
     </main>
+  );
+}
+
+const CONSENT_OPTIONS: { value: "yes" | "ask" | "no"; label: string }[] = [
+  { value: "yes", label: "Yes — my linked post stats can be used as benchmark examples" },
+  { value: "ask", label: "Ask me each time — I'll decide when I link a video" },
+  { value: "no", label: "No — never use my data as a benchmark" },
+];
+
+function DataPrivacyCard() {
+  const [consent, setConsent] = useState<ConsentStatus | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getConsent().then(setConsent).catch(() => {});
+  }, []);
+
+  async function pick(value: "yes" | "no" | "ask") {
+    if (!consent || consent.is_minor || saving) return;
+    const prev = consent;
+    setConsent({ ...consent, seed_consent: value });
+    setSaving(true);
+    setError("");
+    try {
+      await updateConsent(value);
+    } catch {
+      setConsent(prev);
+      setError("Couldn't save your preference — please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <div>
+        <h2 className="text-text-primary font-semibold text-lg">Data &amp; Privacy</h2>
+        <p className="text-text-muted text-sm mt-0.5">Help improve Surge for other creators</p>
+      </div>
+
+      {!consent ? (
+        <p className="text-text-muted text-sm">Loading…</p>
+      ) : consent.is_minor ? (
+        <p className="text-text-muted text-sm">
+          Your data is not used for platform benchmarks (accounts under 18 are
+          automatically excluded).
+        </p>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {CONSENT_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  consent.seed_consent === opt.value
+                    ? "border-purple-to/50 bg-purple-from/5"
+                    : "border-border hover:border-text-muted/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="seed_consent"
+                  checked={consent.seed_consent === opt.value}
+                  onChange={() => pick(opt.value)}
+                  className="mt-0.5 accent-purple-500"
+                />
+                <span className="text-text-primary text-sm">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+          {error && <p className="text-danger text-sm">{error}</p>}
+          <p className="text-text-muted/60 text-xs">
+            Only your public like/view counts and content niche are ever used — never
+            your video file.{" "}
+            <Link href="/privacy#seed-pool" className="text-purple-to hover:underline">
+              Learn more
+            </Link>
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

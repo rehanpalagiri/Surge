@@ -8,8 +8,58 @@ import VerdictBanner from "@/components/VerdictBanner";
 import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
-import { getAnalysis, claimAnalysis, AnalysisOut } from "@/lib/api";
+import { getAnalysis, claimAnalysis, seedConsentDecision, AnalysisOut } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+
+function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  function answer(allow: boolean, remember?: "yes" | "no") {
+    setDismissed(true); // disappears on any click; the API call is best-effort
+    seedConsentDecision(analysis.id, allow, remember).catch(() => {});
+  }
+
+  const views =
+    analysis.actual_views != null
+      ? `${analysis.actual_views.toLocaleString()} views`
+      : "real engagement stats";
+
+  return (
+    <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-5 space-y-3">
+      <div>
+        <p className="text-text-primary font-semibold">🎯 Help other creators?</p>
+        <p className="text-text-muted text-sm mt-1">
+          Your post got {views} — Surge could use these stats as a benchmark to help
+          score other creators&apos; videos. Your video is never stored.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => answer(true)}
+          className="gradient-btn text-white font-semibold px-5 py-2 rounded-xl text-sm"
+        >
+          Yes, help others
+        </button>
+        <button
+          onClick={() => answer(false)}
+          className="border border-border text-text-muted hover:text-text-primary px-5 py-2 rounded-xl text-sm transition-colors"
+        >
+          No thanks
+        </button>
+        <span className="text-text-muted/60 text-xs">
+          <button onClick={() => answer(true, "yes")} className="hover:text-text-muted underline">
+            Always yes
+          </button>
+          {" / "}
+          <button onClick={() => answer(false, "no")} className="hover:text-text-muted underline">
+            Always no
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function ErrorScreen({ title, message }: { title: string; message: string }) {
   return (
@@ -209,6 +259,10 @@ export default function ResultsPage() {
         ) : (
           /* ---------- FULL (logged in) ---------- */
           <>
+            {/* Seed-pool consent banner (only when the user's setting is "ask"
+                and a verified link is waiting on their decision) */}
+            {analysis.pending_seed_consent && <SeedConsentBanner analysis={analysis} />}
+
             {/* Scores grid */}
             <div className="bg-card border border-border rounded-2xl p-6">
               <h2 className="text-text-primary font-semibold text-lg mb-5">

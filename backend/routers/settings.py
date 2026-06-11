@@ -5,7 +5,9 @@ from sqlalchemy import select
 
 from database import get_db
 from models import User
+from schemas import ConsentIn
 from auth import require_user, hash_password, verify_password
+from routers.auth import is_minor
 
 router = APIRouter(prefix="/api/me", tags=["settings"])
 
@@ -61,3 +63,31 @@ async def change_password(
     user.password_hash = hash_password(body.new_password)
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/consent")
+async def get_consent(user: User = Depends(require_user)):
+    minor = is_minor(user)
+    return {
+        # Minors always read as "no" regardless of what's stored.
+        "seed_consent": "no" if minor else (user.seed_consent or "ask"),
+        "is_minor": minor,
+    }
+
+
+@router.patch("/consent")
+async def update_consent(
+    body: ConsentIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    if is_minor(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Accounts under 18 are automatically excluded from platform benchmarks.",
+        )
+    if body.seed_consent not in ("yes", "no", "ask"):
+        raise HTTPException(status_code=400, detail="Invalid consent value.")
+    user.seed_consent = body.seed_consent
+    await db.commit()
+    return {"seed_consent": user.seed_consent, "is_minor": False}

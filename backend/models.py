@@ -10,6 +10,15 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, unique=True, index=True, nullable=False)
+    # v1.24: email is the primary login identifier; username stays as display name.
+    # Nullable so pre-1.24 accounts keep working (they log in with username).
+    email = Column(String, unique=True, nullable=True)
+    # Used ONLY for the age gate (13+ to sign up, 18+ for seed consent). Year, not
+    # full DOB — deliberately the minimum data needed.
+    birth_year = Column(Integer, nullable=True)
+    # Seed-pool consent: "yes" | "no" | "ask". Minors (13–17) are forced to "no"
+    # and can never change it; adults default to "ask" (decide per linked video).
+    seed_consent = Column(String, nullable=True, default="ask")
     password_hash = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -82,6 +91,9 @@ class UserAnalysis(Base):
     # Set once this analysis's verified video has been auto-promoted into the seed
     # library (v1.20). Idempotency guard — a non-NULL value means "already a seed".
     promoted_seed_id = Column(Integer, nullable=True)
+    # v1.24: the owner's seed_consent was "ask" when this verified link came in —
+    # promotion is parked until they answer the consent banner on the results page.
+    pending_seed_consent = Column(Boolean, nullable=True, default=False)
     # The EFFECTIVE mode that actually ran ("quick" | "thinking" | "deep_thinking").
     # May differ from what the user requested if the run degraded (e.g. Deep with
     # no channel profile → Thinking). The results badge reads this.

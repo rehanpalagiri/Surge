@@ -9,7 +9,7 @@ from sqlalchemy import select, func
 
 from database import get_db
 from models import SeedVideo, UserAnalysis, UserProfile, User
-from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn
+from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn, SeedConsentDecisionIn
 from services.gemini import analyze_video, select_seed_examples
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
@@ -374,6 +374,42 @@ async def link_video(
     return _to_out(analysis)
 
 
+@router.post("/analyses/{analysis_id}/seed-consent", response_model=AnalysisOut)
+async def seed_consent_decision(
+    analysis_id: int,
+    payload: SeedConsentDecisionIn,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    """The user answered the results-page consent banner (their account-wide
+    setting is "ask"). allow=True promotes this analysis now; allow=False just
+    dismisses. ``remember`` ("yes"/"no") additionally updates the account setting.
+    """
+    result = await db.execute(
+        select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+    )
+    analysis = result.scalar_one_or_none()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if analysis.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
+
+    analysis.pending_seed_consent = False
+    # Minors can never opt in (their consent is locked to "no" at signup —
+    # this guard is defense in depth in case of a stale token/state).
+    minor = user.birth_year is not None and (datetime.utcnow().year - user.birth_year) < 18
+    if payload.remember in ("yes", "no") and not minor:
+        user.seed_consent = payload.remember
+    await db.commit()
+    await db.refresh(analysis)
+
+    if payload.allow and not minor and analysis.promoted_seed_id is None:
+        background_tasks.add_task(promote_analysis_to_seed, analysis.id, None, True)
+
+    return _to_out(analysis)
+
+
 @router.patch("/analyses/{analysis_id}/feedback", response_model=AnalysisOut)
 async def submit_feedback(
     analysis_id: int,
@@ -442,6 +478,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "actual_likes": analysis.actual_likes,
         "video_url": analysis.video_url,
         "counts_fetched_at": analysis.counts_fetched_at,
+        "pending_seed_consent": bool(analysis.pending_seed_consent),
         "mode": analysis.mode or "quick",
         "created_at": analysis.created_at,
     }

@@ -216,6 +216,17 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border px-4 py-8">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted/60">
+          <span>© {new Date().getFullYear()} Surge</span>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-text-muted transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-text-muted transition-colors">Terms of Service</Link>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }
