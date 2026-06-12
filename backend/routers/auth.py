@@ -3,7 +3,9 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-import httpx
+import aiosmtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
@@ -14,8 +16,11 @@ from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, Rese
 from auth import hash_password, verify_password, create_access_token, require_user
 
 _RESET_TTL = timedelta(hours=1)
-_RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-_RESEND_FROM = os.getenv("RESEND_FROM", "Surge <onboarding@resend.dev>")
+_SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+_SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+_SMTP_USER = os.getenv("SMTP_USER", "")
+_SMTP_PASS = os.getenv("SMTP_PASS", "")
+_EMAIL_FROM = os.getenv("EMAIL_FROM", "Surge <noreply@surge.app>")
 _FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -169,8 +174,8 @@ async def reset_password(payload: ResetPasswordIn, db: AsyncSession = Depends(ge
 
 
 async def _send_reset_email(to_email: str, username: str, reset_url: str) -> None:
-    if not _RESEND_API_KEY:
-        return  # dev: no key — skip silently
+    if not _SMTP_USER or not _SMTP_PASS:
+        return  # not configured — skip silently
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Surge — Password Reset</h2>
@@ -191,17 +196,19 @@ async def _send_reset_email(to_email: str, username: str, reset_url: str) -> Non
     </div>
     """
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {_RESEND_API_KEY}"},
-                json={
-                    "from": _RESEND_FROM,
-                    "to": [to_email],
-                    "subject": "Reset your Surge password",
-                    "html": html,
-                },
-                timeout=10,
-            )
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Reset your Surge password"
+        msg["From"] = _EMAIL_FROM
+        msg["To"] = to_email
+        msg.attach(MIMEText(html, "html"))
+        await aiosmtplib.send(
+            msg,
+            hostname=_SMTP_HOST,
+            port=_SMTP_PORT,
+            username=_SMTP_USER,
+            password=_SMTP_PASS,
+            start_tls=True,
+            timeout=15,
+        )
     except Exception:
         pass  # email failure must never break the HTTP response

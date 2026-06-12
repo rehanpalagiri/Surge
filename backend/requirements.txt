@@ -9,5 +9,6 @@ google-genai
 python-dotenv
 pydantic
 httpx
+aiosmtplib
 passlib[bcrypt]
 PyJWT
