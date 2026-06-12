@@ -20,7 +20,7 @@ _SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 _SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 _SMTP_USER = os.getenv("SMTP_USER", "")
 _SMTP_PASS = os.getenv("SMTP_PASS", "")
-_EMAIL_FROM = os.getenv("EMAIL_FROM", "Surge <noreply@surge.app>")
+_EMAIL_FROM = os.getenv("EMAIL_FROM", f"Surge <{_SMTP_USER}>" if _SMTP_USER else "")
 _FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
