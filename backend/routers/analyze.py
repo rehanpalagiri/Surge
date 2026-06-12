@@ -11,7 +11,7 @@ from database import get_db
 from models import SeedVideo, UserAnalysis, UserProfile, User
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn, SeedConsentDecisionIn
 from services.gemini import analyze_video, select_seed_examples
-from google.api_core.exceptions import ResourceExhausted, PermissionDenied
+from google.genai.errors import ClientError as _GeminiClientError
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
@@ -165,13 +165,15 @@ async def analyze(
             effective_mode,
             niche_raw=raw_niche,
         )
-    except (ResourceExhausted, PermissionDenied):
-        # Gemini quota exhausted or bad API key — return 503 without storing
-        # a broken analysis row and without burning a rate-limit credit.
-        raise HTTPException(
-            status_code=503,
-            detail="AI analysis is temporarily unavailable. Please try again in a few minutes.",
-        )
+    except _GeminiClientError as e:
+        if e.code in (429, 403):
+            # Gemini quota exhausted or bad API key — return 503 without storing
+            # a broken analysis row and without burning a rate-limit credit.
+            raise HTTPException(
+                status_code=503,
+                detail="AI analysis is temporarily unavailable. Please try again in a few minutes.",
+            )
+        raise
     finally:
         # Remove the temp upload — the video has already been sent to Gemini,
         # so we don't need to keep it on the server's disk.
