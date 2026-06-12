@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timedelta
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
 
@@ -111,7 +111,7 @@ async def me(user: User = Depends(require_user)):
 
 
 @router.post("/forgot-password")
-async def forgot_password(payload: ForgotPasswordIn, db: AsyncSession = Depends(get_db)):
+async def forgot_password(payload: ForgotPasswordIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     email = payload.email.strip().lower()
     result = await db.execute(select(User).where(func.lower(User.email) == email))
     user = result.scalar_one_or_none()
@@ -139,7 +139,7 @@ async def forgot_password(payload: ForgotPasswordIn, db: AsyncSession = Depends(
     await db.commit()
 
     reset_url = f"{_FRONTEND_URL}/reset-password?token={token}"
-    await _send_reset_email(user.email, user.username, reset_url)
+    background_tasks.add_task(_send_reset_email, user.email, user.username, reset_url)
     return {"ok": True}
 
 

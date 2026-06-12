@@ -7,6 +7,7 @@ import { forgotPassword, apiErrorDetail } from "@/lib/api";
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [sentAt, setSentAt] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,6 +17,7 @@ export default function ForgotPasswordPage() {
     setError("");
     try {
       await forgotPassword(email.trim().toLowerCase());
+      setSentAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       setSent(true);
     } catch (err) {
       setError(apiErrorDetail(err, "Something went wrong. Please try again."));
@@ -41,8 +43,8 @@ export default function ForgotPasswordPage() {
             <div className="text-4xl">📬</div>
             <p className="text-text-primary font-semibold">Check your inbox</p>
             <p className="text-text-muted text-sm">
-              If an account exists for <strong>{email}</strong>, a reset link is on its way.
-              It expires in 1 hour.
+              If an account exists for <strong>{email}</strong>, a reset link was sent at{" "}
+              <strong>{sentAt}</strong>. It expires in 1 hour.
             </p>
             <Link
               href="/login"

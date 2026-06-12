@@ -95,7 +95,7 @@ function LoginForm() {
             </Link>
           </p>
           <p>
-            <Link href="/forgot-password" className="text-text-muted/60 hover:text-text-muted transition-colors">
+            <Link href="/forgot-password" className="text-purple-to hover:underline transition-colors">
               Forgot your password?
             </Link>
           </p>
