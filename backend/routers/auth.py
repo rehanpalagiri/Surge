@@ -1,9 +1,13 @@
+import logging
 import os
 import re
 import secrets
 from datetime import datetime, timedelta
 
+logger = logging.getLogger(__name__)
+
 import aiosmtplib
+import certifi
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -209,6 +213,7 @@ async def _send_reset_email(to_email: str, username: str, reset_url: str) -> Non
             password=_SMTP_PASS,
             start_tls=True,
             timeout=15,
+            cert_bundle=certifi.where(),
         )
-    except Exception:
-        pass  # email failure must never break the HTTP response
+    except Exception as e:
+        logger.error("Failed to send reset email to %s: %s: %s", to_email, type(e).__name__, e)
