@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import re
@@ -205,21 +206,37 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
       <p style="color:#888;font-size:12px">— The Surge team</p>
     </div>
     """
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Reset your Surge password"
-        msg["From"] = _EMAIL_FROM
-        msg["To"] = to_email
-        msg.attach(MIMEText(html, "html"))
-        await aiosmtplib.send(
-            msg,
-            hostname=_SMTP_HOST,
-            port=_SMTP_PORT,
-            username=_SMTP_USER,
-            password=_SMTP_PASS,
-            start_tls=True,
-            timeout=15,
-            cert_bundle=certifi.where(),
-        )
-    except Exception as e:
-        logger.error("Failed to send reset email to %s: %s: %s", to_email, type(e).__name__, e)
+    plain = (
+        f"Hi {username},\n\n"
+        f"Your Surge password reset code is: {code}\n\n"
+        f"It expires in 1 hour. If you didn't request this, ignore this email.\n\n"
+        f"— The Surge team"
+    )
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Reset your Surge password"
+    msg["From"] = _EMAIL_FROM
+    msg["To"] = to_email
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html, "html"))
+
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            await aiosmtplib.send(
+                msg,
+                hostname=_SMTP_HOST,
+                port=_SMTP_PORT,
+                username=_SMTP_USER,
+                password=_SMTP_PASS,
+                start_tls=True,
+                timeout=30,
+                cert_bundle=certifi.where(),
+            )
+            return
+        except Exception as e:
+            last_err = e
+            logger.warning("Reset email attempt %d failed for %s: %s: %s", attempt + 1, to_email, type(e).__name__, e)
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)  # 1s, 2s
+
+    logger.error("All reset email attempts failed for %s: %s", to_email, last_err)
