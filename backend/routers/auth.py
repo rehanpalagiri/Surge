@@ -252,7 +252,7 @@ async def _send_welcome_email(to_email: str, username: str) -> None:
       <h2 style="color:#6d28d9">Welcome to Surge, {username}!</h2>
       <p>You're all set. Upload your first video and get an AI-powered virality score in seconds.</p>
       <p style="margin:24px 0">
-        <a href="https://surge-chi-khaki.vercel.app"
+        <a href="{_FRONTEND_URL}"
            style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
           Analyse a video →
         </a>
@@ -266,7 +266,7 @@ async def _send_welcome_email(to_email: str, username: str) -> None:
     """
     plain = (
         f"Welcome to Surge, {username}!\n\n"
-        f"You're all set. Upload your first video at https://surge-chi-khaki.vercel.app "
+        f"You're all set. Upload your first video at {_FRONTEND_URL} "
         f"and get an AI-powered virality score in seconds.\n\n"
         f"— The Surge team"
     )
