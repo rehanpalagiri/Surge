@@ -135,8 +135,7 @@ Platform gradient utilities (`gradient-text-tiktok`, `gradient-btn-tiktok`, `tik
 
 ## Production hosts
 
-- **Backend:** Render — Docker build via `backend/Dockerfile`, blueprint at `backend/render.yaml`. Free tier spins down after ~15 min idle; `wakeBackend()` handles client-side cold-start mitigation.
+- **Backend:** Render — Docker build via `backend/Dockerfile`, blueprint at `backend/render.yaml`. Pending upgrade to Starter ($7/mo); until then, free tier spins down after ~15 min idle and `wakeBackend()` (called in UploadZone before uploads) mitigates cold starts for video analysis only — auth flows like forgot-password are not pre-warmed.
 - **Frontend:** Vercel — auto-deploys from `main`. Live at `https://surge-chi-khaki.vercel.app`
 - **Database:** Neon Postgres (AWS US East 1) — use the **direct** (non-pooler) connection string
-- **Repo:** `https://github.com/rehanpalagiri/Surge`
-- **Keep-alive:** `.github/workflows/keep-alive.yml` pings `${{ secrets.BACKEND_HEALTH_URL }}` every 10 min (skips 12am–6am Pacific). Requires `BACKEND_HEALTH_URL` repo secret to be set.
+- **Repo:** `https://github.com/rehanpalagiri/Surge` (private)
