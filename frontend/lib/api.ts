@@ -502,13 +502,14 @@ export async function ackFetchStatus(password: string): Promise<void> {
 }
 
 export interface HarvestStatus {
-  status: "never_run" | "running" | "done";
+  status: "never_run" | "running" | "done" | "failed";
   started_at?: string;
   finished_at?: string;
   niches_processed?: number;
   total_added?: number;
   total_skipped?: number;
   total_errors?: number;
+  error?: string;
   detail?: { niche: string; added: number; skipped: number; errors: number }[];
 }
 

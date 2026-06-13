@@ -211,25 +211,33 @@ async def harvest_all(
     _last_harvest = {"status": "running", "started_at": datetime.utcnow().isoformat()}
     logger.info("Harvest started: %d niches min_views=%d max_per_niche=%d", len(target), min_views, max_per_niche)
 
-    results = []
-    for niche in target:
-        r = await harvest_niche(niche, min_views, max_per_niche)
-        results.append(r)
+    try:
+        results = []
+        for niche in target:
+            r = await harvest_niche(niche, min_views, max_per_niche)
+            results.append(r)
 
-    total_added = sum(r["added"] for r in results)
-    total_skipped = sum(r["skipped"] for r in results)
-    total_errors = sum(r["errors"] for r in results)
+        total_added = sum(r["added"] for r in results)
+        total_skipped = sum(r["skipped"] for r in results)
+        total_errors = sum(r["errors"] for r in results)
 
-    _last_harvest = {
-        "status": "done",
-        "finished_at": datetime.utcnow().isoformat(),
-        "niches_processed": len(results),
-        "total_added": total_added,
-        "total_skipped": total_skipped,
-        "total_errors": total_errors,
-        "detail": results,
-    }
-    logger.info("Harvest done: added=%d skipped=%d errors=%d", total_added, total_skipped, total_errors)
+        _last_harvest = {
+            "status": "done",
+            "finished_at": datetime.utcnow().isoformat(),
+            "niches_processed": len(results),
+            "total_added": total_added,
+            "total_skipped": total_skipped,
+            "total_errors": total_errors,
+            "detail": results,
+        }
+        logger.info("Harvest done: added=%d skipped=%d errors=%d", total_added, total_skipped, total_errors)
+    except Exception as e:
+        logger.error("Harvest failed: %s", e)
+        _last_harvest = {
+            "status": "failed",
+            "finished_at": datetime.utcnow().isoformat(),
+            "error": str(e),
+        }
 
 
 def get_last_harvest() -> dict:

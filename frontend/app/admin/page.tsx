@@ -612,19 +612,36 @@ export default function AdminPage() {
             <div className={`rounded-xl px-4 py-3 text-sm border ${
               harvestStatus.status === "running"
                 ? "bg-yellow-400/5 border-yellow-400/20 text-yellow-400"
+                : harvestStatus.status === "failed"
+                ? "bg-danger/5 border-danger/20 text-danger"
                 : "bg-success/5 border-success/20 text-text-primary"
             }`}>
               {harvestStatus.status === "running" ? (
                 <p>Harvest in progress — checking every 8s…</p>
+              ) : harvestStatus.status === "failed" ? (
+                <div className="space-y-1">
+                  <p className="font-medium">Error — harvest failed</p>
+                  {harvestStatus.error && (
+                    <p className="text-xs opacity-80 font-mono">{harvestStatus.error}</p>
+                  )}
+                  {harvestStatus.finished_at && (
+                    <p className="text-xs opacity-60">{new Date(harvestStatus.finished_at).toLocaleString()}</p>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-1">
                   <p className="font-medium text-success">
                     Harvest complete · +{harvestStatus.total_added} seeds added
                   </p>
                   <p className="text-text-muted text-xs">
-                    {harvestStatus.niches_processed} niches · {harvestStatus.total_skipped} skipped · {harvestStatus.total_errors} errors
+                    {harvestStatus.niches_processed} niches · {harvestStatus.total_skipped} skipped
                     {harvestStatus.finished_at && ` · ${new Date(harvestStatus.finished_at).toLocaleString()}`}
                   </p>
+                  {(harvestStatus.total_errors ?? 0) > 0 && (
+                    <p className="text-yellow-400 text-xs mt-1">
+                      ⚠ {harvestStatus.total_errors} video{harvestStatus.total_errors !== 1 ? "s" : ""} failed to process — check Render logs for details
+                    </p>
+                  )}
                 </div>
               )}
             </div>
