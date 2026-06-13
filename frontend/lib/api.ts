@@ -411,6 +411,15 @@ export async function changePassword(
   return handleResponse<{ ok: boolean }>(res);
 }
 
+export async function deleteAccount(password: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/me/account`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ password }),
+  });
+  return handleResponse<{ ok: boolean }>(res);
+}
+
 export async function deleteAnalysis(
   id: number,
   token?: string | null

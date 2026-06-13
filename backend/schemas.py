@@ -134,6 +134,10 @@ class VerifyResetCodeIn(BaseModel):
     token: str
 
 
+class DeleteAccountIn(BaseModel):
+    password: str
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

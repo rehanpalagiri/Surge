@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
-import { getToken } from "@/lib/auth";
-import { changeUsername, changePassword, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
+import { getToken, clearToken } from "@/lib/auth";
+import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function SettingsPage() {
         <ChangeUsernameCard />
         <ChangePasswordCard />
         <DataPrivacyCard />
+        <DeleteAccountCard />
         <p className="text-center text-text-muted/60 text-xs pt-2">
           <Link href="/privacy" className="hover:text-text-muted transition-colors">Privacy Policy</Link>
           <span className="mx-2">·</span>
@@ -173,6 +174,81 @@ function ChangeUsernameCard() {
           {loading ? "Saving…" : "Save username"}
         </button>
       </form>
+    </div>
+  );
+}
+
+function DeleteAccountCard() {
+  const router = useRouter();
+  const [step, setStep] = useState<"idle" | "confirm" | "loading">("idle");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleDelete(e: React.FormEvent) {
+    e.preventDefault();
+    setStep("loading");
+    setError("");
+    try {
+      await deleteAccount(password);
+      clearToken();
+      router.push("/?deleted=1");
+    } catch {
+      setError("Incorrect password, or something went wrong. Try again.");
+      setStep("confirm");
+    }
+  }
+
+  return (
+    <div className="bg-card border border-danger/30 rounded-2xl p-6 space-y-4">
+      <div>
+        <h2 className="text-danger font-semibold text-lg">Delete Account</h2>
+        <p className="text-text-muted text-sm mt-0.5">
+          Permanently deletes your account and all your analyses. This cannot be undone.
+        </p>
+      </div>
+
+      {step === "idle" && (
+        <button
+          onClick={() => setStep("confirm")}
+          className="border border-danger/40 text-danger font-semibold px-6 py-2.5 rounded-xl hover:bg-danger/10 transition-colors"
+        >
+          Delete my account
+        </button>
+      )}
+
+      {(step === "confirm" || step === "loading") && (
+        <form onSubmit={handleDelete} className="space-y-3">
+          <p className="text-text-muted text-sm">
+            Enter your password to confirm. All your data will be deleted immediately.
+          </p>
+          <input
+            type="password"
+            placeholder="Your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-danger"
+          />
+          {error && <p className="text-danger text-sm">{error}</p>}
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={step === "loading"}
+              className="border border-danger/40 text-danger font-semibold px-6 py-2.5 rounded-xl hover:bg-danger/10 transition-colors disabled:opacity-50"
+            >
+              {step === "loading" ? "Deleting…" : "Yes, delete everything"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep("idle"); setPassword(""); setError(""); }}
+              className="text-text-muted text-sm hover:text-text-primary transition-colors px-4"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
