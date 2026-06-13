@@ -138,6 +138,7 @@ def _build_system_prompt(
     channel_profile: str | None = None,
     mode: str = "quick",
     niche_raw: str = "",
+    creator_like_baseline: dict | None = None,
 ) -> str:
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
@@ -249,19 +250,38 @@ def _build_system_prompt(
             f'(creator describes their content as: "{raw}").'
         )
 
-    calibration_block = (
-        "CALIBRATION (internalize this before scoring):\n"
-        "- A random person's first video upload = 2–3.\n"
-        "- A creator who posts regularly but hasn't broken through = 4–5.\n"
-        + (
-            "- A Reel that gets 2k–10k likes organically = 6–7.\n"
-            "- A Reel that blows up (50k+ likes) = 8–9.\n"
-            if is_instagram else
-            "- A video that gets 50k–200k views organically = 6–7.\n"
-            "- A video that blows up (500k+) = 8–9.\n"
+    if creator_like_baseline and creator_like_baseline.get("sample_count", 0) >= 2:
+        ml = creator_like_baseline["median_likes"]
+        n = creator_like_baseline["sample_count"]
+        low_threshold = max(0, ml // 4)
+        mid_high = ml * 3
+        breakout = ml * 8
+        calibration_block = (
+            f"CALIBRATION — PERSONALISED TO THIS CREATOR (based on {n} verified post(s)):\n"
+            f"Their videos typically get ~{ml:,} likes.\n"
+            f"Score RELATIVE TO THEIR OWN BASELINE — not against industry averages:\n"
+            f"- 3–4: Underperforming for them (~{low_threshold:,} likes or fewer).\n"
+            f"- 5: About what they normally get (~{ml:,} likes).\n"
+            f"- 6–7: Noticeably above their typical (~{ml * 2:,}–{mid_high:,} likes).\n"
+            f"- 8–9: A breakout for this creator (~{breakout:,}+ likes — rare for their account).\n"
+            f"- 10: Never give this.\n"
+            f"A creator with a {ml:,}-like baseline scoring 5 is doing fine for THEM — "
+            f"don't penalise a micro-creator for having a smaller audience."
         )
-        + "- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't."
-    )
+    else:
+        calibration_block = (
+            "CALIBRATION (internalize this before scoring):\n"
+            "- A random person's first video upload = 2–3.\n"
+            "- A creator who posts regularly but hasn't broken through = 4–5.\n"
+            + (
+                "- A Reel that gets 2k–10k likes organically = 6–7.\n"
+                "- A Reel that blows up (50k+ likes) = 8–9.\n"
+                if is_instagram else
+                "- A video that gets 50k–200k views organically = 6–7.\n"
+                "- A video that blows up (500k+) = 8–9.\n"
+            )
+            + "- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't."
+        )
 
     projection_instruction = (
         "- \"projected_verdict\" and \"projected_likes\" should be your honest estimate IF the creator applies every fix — don't be overly optimistic."
@@ -363,6 +383,7 @@ async def analyze_video(
     channel_profile: str | None = None,
     mode: str = "quick",
     niche_raw: str = "",
+    creator_like_baseline: dict | None = None,
 ) -> dict:
     try:
         prompt = _build_system_prompt(
@@ -376,6 +397,7 @@ async def analyze_video(
             channel_profile,
             mode,
             niche_raw=niche_raw,
+            creator_like_baseline=creator_like_baseline,
         )
 
         uploaded = await client.aio.files.upload(file=video_path)

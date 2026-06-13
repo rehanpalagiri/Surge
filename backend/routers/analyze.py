@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 from datetime import datetime, timedelta
+from statistics import median
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,6 +122,28 @@ async def analyze(
 
     effective_mode = resolve_mode(requested_mode, user, has_usable_seeds, channel_profile)
 
+    # --- Per-creator like baseline (all modes — personalises the 1–10 calibration) ---
+    # Uses verified actual_likes from this user's past analyses on this platform.
+    # Needs >= 2 data points; falls back to generic calibration otherwise.
+    creator_like_baseline: dict | None = None
+    if user:
+        likes_result = await db.execute(
+            select(UserAnalysis.actual_likes).where(
+                UserAnalysis.user_id == user.id,
+                UserAnalysis.platform == platform,
+                UserAnalysis.actual_likes.is_not(None),
+            ).order_by(UserAnalysis.created_at.desc()).limit(10)
+        )
+        past_likes = [r for r in likes_result.scalars().all() if r is not None and r >= 0]
+        if len(past_likes) >= 2:
+            med = int(median(past_likes))
+            creator_like_baseline = {
+                "median_likes": med,
+                "sample_count": len(past_likes),
+                "min_likes": min(past_likes),
+                "max_likes": max(past_likes),
+            }
+
     # Build saved-profile context (name/handle/niche/bio/audience). The prompt builder
     # only injects it for Thinking/Deep, so Quick stays a pure video assessment.
     profile_context = ""
@@ -164,6 +187,7 @@ async def analyze(
             profile_arg,
             effective_mode,
             niche_raw=raw_niche,
+            creator_like_baseline=creator_like_baseline,
         )
     except _GeminiClientError as e:
         if e.code in (429, 403):
