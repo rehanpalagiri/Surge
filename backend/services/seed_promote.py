@@ -128,10 +128,13 @@ async def promote_analysis_to_seed(
             return
 
         # --- Write phase: re-check idempotency inside the write txn (guards against
-        #     two refreshes racing), persist the seed, stamp the analysis. ---
+        #     two refreshes racing), persist the seed, stamp the analysis.
+        #     with_for_update locks the row so a second concurrent promote blocks
+        #     here until the first commits, then sees promoted_seed_id set and bails
+        #     (no-op on SQLite, which uses db-level locking). ---
         async with AsyncSessionLocal() as db:
             res = await db.execute(
-                select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+                select(UserAnalysis).where(UserAnalysis.id == analysis_id).with_for_update()
             )
             a = res.scalar_one_or_none()
             if a is None or a.promoted_seed_id is not None:

@@ -642,6 +642,11 @@ export default function AdminPage() {
                       ⚠ {harvestStatus.total_errors} video{harvestStatus.total_errors !== 1 ? "s" : ""} failed to process — check Render logs for details
                     </p>
                   )}
+                  {(harvestStatus.total_search_failures ?? 0) > 0 && (
+                    <p className="text-yellow-400 text-xs mt-1">
+                      ⚠ {harvestStatus.total_search_failures} search{harvestStatus.total_search_failures !== 1 ? "es" : ""} failed (likely tikwm rate limit) — fewer seeds than expected, try again later
+                    </p>
+                  )}
                 </div>
               )}
             </div>

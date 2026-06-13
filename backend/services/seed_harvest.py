@@ -128,7 +128,7 @@ async def harvest_niche(
     max_videos: int = DEFAULT_MAX_PER_NICHE,
 ) -> dict:
     keywords = NICHE_KEYWORDS.get(niche, [niche])
-    added = skipped = errors = 0
+    added = skipped = errors = search_failures = 0
 
     for keyword in keywords:
         if added >= max_videos:
@@ -138,6 +138,7 @@ async def harvest_niche(
             await asyncio.sleep(1.2)  # tikwm free tier ~1 req/sec
         except Exception as e:
             logger.warning("Search failed '%s': %s", keyword, e)
+            search_failures += 1
             continue
 
         for v in videos:
@@ -157,7 +158,8 @@ async def harvest_niche(
                 skipped += 1
                 continue
 
-            tmp = tempfile.mktemp(suffix=".mp4")
+            fd, tmp = tempfile.mkstemp(suffix=".mp4")
+            os.close(fd)  # _download reopens by path; we don't need the fd
             try:
                 await _download(play_url, tmp)
                 result = await analyze_seed_video(tmp, "tiktok", niche, play_count, like_count)
@@ -198,7 +200,13 @@ async def harvest_niche(
                 if os.path.exists(tmp):
                     os.remove(tmp)
 
-    return {"niche": niche, "added": added, "skipped": skipped, "errors": errors}
+    return {
+        "niche": niche,
+        "added": added,
+        "skipped": skipped,
+        "errors": errors,
+        "search_failures": search_failures,
+    }
 
 
 async def harvest_all(
@@ -220,6 +228,7 @@ async def harvest_all(
         total_added = sum(r["added"] for r in results)
         total_skipped = sum(r["skipped"] for r in results)
         total_errors = sum(r["errors"] for r in results)
+        total_search_failures = sum(r.get("search_failures", 0) for r in results)
 
         _last_harvest = {
             "status": "done",
@@ -228,9 +237,13 @@ async def harvest_all(
             "total_added": total_added,
             "total_skipped": total_skipped,
             "total_errors": total_errors,
+            "total_search_failures": total_search_failures,
             "detail": results,
         }
-        logger.info("Harvest done: added=%d skipped=%d errors=%d", total_added, total_skipped, total_errors)
+        logger.info(
+            "Harvest done: added=%d skipped=%d errors=%d search_failures=%d",
+            total_added, total_skipped, total_errors, total_search_failures,
+        )
     except Exception as e:
         logger.error("Harvest failed: %s", e)
         _last_harvest = {

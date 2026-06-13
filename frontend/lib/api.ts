@@ -509,8 +509,9 @@ export interface HarvestStatus {
   total_added?: number;
   total_skipped?: number;
   total_errors?: number;
+  total_search_failures?: number;
   error?: string;
-  detail?: { niche: string; added: number; skipped: number; errors: number }[];
+  detail?: { niche: string; added: number; skipped: number; errors: number; search_failures?: number }[];
 }
 
 export async function triggerHarvest(

@@ -499,6 +499,10 @@ async def delete_analysis(
 
 
 def _to_out(analysis: UserAnalysis) -> dict:
+    try:
+        scores = json.loads(analysis.scores_json)
+    except (ValueError, TypeError):
+        scores = {}
     return {
         "id": analysis.id,
         "platform": analysis.platform or "tiktok",
@@ -506,7 +510,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "niche": analysis.niche,
         "caption": analysis.caption,
         "bio": analysis.bio,
-        "scores_json": json.loads(analysis.scores_json),
+        "scores_json": scores,
         "verdict": analysis.verdict,
         "actual_views": analysis.actual_views,
         "actual_likes": analysis.actual_likes,
