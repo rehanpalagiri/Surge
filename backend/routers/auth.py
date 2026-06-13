@@ -54,7 +54,7 @@ def user_to_out(user: User) -> dict:
 
 
 @router.post("/signup", response_model=TokenOut)
-async def signup(payload: SignupIn, db: AsyncSession = Depends(get_db)):
+async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     email = payload.email.strip().lower()
     username = payload.username.strip()
 
@@ -97,6 +97,7 @@ async def signup(payload: SignupIn, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(user)
 
+    background_tasks.add_task(_send_welcome_email, user.email, user.username)
     return TokenOut(access_token=create_access_token(user.id))
 
 
@@ -232,6 +233,7 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
                 timeout=30,
                 cert_bundle=certifi.where(),
             )
+            logger.info("Reset email sent to %s (attempt %d)", to_email, attempt + 1)
             return
         except Exception as e:
             last_err = e
@@ -240,3 +242,60 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
                 await asyncio.sleep(2 ** attempt)  # 1s, 2s
 
     logger.error("All reset email attempts failed for %s: %s", to_email, last_err)
+
+
+async def _send_welcome_email(to_email: str, username: str) -> None:
+    if not _SMTP_USER or not _SMTP_PASS:
+        return
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#6d28d9">Welcome to Surge, {username}!</h2>
+      <p>You're all set. Upload your first video and get an AI-powered virality score in seconds.</p>
+      <p style="margin:24px 0">
+        <a href="https://surge-chi-khaki.vercel.app"
+           style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+          Analyse a video →
+        </a>
+      </p>
+      <p style="color:#888;font-size:13px">
+        Upgrade to <strong>Thinking</strong> or <strong>Deep</strong> mode for a detailed breakdown
+        and personalised tips based on your channel's history.
+      </p>
+      <p style="color:#888;font-size:12px">— The Surge team</p>
+    </div>
+    """
+    plain = (
+        f"Welcome to Surge, {username}!\n\n"
+        f"You're all set. Upload your first video at https://surge-chi-khaki.vercel.app "
+        f"and get an AI-powered virality score in seconds.\n\n"
+        f"— The Surge team"
+    )
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Welcome to Surge 🎬"
+    msg["From"] = _EMAIL_FROM
+    msg["To"] = to_email
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html, "html"))
+
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            await aiosmtplib.send(
+                msg,
+                hostname=_SMTP_HOST,
+                port=_SMTP_PORT,
+                username=_SMTP_USER,
+                password=_SMTP_PASS,
+                start_tls=True,
+                timeout=30,
+                cert_bundle=certifi.where(),
+            )
+            logger.info("Welcome email sent to %s (attempt %d)", to_email, attempt + 1)
+            return
+        except Exception as e:
+            last_err = e
+            logger.warning("Welcome email attempt %d failed for %s: %s: %s", attempt + 1, to_email, type(e).__name__, e)
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)  # 1s, 2s
+
+    logger.error("All welcome email attempts failed for %s: %s", to_email, last_err)
