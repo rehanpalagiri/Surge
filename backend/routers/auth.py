@@ -138,7 +138,7 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
     for tok in existing.scalars().all():
         tok.used = True
 
-    token = secrets.token_urlsafe(32)
+    token = f"{secrets.randbelow(1_000_000):06d}"
     reset = PasswordResetToken(
         user_id=user.id,
         token=token,
@@ -147,8 +147,7 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
     db.add(reset)
     await db.commit()
 
-    reset_url = f"{_FRONTEND_URL}/reset-password?token={token}"
-    background_tasks.add_task(_send_reset_email, user.email, user.username, reset_url)
+    background_tasks.add_task(_send_reset_email, user.email, user.username, token)
     return {"ok": True}
 
 
@@ -177,24 +176,20 @@ async def reset_password(payload: ResetPasswordIn, db: AsyncSession = Depends(ge
     return {"ok": True}
 
 
-async def _send_reset_email(to_email: str, username: str, reset_url: str) -> None:
+async def _send_reset_email(to_email: str, username: str, code: str) -> None:
     if not _SMTP_USER or not _SMTP_PASS:
         return  # not configured — skip silently
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Surge — Password Reset</h2>
       <p>Hi <strong>{username}</strong>,</p>
-      <p>Someone requested a password reset for your Surge account.</p>
-      <p style="margin:24px 0">
-        <a href="{reset_url}"
-           style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:8px;
-                  text-decoration:none;font-weight:bold">
-          Reset my password
-        </a>
+      <p>Your password reset code is:</p>
+      <p style="margin:24px 0;text-align:center">
+        <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#6d28d9">{code}</span>
       </p>
       <p style="color:#888;font-size:13px">
-        This link expires in 1 hour. If you didn't request this, ignore this email —
-        your password won't change.
+        Enter this code on the Surge reset page. It expires in 1 hour.
+        If you didn't request this, ignore this email — your password won't change.
       </p>
       <p style="color:#888;font-size:12px">— The Surge team</p>
     </div>
