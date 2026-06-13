@@ -40,18 +40,15 @@ export default function VerdictBanner({
       </h1>
 
       {isInstagram ? (
-        /* Instagram: likes are the primary metric */
+        /* Instagram: likes only — views are hidden by the platform */
         <>
-          {hasLikes && (
+          {hasLikes ? (
             <p className="text-text-primary text-lg font-semibold">
               {predictedLikes} predicted likes
             </p>
+          ) : (
+            <p className="text-text-muted text-sm mt-1">Likes prediction unavailable</p>
           )}
-          <p className="text-text-muted text-sm mt-1">
-            Predicted views:{" "}
-            <span className="text-text-muted/80">{predictedViews}</span>
-            <span className="text-text-muted/50 text-xs ml-1">(Instagram hides real views)</span>
-          </p>
         </>
       ) : (
         /* TikTok: views are the primary metric */

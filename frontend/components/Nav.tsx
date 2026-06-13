@@ -54,7 +54,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             <Link href="/" className="font-bold text-xl gradient-text">
               Surge
             </Link>
-            <span className="text-[10px] text-text-muted/40 font-mono select-none">v1.26</span>
+            <span className="text-[10px] text-text-muted/40 font-mono select-none">v1.27</span>
           </div>
           {subtitle && (
             <span className="text-text-muted text-sm capitalize">{subtitle}</span>

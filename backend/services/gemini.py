@@ -53,7 +53,7 @@ _PLATFORM_CONTEXT = {
 }
 
 
-# Mode-specific guidance for the predicted_views field. {pname} is filled at build time.
+# Mode-specific guidance for the predicted_views field (TikTok). {pname} filled at build time.
 _PREDICTED_VIEWS_GUIDANCE = {
     "quick": (
         "For predicted_views: you have NO reference library for this run — rely on your "
@@ -68,6 +68,25 @@ _PREDICTED_VIEWS_GUIDANCE = {
     "deep_thinking": (
         "For predicted_views: anchor primarily to this creator's VERIFIED history above, and "
         "also use the global benchmark data when shown. If their typical video gets ~800 views, "
+        "require clear breakout signals in THIS video to predict meaningfully higher. Err LOW."
+    ),
+}
+
+# Mode-specific guidance for predicted_likes (Instagram — views are hidden by the platform).
+_PREDICTED_LIKES_GUIDANCE = {
+    "quick": (
+        "For predicted_likes: you have NO reference library for this run — rely on your "
+        "general training knowledge of Instagram Reels. Most Reels from creators who haven't "
+        "broken through get under 500 likes. Give a realistic range and err LOW."
+    ),
+    "thinking": (
+        "For predicted_likes: anchor to the GLOBAL PERFORMANCE REFERENCE and REAL BENCHMARK "
+        "DATA above. Most Reels land far closer to the low-performer range. "
+        "Never exceed the high-performer peak unless the video is clearly exceptional. Err LOW."
+    ),
+    "deep_thinking": (
+        "For predicted_likes: anchor primarily to this creator's VERIFIED history above, and "
+        "also use the global benchmark data. If their typical Reel gets ~200 likes, "
         "require clear breakout signals in THIS video to predict meaningfully higher. Err LOW."
     ),
 }
@@ -184,10 +203,11 @@ def _build_system_prompt(
                 bm.append(
                     f"  Low performers: avg {sum(ll) // len(ll):,} likes"
                 )
+        anchor_field = "predicted_likes" if platform == "instagram" else "predicted_views"
         benchmark_block = (
             f"\nREAL BENCHMARK DATA ({pname}):\n"
             + "\n".join(bm)
-            + "\nUse THESE real numbers to anchor predicted_views — not a generic table."
+            + f"\nUse THESE real numbers to anchor {anchor_field} — not a generic table."
         )
 
     # --- Creator channel profile (Deep only) ---
@@ -209,9 +229,15 @@ def _build_system_prompt(
         if profile_context and profile_context.strip():
             profile_block = f"\n\nCREATOR PROFILE CONTEXT:\n{profile_context.strip()}"
 
-    predicted_guidance = _PREDICTED_VIEWS_GUIDANCE.get(
-        mode, _PREDICTED_VIEWS_GUIDANCE["quick"]
-    ).format(pname=pname)
+    is_instagram = platform == "instagram"
+    if is_instagram:
+        predicted_guidance = _PREDICTED_LIKES_GUIDANCE.get(
+            mode, _PREDICTED_LIKES_GUIDANCE["quick"]
+        )
+    else:
+        predicted_guidance = _PREDICTED_VIEWS_GUIDANCE.get(
+            mode, _PREDICTED_VIEWS_GUIDANCE["quick"]
+        ).format(pname=pname)
 
     # Canonical niche drives seed matching; the creator's own words add
     # specificity for the model. Cap raw text so an essay can't bloat the prompt.
@@ -222,6 +248,42 @@ def _build_system_prompt(
             f"The user's video is a **{pname} video** in the **{niche}** niche "
             f'(creator describes their content as: "{raw}").'
         )
+
+    calibration_block = (
+        "CALIBRATION (internalize this before scoring):\n"
+        "- A random person's first video upload = 2–3.\n"
+        "- A creator who posts regularly but hasn't broken through = 4–5.\n"
+        + (
+            "- A Reel that gets 2k–10k likes organically = 6–7.\n"
+            "- A Reel that blows up (50k+ likes) = 8–9.\n"
+            if is_instagram else
+            "- A video that gets 50k–200k views organically = 6–7.\n"
+            "- A video that blows up (500k+) = 8–9.\n"
+        )
+        + "- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't."
+    )
+
+    projection_instruction = (
+        "- \"projected_verdict\" and \"projected_likes\" should be your honest estimate IF the creator applies every fix — don't be overly optimistic."
+        if is_instagram else
+        "- \"projected_verdict\" and \"projected_views\" should be your honest estimate IF the creator applies every fix — don't be overly optimistic."
+    )
+
+    prediction_schema = (
+        f'  "predicted_likes": "<realistic like range. {predicted_guidance} When in doubt, predict LESS.>",'
+        if is_instagram else
+        f'  "predicted_views": "<realistic view range. {predicted_guidance} When in doubt, predict LESS.>",\n'
+        f'  "predicted_likes": "<realistic like range, typically 3–10% of predicted views. Err LOW.>",'
+    )
+
+    projection_schema = (
+        '  "projected_verdict": "<honest verdict if they apply the full plan>",\n'
+        '  "projected_likes": "<realistic projected like range after fixes. Err LOW.>"'
+        if is_instagram else
+        '  "projected_verdict": "<honest verdict if they apply the full plan>",\n'
+        '  "projected_views": "<realistic projected range after fixes. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer numbers even after improvements.>",\n'
+        '  "projected_likes": "<realistic like range after fixes. Err LOW.>"'
+    )
 
     return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh.
 {benchmark_block}
@@ -236,12 +298,7 @@ SCORING RULES (0–10) — read carefully before scoring anything:
 - 9: Near-viral quality. Rare. Give this only when the video is clearly elite.
 - 10: Exceptional. Do not give this. Ever.
 
-CALIBRATION (internalize this before scoring):
-- A random person's first video upload = 2–3.
-- A creator who posts regularly but hasn't broken through = 4–5.
-- A video that gets 50k–200k views organically = 6–7.
-- A video that blows up (500k+) = 8–9.
-- When in doubt, score LOWER. Inflated scores are useless. The creator already knows if their video was great — they're here because it probably wasn't.
+{calibration_block}
 {profile_perf_block}{seed_block}
 
 {niche_line}
@@ -262,7 +319,7 @@ ANALYSIS INSTRUCTIONS:
 - Build the improvement_plan ordered by impact (priority 1 = highest impact). Target the weakest areas first. Provide 3–5 items.
 - For "caption_rewrite": rewrite their actual caption to maximize {pname} performance. If they gave no caption, write one from scratch that fits the video.
 - For "hook_rewrite": rewrite the exact first spoken line or on-screen text to stop the scroll.
-- "projected_verdict" and "projected_views" should be your honest estimate IF the creator applies every fix — don't be overly optimistic.
+- {projection_instruction}
 - {predicted_guidance}
 
 Return ONLY valid JSON with exactly this structure:
@@ -273,8 +330,7 @@ Return ONLY valid JSON with exactly this structure:
   "audio_score": <0-10>,
   "caption_score": <0-10>,
   "trend_alignment": <0-10>,
-  "predicted_views": "<realistic view range. {predicted_guidance} When in doubt, predict LESS.>",
-  "predicted_likes": "<realistic like range for this video. Likes are typically 3–10% of views on TikTok; for Instagram anchor entirely to like benchmarks since views are unavailable. Give a range and err LOW.>",
+{prediction_schema}
   "strengths": ["<specific genuine strength 1>", "<specific genuine strength 2>"],
   "improvements": ["<blunt specific improvement 1>", "<blunt specific improvement 2>", "<blunt specific improvement 3>"],
   "verdict": "<exactly one of: High potential | Average potential | Needs work>",
@@ -291,9 +347,7 @@ Return ONLY valid JSON with exactly this structure:
   ],
   "caption_rewrite": "<rewritten caption optimized for {pname}>",
   "hook_rewrite": "<specific rewrite of the first 1-2 seconds>",
-  "projected_verdict": "<honest verdict if they apply the full plan>",
-  "projected_views": "<realistic projected range after fixes. Only approach top-performer territory if the fixes would genuinely transform the video. Most creators still land well below top-performer numbers even after improvements.>",
-  "projected_likes": "<realistic like range after fixes, same logic as projected_views. Err LOW.>"
+{projection_schema}
 }}"""
 
 
