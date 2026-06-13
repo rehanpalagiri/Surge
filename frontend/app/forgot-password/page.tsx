@@ -1,11 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { forgotPassword, resetPassword, apiErrorDetail } from "@/lib/api";
+import { forgotPassword, verifyResetCode, resetPassword, apiErrorDetail } from "@/lib/api";
 
-type Step = "email" | "code" | "done";
+type Step = "email" | "code" | "password" | "done";
+
+function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const r0 = useRef<HTMLInputElement>(null);
+  const r1 = useRef<HTMLInputElement>(null);
+  const r2 = useRef<HTMLInputElement>(null);
+  const r3 = useRef<HTMLInputElement>(null);
+  const r4 = useRef<HTMLInputElement>(null);
+  const r5 = useRef<HTMLInputElement>(null);
+  const refs = [r0, r1, r2, r3, r4, r5];
+  const digits = value.padEnd(6, "").split("").slice(0, 6);
+
+  function focus(i: number) {
+    refs[i]?.current?.focus();
+  }
+
+  function handleChange(i: number, raw: string) {
+    const digit = raw.replace(/\D/g, "").slice(-1);
+    const next = digits.map((d, idx) => (idx === i ? digit : d)).join("").replace(/ /g, "");
+    onChange(next);
+    if (digit && i < 5) setTimeout(() => focus(i + 1), 0);
+  }
+
+  function handleKeyDown(i: number, e: React.KeyboardEvent) {
+    if (e.key === "Backspace") {
+      if (digits[i]) {
+        const next = digits.map((d, idx) => (idx === i ? "" : d)).join("");
+        onChange(next);
+      } else if (i > 0) {
+        focus(i - 1);
+      }
+    } else if (e.key === "ArrowLeft" && i > 0) {
+      focus(i - 1);
+    } else if (e.key === "ArrowRight" && i < 5) {
+      focus(i + 1);
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    onChange(pasted);
+    const nextIdx = Math.min(pasted.length, 5);
+    setTimeout(() => focus(nextIdx), 0);
+  }
+
+  return (
+    <div className="flex items-end justify-center gap-2">
+      {[0, 1, 2].map((i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={digits[i] || ""}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          className="w-10 h-14 bg-transparent border-b-2 border-text-primary text-text-primary text-3xl font-bold text-center focus:outline-none focus:border-purple-to caret-transparent"
+        />
+      ))}
+      <span className="text-text-muted text-2xl pb-2 px-1 select-none">·</span>
+      {[3, 4, 5].map((i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={digits[i] || ""}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          className="w-10 h-14 bg-transparent border-b-2 border-text-primary text-text-primary text-3xl font-bold text-center focus:outline-none focus:border-purple-to caret-transparent"
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -31,6 +110,21 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await verifyResetCode(code);
+      setStep("password");
+    } catch (err) {
+      setError(apiErrorDetail(err, "Invalid or expired code."));
+      setCode("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) { setError("Passwords don't match."); return; }
@@ -38,10 +132,10 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      await resetPassword(code.trim(), password);
+      await resetPassword(code, password);
       setStep("done");
     } catch (err) {
-      setError(apiErrorDetail(err, "Invalid or expired code. Please try again."));
+      setError(apiErrorDetail(err, "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -60,14 +154,17 @@ export default function ForgotPasswordPage() {
           )}
           {step === "code" && (
             <>
-              <h1 className="text-xl font-bold text-text-primary mt-4">Enter your code</h1>
+              <h1 className="text-xl font-bold text-text-primary mt-4">Check your email</h1>
               <p className="text-text-muted text-sm mt-1">
-                We sent a 6-digit code to <strong>{email}</strong>
+                Enter the 6-digit code sent to <strong>{email}</strong>
               </p>
             </>
           )}
-          {step === "done" && (
-            <h1 className="text-xl font-bold text-text-primary mt-4">Password updated!</h1>
+          {step === "password" && (
+            <>
+              <h1 className="text-xl font-bold text-text-primary mt-4">Set new password</h1>
+              <p className="text-text-muted text-sm mt-1">Choose something you&apos;ll remember.</p>
+            </>
           )}
         </div>
 
@@ -83,11 +180,8 @@ export default function ForgotPasswordPage() {
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
             />
             {error && <p className="text-danger text-sm">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading}
+              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50">
               {loading ? "Sending…" : "Send code"}
             </button>
             <p className="text-center">
@@ -99,17 +193,25 @@ export default function ForgotPasswordPage() {
         )}
 
         {step === "code" && (
+          <form onSubmit={handleVerifyCode} className="space-y-6">
+            <OtpInput value={code} onChange={setCode} />
+            {error && <p className="text-danger text-sm text-center">{error}</p>}
+            <button type="submit" disabled={loading || code.length < 6}
+              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50">
+              {loading ? "Verifying…" : "Verify code"}
+            </button>
+            <p className="text-center text-sm">
+              <button type="button"
+                onClick={() => { setStep("email"); setError(""); setCode(""); }}
+                className="text-text-muted/60 hover:text-text-muted transition-colors">
+                Resend code
+              </button>
+            </p>
+          </form>
+        )}
+
+        {step === "password" && (
           <form onSubmit={handleReset} className="space-y-4">
-            <input
-              type="text"
-              placeholder="6-digit code"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              required
-              inputMode="numeric"
-              maxLength={6}
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to text-center text-2xl tracking-widest font-bold"
-            />
             <input
               type="password"
               placeholder="New password (min 8 chars)"
@@ -129,33 +231,20 @@ export default function ForgotPasswordPage() {
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
             />
             {error && <p className="text-danger text-sm">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading || code.length !== 6}
-              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading}
+              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50">
               {loading ? "Saving…" : "Set new password"}
             </button>
-            <p className="text-center text-sm">
-              <button
-                type="button"
-                onClick={() => { setStep("email"); setError(""); setCode(""); }}
-                className="text-text-muted/60 hover:text-text-muted transition-colors"
-              >
-                Resend code
-              </button>
-            </p>
           </form>
         )}
 
         {step === "done" && (
           <div className="space-y-4 text-center">
             <div className="text-4xl">✅</div>
+            <p className="text-text-primary font-semibold">Password updated!</p>
             <p className="text-text-muted text-sm">You can now log in with your new password.</p>
-            <button
-              onClick={() => router.push("/login")}
-              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl"
-            >
+            <button onClick={() => router.push("/login")}
+              className="w-full gradient-btn text-white font-semibold py-3 rounded-xl">
               Log in
             </button>
           </div>

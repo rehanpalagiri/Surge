@@ -130,6 +130,10 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
+class VerifyResetCodeIn(BaseModel):
+    token: str
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -16,7 +16,7 @@ from sqlalchemy import select, or_, func
 
 from database import get_db
 from models import User, PasswordResetToken
-from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn
+from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn
 from auth import hash_password, verify_password, create_access_token, require_user
 
 _RESET_TTL = timedelta(hours=1)
@@ -149,6 +149,17 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
 
     background_tasks.add_task(_send_reset_email, user.email, user.username, token)
     return {"ok": True}
+
+
+@router.post("/verify-reset-code")
+async def verify_reset_code(payload: VerifyResetCodeIn, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
+    )
+    reset = result.scalar_one_or_none()
+    if not reset or reset.used or reset.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired code.")
+    return {"valid": True}
 
 
 @router.post("/reset-password")
