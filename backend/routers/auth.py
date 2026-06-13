@@ -162,7 +162,7 @@ async def reset_password(payload: ResetPasswordIn, db: AsyncSession = Depends(ge
     reset = result.scalar_one_or_none()
 
     if not reset or reset.used or reset.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+        raise HTTPException(status_code=400, detail="Invalid or expired code. Please request a new one.")
 
     user_result = await db.execute(select(User).where(User.id == reset.user_id))
     user = user_result.scalar_one_or_none()
