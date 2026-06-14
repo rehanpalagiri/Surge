@@ -387,6 +387,15 @@ export async function resetPassword(
   return handleResponse<{ ok: boolean }>(res);
 }
 
+export async function deleteAccount(password: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/me/account`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ password }),
+  });
+  return handleResponse<{ ok: boolean }>(res);
+}
+
 export async function changeUsername(
   newUsername: string,
   currentPassword: string
@@ -510,29 +519,34 @@ export async function ackFetchStatus(password: string): Promise<void> {
   await handleResponse<unknown>(res);
 }
 
-export interface HarvestStatus {
+export interface SingleHarvestStatus {
   status: "never_run" | "running" | "done" | "failed";
+  platform?: string;
   started_at?: string;
   finished_at?: string;
   niches_processed?: number;
   total_added?: number;
   total_skipped?: number;
   total_errors?: number;
-  total_search_failures?: number;
   error?: string;
-  detail?: { niche: string; added: number; skipped: number; errors: number; search_failures?: number }[];
+  detail?: { niche: string; added: number; skipped: number; errors: number }[];
+}
+
+export interface HarvestStatus {
+  tiktok?: SingleHarvestStatus;
+  instagram?: SingleHarvestStatus;
 }
 
 export async function triggerHarvest(
   password: string,
-  options?: { niches?: string[]; min_views?: number; max_per_niche?: number }
-): Promise<{ status: string; niches: number }> {
+  options?: { niches?: string[]; min_views?: number; max_per_niche?: number; platform?: string; min_likes?: number }
+): Promise<{ status: string; niches: number; platform: string }> {
   const res = await fetch(`${BASE}/api/admin/harvest`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Admin-Password": password },
     body: JSON.stringify(options ?? {}),
   });
-  return handleResponse<{ status: string; niches: number }>(res);
+  return handleResponse<{ status: string; niches: number; platform: string }>(res);
 }
 
 export interface RateLimitStatus {

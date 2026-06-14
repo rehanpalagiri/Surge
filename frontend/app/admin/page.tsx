@@ -136,7 +136,9 @@ export default function AdminPage() {
   const [harvesting, setHarvesting] = useState(false);
   const [harvestError, setHarvestError] = useState("");
   const [harvestMinViews, setHarvestMinViews] = useState("500000");
+  const [harvestMinLikes, setHarvestMinLikes] = useState("1000");
   const [harvestMaxPer, setHarvestMaxPer] = useState("3");
+  const [harvestPlatform, setHarvestPlatform] = useState<"tiktok" | "instagram">("tiktok");
 
   // Manual upload state
   const [file, setFile] = useState<File | null>(null);
@@ -268,15 +270,17 @@ export default function AdminPage() {
     setHarvestError("");
     try {
       await triggerHarvest(password, {
+        platform: harvestPlatform,
         min_views: parseInt(harvestMinViews) || 500_000,
+        min_likes: parseInt(harvestMinLikes) || 1_000,
         max_per_niche: parseInt(harvestMaxPer) || 3,
       });
-      // Poll until done (harvest runs as a BackgroundTask)
       const poll = async () => {
         try {
           const s = await getHarvestStatus(password);
           setHarvestStatus(s);
-          if (s.status === "running") {
+          const platformStatus = harvestPlatform === "instagram" ? s.instagram : s.tiktok;
+          if (platformStatus?.status === "running") {
             setTimeout(poll, 8000);
           } else {
             setHarvesting(false);
@@ -568,7 +572,7 @@ export default function AdminPage() {
             <div>
               <h2 className="text-text-primary font-semibold text-lg">Auto-Harvest Seeds</h2>
               <p className="text-text-muted text-sm mt-1">
-                Searches TikTok for top-performing videos across all 50 niches via tikwm, analyzes each with Gemini, and auto-adds to the seed pool. Runs in the background — keep this tab open or trigger via the weekly GitHub Actions cron.
+                TikTok: searches via tikwm (free, unlimited). Instagram: searches via HikerAPI (requires HIKERAPI_KEY env var, 100 free requests).
               </p>
             </div>
             <span className="flex-shrink-0 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full whitespace-nowrap">
@@ -576,81 +580,86 @@ export default function AdminPage() {
             </span>
           </div>
 
+          {/* Platform toggle */}
+          <div className="flex gap-2">
+            {(["tiktok", "instagram"] as const).map((p) => (
+              <button key={p} onClick={() => setHarvestPlatform(p)}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                  harvestPlatform === p
+                    ? "gradient-btn text-white"
+                    : "border border-border text-text-muted hover:text-text-primary"
+                }`}>
+                {p === "tiktok" ? "TikTok" : "Instagram"}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap gap-4 items-end">
-            <div>
-              <label className="block text-xs text-text-muted mb-1">Min views</label>
-              <input
-                type="number"
-                value={harvestMinViews}
-                onChange={(e) => setHarvestMinViews(e.target.value)}
-                className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
-              />
-            </div>
+            {harvestPlatform === "tiktok" ? (
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Min views</label>
+                <input type="number" value={harvestMinViews}
+                  onChange={(e) => setHarvestMinViews(e.target.value)}
+                  className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Min likes</label>
+                <input type="number" value={harvestMinLikes}
+                  onChange={(e) => setHarvestMinLikes(e.target.value)}
+                  className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+              </div>
+            )}
             <div>
               <label className="block text-xs text-text-muted mb-1">Max per niche</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={harvestMaxPer}
+              <input type="number" min="1" max="10" value={harvestMaxPer}
                 onChange={(e) => setHarvestMaxPer(e.target.value)}
-                className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
-              />
+                className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
             </div>
-            <button
-              onClick={handleHarvest}
-              disabled={harvesting}
-              className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm"
-            >
-              {harvesting ? "Harvesting…" : "Run Harvest"}
+            <button onClick={handleHarvest} disabled={harvesting}
+              className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
+              {harvesting ? "Harvesting…" : `Run ${harvestPlatform === "instagram" ? "Instagram" : "TikTok"} Harvest`}
             </button>
           </div>
 
           {harvestError && <p className="text-danger text-sm">{harvestError}</p>}
 
-          {harvestStatus && harvestStatus.status !== "never_run" && (
-            <div className={`rounded-xl px-4 py-3 text-sm border ${
-              harvestStatus.status === "running"
-                ? "bg-yellow-400/5 border-yellow-400/20 text-yellow-400"
-                : harvestStatus.status === "failed"
-                ? "bg-danger/5 border-danger/20 text-danger"
+          {/* Status for each platform */}
+          {(["tiktok", "instagram"] as const).map((p) => {
+            const s = harvestStatus?.[p];
+            if (!s || s.status === "never_run") return null;
+            return (
+              <div key={p} className={`rounded-xl px-4 py-3 text-sm border ${
+                s.status === "running" ? "bg-yellow-400/5 border-yellow-400/20 text-yellow-400"
+                : s.status === "failed" ? "bg-danger/5 border-danger/20 text-danger"
                 : "bg-success/5 border-success/20 text-text-primary"
-            }`}>
-              {harvestStatus.status === "running" ? (
-                <p>Harvest in progress — checking every 8s…</p>
-              ) : harvestStatus.status === "failed" ? (
-                <div className="space-y-1">
-                  <p className="font-medium">Error — harvest failed</p>
-                  {harvestStatus.error && (
-                    <p className="text-xs opacity-80 font-mono">{harvestStatus.error}</p>
-                  )}
-                  {harvestStatus.finished_at && (
-                    <p className="text-xs opacity-60">{new Date(harvestStatus.finished_at).toLocaleString()}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="font-medium text-success">
-                    Harvest complete · +{harvestStatus.total_added} seeds added
-                  </p>
-                  <p className="text-text-muted text-xs">
-                    {harvestStatus.niches_processed} niches · {harvestStatus.total_skipped} skipped
-                    {harvestStatus.finished_at && ` · ${new Date(harvestStatus.finished_at).toLocaleString()}`}
-                  </p>
-                  {(harvestStatus.total_errors ?? 0) > 0 && (
-                    <p className="text-yellow-400 text-xs mt-1">
-                      ⚠ {harvestStatus.total_errors} video{harvestStatus.total_errors !== 1 ? "s" : ""} failed to process — check Render logs for details
+              }`}>
+                <p className="text-xs text-text-muted/60 uppercase tracking-widest mb-1">{p === "tiktok" ? "TikTok" : "Instagram"}</p>
+                {s.status === "running" ? (
+                  <p>Harvest in progress — checking every 8s…</p>
+                ) : s.status === "failed" ? (
+                  <div className="space-y-1">
+                    <p className="font-medium">Error — harvest failed</p>
+                    {s.error && <p className="text-xs opacity-80 font-mono">{s.error}</p>}
+                    {s.finished_at && <p className="text-xs opacity-60">{new Date(s.finished_at).toLocaleString()}</p>}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="font-medium text-success">Complete · +{s.total_added} seeds added</p>
+                    <p className="text-text-muted text-xs">
+                      {s.niches_processed} niches · {s.total_skipped} skipped
+                      {s.finished_at && ` · ${new Date(s.finished_at).toLocaleString()}`}
                     </p>
-                  )}
-                  {(harvestStatus.total_search_failures ?? 0) > 0 && (
-                    <p className="text-yellow-400 text-xs mt-1">
-                      ⚠ {harvestStatus.total_search_failures} search{harvestStatus.total_search_failures !== 1 ? "es" : ""} failed (likely tikwm rate limit) — fewer seeds than expected, try again later
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                    {(s.total_errors ?? 0) > 0 && (
+                      <p className="text-yellow-400 text-xs mt-1">
+                        ⚠ {s.total_errors} video{s.total_errors !== 1 ? "s" : ""} failed — check Render logs
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Seed table */}

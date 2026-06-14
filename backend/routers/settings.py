@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete, update
 
 from database import get_db
-from models import User
+from models import User, UserProfile, UserAnalysis, PasswordResetToken
 from schemas import ConsentIn
 from auth import require_user, hash_password, verify_password
 from routers.auth import is_minor
@@ -91,3 +91,27 @@ async def update_consent(
     user.seed_consent = body.seed_consent
     await db.commit()
     return {"seed_consent": user.seed_consent, "is_minor": False}
+
+
+class DeleteAccountIn(BaseModel):
+    password: str
+
+
+@router.delete("/account")
+async def delete_account(
+    body: DeleteAccountIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect password.")
+
+    # Delete in FK order; unlink analyses (keep anonymised data) then remove user.
+    await db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    await db.execute(delete(UserProfile).where(UserProfile.user_id == user.id))
+    await db.execute(
+        update(UserAnalysis).where(UserAnalysis.user_id == user.id).values(user_id=None)
+    )
+    await db.delete(user)
+    await db.commit()
+    return {"ok": True}

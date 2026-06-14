@@ -17,6 +17,7 @@ from schemas import SeedVideoOut
 from services.seed_analysis import analyze_seed_video
 from services.tiktok_fetch import fetch_tiktok
 from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
+from services.instagram_harvest import harvest_instagram_all, get_last_instagram_harvest
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -340,6 +341,8 @@ class HarvestRequest(BaseModel):
     niches: Optional[list[str]] = None       # None = all 50
     min_views: int = 500_000
     max_per_niche: int = 3
+    platform: str = "tiktok"                 # "tiktok" | "instagram"
+    min_likes: int = 1_000                   # Instagram only
 
 
 @router.post("/harvest")
@@ -349,15 +352,20 @@ async def trigger_harvest(
     _: None = Depends(check_admin),
 ):
     target = req.niches or list(NICHE_KEYWORDS.keys())
-    background_tasks.add_task(harvest_all, target, req.min_views, req.max_per_niche)
-    return {"status": "harvest started", "niches": len(target)}
+    if req.platform == "instagram":
+        background_tasks.add_task(harvest_instagram_all, target, req.min_likes, req.max_per_niche)
+    else:
+        background_tasks.add_task(harvest_all, target, req.min_views, req.max_per_niche)
+    return {"status": "harvest started", "niches": len(target), "platform": req.platform}
 
 
 @router.get("/harvest/status")
 async def get_harvest_status(
     _: None = Depends(check_admin),
 ):
-    return get_last_harvest() or {"status": "never_run"}
+    tiktok = get_last_harvest() or {"status": "never_run"}
+    instagram = get_last_instagram_harvest() or {"status": "never_run"}
+    return {"tiktok": tiktok, "instagram": instagram}
 
 
 @router.get("/api-usage")
