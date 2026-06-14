@@ -15,7 +15,11 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
   const r4 = useRef<HTMLInputElement>(null);
   const r5 = useRef<HTMLInputElement>(null);
   const refs = [r0, r1, r2, r3, r4, r5];
-  const digits = value.padEnd(6, "").split("").slice(0, 6);
+  // padEnd with " " (space) so we always get 6 slots; .replace(/ /g,"") strips
+  // them back out when building the next state string. padEnd(6,"") is a no-op
+  // per JS spec (empty padString can't lengthen the string), which would cause
+  // digits=[] and make typed characters silently disappear.
+  const digits = value.padEnd(6, " ").split("").slice(0, 6);
 
   function focus(i: number) {
     refs[i]?.current?.focus();

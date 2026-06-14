@@ -48,9 +48,14 @@ const PLATFORM_CONFIG = {
 
 // ─── Splash screen ────────────────────────────────────────────────────────────
 
-function SplashScreen({ onGuest }: { onGuest: () => void }) {
+function SplashScreen({ onGuest, deleted }: { onGuest: () => void; deleted: boolean }) {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-background">
+      {deleted && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-success/10 border border-success/30 text-success text-sm px-5 py-3 rounded-xl shadow-lg">
+          Your account has been deleted.
+        </div>
+      )}
       <div className="w-full max-w-md text-center space-y-10">
         {/* Branding */}
         <div className="space-y-4">
@@ -123,18 +128,22 @@ export default function Home() {
   const [platform, setPlatform] = useState<Platform>("tiktok");
   // null = still checking localStorage (avoids flash); true = show splash; false = show app
   const [showSplash, setShowSplash] = useState<boolean | null>(null);
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
-    // If a valid token exists the user is already logged in — skip the splash entirely.
-    // localStorage persists across tab closes, so reopening the tab keeps them signed in.
     setShowSplash(!getToken());
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("deleted") === "1") {
+      setDeleted(true);
+      window.history.replaceState({}, "", "/");
+    }
   }, []);
 
   // Nothing rendered until we know whether to show splash (avoids layout flash)
   if (showSplash === null) return null;
 
   if (showSplash) {
-    return <SplashScreen onGuest={() => setShowSplash(false)} />;
+    return <SplashScreen onGuest={() => setShowSplash(false)} deleted={deleted} />;
   }
 
   const cfg = PLATFORM_CONFIG[platform];

@@ -127,7 +127,7 @@ function ChangeUsernameCard() {
     setMsg(null);
     try {
       await changeUsername(newUsername.trim(), currentPassword);
-      setMsg({ type: "ok", text: "Username updated! Log in again to refresh your session." });
+      setMsg({ type: "ok", text: "Username updated!" });
       setNewUsername("");
       setCurrentPassword("");
     } catch (err: unknown) {
@@ -151,6 +151,7 @@ function ChangeUsernameCard() {
           value={newUsername}
           onChange={(e) => setNewUsername(e.target.value)}
           required
+          autoComplete="username"
           className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
         <input
@@ -265,8 +266,8 @@ function ChangePasswordCard() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      setMsg({ type: "err", text: "New password must be at least 6 characters." });
+    if (newPassword.length < 8) {
+      setMsg({ type: "err", text: "New password must be at least 8 characters." });
       return;
     }
     setLoading(true);
@@ -302,7 +303,7 @@ function ChangePasswordCard() {
         />
         <input
           type="password"
-          placeholder="New password (6+ chars)"
+          placeholder="New password (8+ chars)"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
