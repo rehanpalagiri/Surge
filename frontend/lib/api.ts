@@ -93,6 +93,7 @@ export interface UserOut {
   username: string;
   email?: string | null;
   birth_year?: number | null;
+  birth_date?: string | null;
   seed_consent?: "yes" | "no" | "ask";
   is_minor?: boolean;
   created_at: string;
@@ -237,12 +238,12 @@ export async function signup(
   email: string,
   username: string,
   password: string,
-  birthYear: number
+  birthDate: string  // ISO YYYY-MM-DD
 ): Promise<TokenOut> {
   const res = await fetch(`${BASE}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, username, password, birth_year: birthYear }),
+    body: JSON.stringify({ email, username, password, birth_date: birthDate }),
   });
   return handleResponse<TokenOut>(res);
 }

@@ -13,9 +13,10 @@ class User(Base):
     # v1.24: email is the primary login identifier; username stays as display name.
     # Nullable so pre-1.24 accounts keep working (they log in with username).
     email = Column(String, unique=True, nullable=True)
-    # Used ONLY for the age gate (13+ to sign up, 18+ for seed consent). Year, not
-    # full DOB — deliberately the minimum data needed.
+    # Age gate: birth_date (YYYY-MM-DD) is the authoritative field; birth_year is
+    # kept for backward compat with pre-DOB accounts. is_minor() prefers birth_date.
     birth_year = Column(Integer, nullable=True)
+    birth_date = Column(String, nullable=True)  # ISO format YYYY-MM-DD
     # Seed-pool consent: "yes" | "no" | "ask". Minors (13–17) are forced to "no"
     # and can never change it; adults default to "ask" (decide per linked video).
     seed_consent = Column(String, nullable=True, default="ask")

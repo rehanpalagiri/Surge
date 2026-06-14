@@ -20,12 +20,38 @@ function SignupForm() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [birthYear, setBirthYear] = useState("");
+  const [birthday, setBirthday] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const currentYear = new Date().getFullYear();
+  function handleBirthdayChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
+    let formatted = digits;
+    if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    setBirthday(formatted);
+  }
+
+  function parseBirthday(): Date | null {
+    const parts = birthday.split("/");
+    if (parts.length !== 3) return null;
+    const [mm, dd, yyyy] = parts;
+    if (yyyy.length < 4) return null;
+    const d = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
+    if (isNaN(d.getTime()) || d.getMonth() !== parseInt(mm) - 1) return null;
+    return d;
+  }
+
+  function calcAge(bd: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - bd.getFullYear();
+    if (
+      today.getMonth() < bd.getMonth() ||
+      (today.getMonth() === bd.getMonth() && today.getDate() < bd.getDate())
+    ) age--;
+    return age;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,12 +59,12 @@ function SignupForm() {
       setError("Password must be at least 8 characters.");
       return;
     }
-    const year = parseInt(birthYear, 10);
-    if (!year || year < 1900 || year > currentYear) {
-      setError("Please enter a valid birth year.");
+    const bd = parseBirthday();
+    if (!bd || bd > new Date() || bd.getFullYear() < 1900) {
+      setError("Please enter a valid date of birth (MM/DD/YYYY).");
       return;
     }
-    if (currentYear - year < 13) {
+    if (calcAge(bd) < 13) {
       setError("You must be 13 or older to use Surge.");
       return;
     }
@@ -48,8 +74,10 @@ function SignupForm() {
     }
     setLoading(true);
     setError("");
+    const [mm, dd, yyyy] = birthday.split("/");
+    const isoDate = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
     try {
-      const { access_token } = await signup(email.trim(), username.trim(), password, year);
+      const { access_token } = await signup(email.trim(), username.trim(), password, isoDate);
       setToken(access_token);
 
       // Save the just-analyzed video to the brand-new account.
@@ -117,20 +145,22 @@ function SignupForm() {
           />
           <div>
             <input
-              type="number"
-              placeholder="Birth year (e.g. 1998)"
-              value={birthYear}
-              onChange={(e) => setBirthYear(e.target.value)}
+              type="text"
+              inputMode="numeric"
+              placeholder="Birthday (MM/DD/YYYY)"
+              value={birthday}
+              onChange={handleBirthdayChange}
               required
-              min={1900}
-              max={currentYear}
+              maxLength={10}
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
             />
-            {birthYear.length === 4 && currentYear - parseInt(birthYear, 10) < 13 && (
-              <p className="text-danger text-xs mt-1.5">
-                You must be 13 or older to use Surge.
-              </p>
-            )}
+            {birthday.length === 10 && (() => {
+              const bd = parseBirthday();
+              if (bd && calcAge(bd) < 13) {
+                return <p className="text-danger text-xs mt-1.5">You must be 13 or older to use Surge.</p>;
+              }
+              return null;
+            })()}
           </div>
           <label className="flex items-start gap-2.5 cursor-pointer">
             <input

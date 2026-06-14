@@ -3,7 +3,7 @@ import logging
 import os
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +48,18 @@ def _client_ip(request: Request) -> str:
 
 
 def is_minor(user: User) -> bool:
-    """Under 18 by birth year. Legacy accounts (no birth_year) are treated as
-    adults — they predate the age gate and were never offered seed consent."""
+    """Under 18 by exact date when available; falls back to year for legacy accounts."""
+    today = date.today()
+    if user.birth_date:
+        try:
+            bd = date.fromisoformat(user.birth_date)
+            age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+            return age < 18
+        except ValueError:
+            pass
     if user.birth_year is None:
         return False
-    return (datetime.utcnow().year - user.birth_year) < 18
+    return (today.year - user.birth_year) < 18
 
 
 def user_to_out(user: User) -> dict:
@@ -61,6 +68,7 @@ def user_to_out(user: User) -> dict:
         "username": user.username,
         "email": user.email,
         "birth_year": user.birth_year,
+        "birth_date": user.birth_date,
         "seed_consent": user.seed_consent or "ask",
         "is_minor": is_minor(user),
         "created_at": user.created_at,
@@ -79,10 +87,14 @@ async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: Async
     if len(payload.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
 
-    current_year = datetime.utcnow().year
-    if payload.birth_year < 1900 or payload.birth_year > current_year:
-        raise HTTPException(status_code=400, detail="Please enter a valid birth year.")
-    age = current_year - payload.birth_year
+    try:
+        bd = date.fromisoformat(payload.birth_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Please enter a valid date of birth.")
+    today = date.today()
+    if bd > today or bd.year < 1900:
+        raise HTTPException(status_code=400, detail="Please enter a valid date of birth.")
+    age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
     if age < 13:
         raise HTTPException(status_code=403, detail="You must be 13 or older to use Surge.")
 
@@ -103,7 +115,8 @@ async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: Async
     user = User(
         username=username,
         email=email,
-        birth_year=payload.birth_year,
+        birth_year=bd.year,
+        birth_date=payload.birth_date,
         seed_consent=consent,
         password_hash=hash_password(payload.password),
     )

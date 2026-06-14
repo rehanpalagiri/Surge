@@ -133,6 +133,8 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN email TEXT")
     if "birth_year" not in user_cols:
         await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN birth_year INTEGER")
+    if "birth_date" not in user_cols:
+        await conn.exec_driver_sql("ALTER TABLE users ADD COLUMN birth_date TEXT")
     if "seed_consent" not in user_cols:
         await conn.exec_driver_sql(
             "ALTER TABLE users ADD COLUMN seed_consent TEXT DEFAULT 'ask'"
@@ -175,6 +177,7 @@ async def _ensure_columns_pg(conn):
         # --- v1.24: email auth + age gate + seed consent ---
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR UNIQUE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
     ]

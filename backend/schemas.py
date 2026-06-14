@@ -89,7 +89,7 @@ class SignupIn(BaseModel):
     email: str
     username: str
     password: str
-    birth_year: int
+    birth_date: str  # ISO format YYYY-MM-DD; birth_year is derived server-side
 
 
 class LoginIn(BaseModel):
@@ -103,8 +103,9 @@ class UserOut(BaseModel):
     username: str
     email: Optional[str] = None
     birth_year: Optional[int] = None
+    birth_date: Optional[str] = None
     seed_consent: Optional[str] = "ask"
-    is_minor: bool = False  # computed: birth_year makes the user under 18
+    is_minor: bool = False
     created_at: datetime
 
     class Config:
