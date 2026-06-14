@@ -33,6 +33,9 @@ _HIKERAPI_KEY = os.getenv("HIKERAPI_KEY", "")
 
 DEFAULT_MIN_LIKES = 1_000
 DEFAULT_MAX_PER_NICHE = 3
+_IG_KEYWORDS_PER_NICHE = 2   # 50 niches × 2 = 100 calls = fits free tier exactly
+_IG_RESULTS_PER_CALL = 50    # max candidates per hashtag search
+_IG_CONCURRENCY = 3          # niches processed in parallel
 
 _last_instagram_harvest: dict = {}
 
@@ -42,8 +45,10 @@ def _hashtag(keyword: str) -> str:
     return keyword.replace(" ", "").lower()
 
 
-async def _search_hashtag(hashtag: str, amount: int = 20) -> list[dict]:
-    """Fetch top Instagram Reels for a hashtag via HikerAPI."""
+async def _search_hashtag(hashtag: str, amount: int = _IG_RESULTS_PER_CALL) -> list[dict]:
+    """Fetch top Instagram Reels for a hashtag via HikerAPI.
+    Returns up to `amount` media objects in a single API call.
+    """
     if not _HIKERAPI_KEY:
         raise ValueError("HIKERAPI_KEY is not set.")
     async with httpx.AsyncClient(timeout=30) as http:
@@ -83,7 +88,8 @@ async def harvest_instagram_niche(
     min_likes: int = DEFAULT_MIN_LIKES,
     max_videos: int = DEFAULT_MAX_PER_NICHE,
 ) -> dict:
-    keywords = NICHE_KEYWORDS.get(niche, [niche])
+    # Use only the first N keywords to stay within HikerAPI free-tier budget.
+    keywords = NICHE_KEYWORDS.get(niche, [niche])[:_IG_KEYWORDS_PER_NICHE]
     added = skipped = errors = 0
 
     for keyword in keywords:
@@ -180,14 +186,17 @@ async def harvest_instagram_all(
         "platform": "instagram",
     }
     logger.info(
-        "Instagram harvest started: %d niches min_likes=%d max_per_niche=%d",
-        len(target), min_likes, max_per_niche,
+        "Instagram harvest started: %d niches min_likes=%d max_per_niche=%d concurrency=%d",
+        len(target), min_likes, max_per_niche, _IG_CONCURRENCY,
     )
     try:
-        results = []
-        for niche in target:
-            r = await harvest_instagram_niche(niche, min_likes, max_per_niche)
-            results.append(r)
+        sem = asyncio.Semaphore(_IG_CONCURRENCY)
+
+        async def _run(niche: str) -> dict:
+            async with sem:
+                return await harvest_instagram_niche(niche, min_likes, max_per_niche)
+
+        results = await asyncio.gather(*[_run(n) for n in target], return_exceptions=False)
 
         total_added = sum(r["added"] for r in results)
         total_skipped = sum(r["skipped"] for r in results)
