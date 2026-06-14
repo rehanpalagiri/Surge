@@ -434,6 +434,9 @@ async def analyze_video(
     except _GeminiClientError as e:
         if e.code in (429, 403):
             raise  # quota or bad key — router returns 503 without storing broken data
+        # Any other API error (400/404/500/503, etc.) degrades gracefully — without
+        # this return the function would fall through to None and crash the router.
+        return _error_dict(f"Gemini API error ({e.code}): {e}")
     except json.JSONDecodeError as e:
         return _error_dict(f"Failed to parse Gemini response as JSON: {e}")
     except Exception as e:
