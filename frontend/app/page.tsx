@@ -164,7 +164,7 @@ export default function Home() {
       </div>
 
       {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
+      <section id="upload" className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center scroll-mt-20">
         <div className="max-w-3xl mx-auto space-y-8">
           <div className="space-y-4">
             <div
@@ -214,6 +214,24 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Closing CTA */}
+      <section className="border-t border-border px-4 py-16 text-center">
+        <div className="max-w-xl mx-auto space-y-5">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-text-primary">
+            Know before you post.
+          </h2>
+          <p className="text-text-muted text-lg">
+            Stop guessing which videos will hit. Get an honest AI score in seconds — free.
+          </p>
+          <a
+            href="#upload"
+            className={`inline-block ${cfg.btnGradient} text-white font-bold py-4 px-8 rounded-xl text-lg shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform`}
+          >
+            Score my {cfg.label} video →
+          </a>
         </div>
       </section>
 

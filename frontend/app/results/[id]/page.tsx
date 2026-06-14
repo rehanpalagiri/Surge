@@ -220,21 +220,31 @@ export default function ResultsPage() {
               </div>
 
               {/* Unlock overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/40 text-center px-6">
-                <span className="text-3xl">🔒</span>
-                <p className="text-text-primary font-bold text-lg">
-                  Your full breakdown is locked
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/50 to-background/80 text-center px-6">
+                <p className="text-text-primary font-bold text-xl">
+                  Your full breakdown is ready 🎉
                 </p>
-                <p className="text-text-muted text-sm max-w-sm">
-                  See your 6-score breakdown, strengths, fixes, and rewritten
-                  hooks &amp; captions — free.
-                </p>
+                <ul className="text-text-muted text-sm space-y-2 text-left">
+                  {[
+                    "All 6 performance scores, explained",
+                    "Your strengths & priority fixes",
+                    "Rewritten hook & caption",
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2.5">
+                      <span className="text-success flex-shrink-0">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
                 <Link
                   href={`/signup?next=/results/${analysis.id}`}
-                  className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl mt-1 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  className="gradient-btn text-white font-semibold px-7 py-3 rounded-xl mt-1 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
                 >
                   Sign up free to unlock
                 </Link>
+                <p className="text-text-muted/70 text-xs">
+                  Free forever · no credit card
+                </p>
                 <p className="text-text-muted text-xs">
                   Already have an account?{" "}
                   <Link
