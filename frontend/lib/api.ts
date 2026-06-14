@@ -420,15 +420,6 @@ export async function changePassword(
   return handleResponse<{ ok: boolean }>(res);
 }
 
-export async function deleteAccount(password: string): Promise<{ ok: boolean }> {
-  const res = await fetch(`${BASE}/api/me/account`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ password }),
-  });
-  return handleResponse<{ ok: boolean }>(res);
-}
-
 export async function deleteAnalysis(
   id: number,
   token?: string | null
@@ -528,8 +519,10 @@ export interface SingleHarvestStatus {
   total_added?: number;
   total_skipped?: number;
   total_errors?: number;
+  total_search_failures?: number;   // keyword/hashtag searches that failed (likely API rate limit)
+  failed_niches?: number;           // Instagram only — niche tasks that crashed outright
   error?: string;
-  detail?: { niche: string; added: number; skipped: number; errors: number }[];
+  detail?: { niche: string; added: number; skipped: number; errors: number; search_failures?: number }[];
 }
 
 export interface HarvestStatus {

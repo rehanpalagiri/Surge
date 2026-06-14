@@ -182,8 +182,32 @@ async def _ensure_columns_pg(conn):
         await conn.exec_driver_sql(stmt)
 
 
+def _assert_prod_secrets() -> None:
+    """Refuse to boot in production with insecure development defaults.
+
+    Prod is detected by DATABASE_URL being set (Neon); local dev defaults to
+    SQLite and is exempt. A default JWT_SECRET lets anyone forge a token for any
+    user; the default ADMIN_PASSWORD is documented publicly. Failing loudly here
+    turns a silent account-takeover hole into an obvious failed deploy.
+    """
+    if not os.getenv("DATABASE_URL"):
+        return  # local / dev — the dev defaults are fine
+    insecure = []
+    if os.getenv("JWT_SECRET", "") in ("", "dev-insecure-secret-change-me"):
+        insecure.append("JWT_SECRET")
+    if os.getenv("ADMIN_PASSWORD", "") in ("", "viraliq-admin"):
+        insecure.append("ADMIN_PASSWORD")
+    if insecure:
+        raise RuntimeError(
+            "Refusing to start in production with insecure default(s): "
+            + ", ".join(insecure)
+            + ". Set each to a strong, unique value in the Render environment."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _assert_prod_secrets()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # _ensure_columns uses SQLite-only PRAGMA syntax; _ensure_columns_pg is

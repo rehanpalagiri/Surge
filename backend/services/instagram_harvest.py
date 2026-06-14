@@ -90,7 +90,7 @@ async def harvest_instagram_niche(
 ) -> dict:
     # Use only the first N keywords to stay within HikerAPI free-tier budget.
     keywords = NICHE_KEYWORDS.get(niche, [niche])[:_IG_KEYWORDS_PER_NICHE]
-    added = skipped = errors = 0
+    added = skipped = errors = search_failures = 0
 
     for keyword in keywords:
         if added >= max_videos:
@@ -101,6 +101,7 @@ async def harvest_instagram_niche(
             await asyncio.sleep(1.5)  # HikerAPI rate-limit buffer
         except Exception as e:
             logger.warning("HikerAPI search failed '#%s': %s", hashtag, e)
+            search_failures += 1
             continue
 
         for media in medias:
@@ -126,7 +127,8 @@ async def harvest_instagram_niche(
                 skipped += 1
                 continue
 
-            tmp = tempfile.mktemp(suffix=".mp4")
+            fd, tmp = tempfile.mkstemp(suffix=".mp4")
+            os.close(fd)  # _download reopens by path; we don't need the fd
             try:
                 await _download(video_url, tmp)
                 result = await analyze_seed_video(tmp, "instagram", niche, None, like_count)
@@ -170,7 +172,13 @@ async def harvest_instagram_niche(
                 if os.path.exists(tmp):
                     os.remove(tmp)
 
-    return {"niche": niche, "added": added, "skipped": skipped, "errors": errors}
+    return {
+        "niche": niche,
+        "added": added,
+        "skipped": skipped,
+        "errors": errors,
+        "search_failures": search_failures,
+    }
 
 
 async def harvest_instagram_all(
@@ -196,11 +204,20 @@ async def harvest_instagram_all(
             async with sem:
                 return await harvest_instagram_niche(niche, min_likes, max_per_niche)
 
-        results = await asyncio.gather(*[_run(n) for n in target], return_exceptions=False)
+        # return_exceptions=True: one niche crashing must not discard every other
+        # niche's completed work (this is a budgeted, paid API run).
+        raw = await asyncio.gather(*[_run(n) for n in target], return_exceptions=True)
+        results = [r for r in raw if isinstance(r, dict)]
+        failed_niches = 0
+        for r in raw:
+            if isinstance(r, Exception):
+                failed_niches += 1
+                logger.error("Instagram niche task crashed: %s", r)
 
         total_added = sum(r["added"] for r in results)
         total_skipped = sum(r["skipped"] for r in results)
         total_errors = sum(r["errors"] for r in results)
+        total_search_failures = sum(r.get("search_failures", 0) for r in results)
 
         _last_instagram_harvest = {
             "status": "done",
@@ -210,11 +227,13 @@ async def harvest_instagram_all(
             "total_added": total_added,
             "total_skipped": total_skipped,
             "total_errors": total_errors,
+            "total_search_failures": total_search_failures,
+            "failed_niches": failed_niches,
             "detail": results,
         }
         logger.info(
-            "Instagram harvest done: added=%d skipped=%d errors=%d",
-            total_added, total_skipped, total_errors,
+            "Instagram harvest done: added=%d skipped=%d errors=%d search_failures=%d failed_niches=%d",
+            total_added, total_skipped, total_errors, total_search_failures, failed_niches,
         )
     except Exception as e:
         logger.error("Instagram harvest failed: %s", e)

@@ -655,6 +655,16 @@ export default function AdminPage() {
                         ⚠ {s.total_errors} video{s.total_errors !== 1 ? "s" : ""} failed — check Render logs
                       </p>
                     )}
+                    {(s.total_search_failures ?? 0) > 0 && (
+                      <p className="text-yellow-400 text-xs mt-1">
+                        ⚠ {s.total_search_failures} search{s.total_search_failures !== 1 ? "es" : ""} failed (likely API rate limit) — fewer seeds than expected
+                      </p>
+                    )}
+                    {(s.failed_niches ?? 0) > 0 && (
+                      <p className="text-yellow-400 text-xs mt-1">
+                        ⚠ {s.failed_niches} niche{s.failed_niches !== 1 ? "s" : ""} crashed — check Render logs
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
