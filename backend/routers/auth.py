@@ -11,7 +11,7 @@ import aiosmtplib
 import certifi
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
 
@@ -19,6 +19,7 @@ from database import get_db
 from models import User, PasswordResetToken
 from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn
 from auth import hash_password, verify_password, create_access_token, require_user
+from services.throttle import check_rate
 
 _RESET_TTL = timedelta(hours=1)
 _SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -31,6 +32,19 @@ _FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Per-email reset cap (persistent, via the token table's created_at): at most this
+# many reset emails per hour to one account — guards a victim's inbox + Brevo quota.
+_RESET_PER_EMAIL_HOUR = 3
+
+
+def _client_ip(request: Request) -> str:
+    """Real client IP behind Render's proxy (X-Forwarded-For), falling back to
+    the socket peer. Used as the throttle key for unauthenticated reset endpoints."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def is_minor(user: User) -> bool:
@@ -122,12 +136,34 @@ async def me(user: User = Depends(require_user)):
 
 
 @router.post("/forgot-password")
-async def forgot_password(payload: ForgotPasswordIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def forgot_password(payload: ForgotPasswordIn, background_tasks: BackgroundTasks, request: Request, db: AsyncSession = Depends(get_db)):
+    # Per-IP guard: stop a script from spraying requests to burn the Brevo quota.
+    # IP-based, so it's independent of whether the email exists (no enumeration leak).
+    if not check_rate(f"forgot-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many reset requests. Please wait a few minutes and try again.",
+        )
+
     email = payload.email.strip().lower()
     result = await db.execute(select(User).where(func.lower(User.email) == email))
     user = result.scalar_one_or_none()
     # Always return 200 — never reveal whether the email exists.
     if not user or not user.email:
+        return {"ok": True}
+
+    # Per-email cap (persistent across restarts via created_at): silently no-op
+    # past the hourly limit so a victim's inbox can't be flooded. Same 200 as the
+    # not-found path, so it still leaks nothing about account existence.
+    recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+    recent_q = await db.execute(
+        select(func.count()).select_from(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.created_at >= recent_cutoff,
+        )
+    )
+    if (recent_q.scalar() or 0) >= _RESET_PER_EMAIL_HOUR:
+        logger.info("Reset rate cap hit for user %s — suppressing email", user.id)
         return {"ok": True}
 
     # Invalidate any existing unused tokens for this user.
@@ -154,7 +190,12 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
 
 
 @router.post("/verify-reset-code")
-async def verify_reset_code(payload: VerifyResetCodeIn, db: AsyncSession = Depends(get_db)):
+async def verify_reset_code(payload: VerifyResetCodeIn, request: Request, db: AsyncSession = Depends(get_db)):
+    # Brute-force guard: codes are 6 digits and matched globally, so cap guesses
+    # per IP. 20 / 10 min vs a 1M space inside the 1h TTL = negligible hit chance.
+    if not check_rate(f"reset-verify-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
+
     result = await db.execute(
         select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
     )
@@ -165,7 +206,11 @@ async def verify_reset_code(payload: VerifyResetCodeIn, db: AsyncSession = Depen
 
 
 @router.post("/reset-password")
-async def reset_password(payload: ResetPasswordIn, db: AsyncSession = Depends(get_db)):
+async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSession = Depends(get_db)):
+    # Same brute-force guard as verify — this endpoint also matches the code globally.
+    if not check_rate(f"reset-pw-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
+
     if len(payload.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
 
