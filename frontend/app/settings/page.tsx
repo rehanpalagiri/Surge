@@ -159,8 +159,12 @@ function ChangeUsernameCard() {
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required
+          autoComplete="current-password"
           className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
+        <Link href="/forgot-password" className="block text-purple-to text-sm hover:underline">
+          Forgot your password?
+        </Link>
         {msg && (
           <p className={`text-sm ${msg.type === "ok" ? "text-success" : "text-danger"}`}>
             {msg.text}
@@ -305,6 +309,9 @@ function ChangePasswordCard() {
           autoComplete="new-password"
           className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
+        <Link href="/forgot-password" className="block text-purple-to text-sm hover:underline">
+          Forgot your current password?
+        </Link>
         {msg && (
           <p className={`text-sm ${msg.type === "ok" ? "text-success" : "text-danger"}`}>
             {msg.text}
