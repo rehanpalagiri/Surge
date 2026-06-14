@@ -86,6 +86,7 @@ NICHE_KEYWORDS: dict[str, list[str]] = {
 
 DEFAULT_MIN_VIEWS = 500_000
 DEFAULT_MAX_PER_NICHE = 3
+_TIKTOK_CONCURRENCY = 3  # niches processed in parallel (matches Instagram harvester)
 
 # Single-instance in-memory state (Render free tier = one process)
 _last_harvest: dict = {}
@@ -220,10 +221,21 @@ async def harvest_all(
     logger.info("Harvest started: %d niches min_views=%d max_per_niche=%d", len(target), min_views, max_per_niche)
 
     try:
-        results = []
-        for niche in target:
-            r = await harvest_niche(niche, min_views, max_per_niche)
-            results.append(r)
+        sem = asyncio.Semaphore(_TIKTOK_CONCURRENCY)
+
+        async def _run(niche: str) -> dict:
+            async with sem:
+                return await harvest_niche(niche, min_views, max_per_niche)
+
+        # return_exceptions=True: one niche crashing must not discard every other
+        # niche's completed work.
+        raw = await asyncio.gather(*[_run(n) for n in target], return_exceptions=True)
+        results = [r for r in raw if isinstance(r, dict)]
+        failed_niches = 0
+        for r in raw:
+            if isinstance(r, Exception):
+                failed_niches += 1
+                logger.error("TikTok niche task crashed: %s", r)
 
         total_added = sum(r["added"] for r in results)
         total_skipped = sum(r["skipped"] for r in results)
@@ -238,11 +250,12 @@ async def harvest_all(
             "total_skipped": total_skipped,
             "total_errors": total_errors,
             "total_search_failures": total_search_failures,
+            "failed_niches": failed_niches,
             "detail": results,
         }
         logger.info(
-            "Harvest done: added=%d skipped=%d errors=%d search_failures=%d",
-            total_added, total_skipped, total_errors, total_search_failures,
+            "Harvest done: added=%d skipped=%d errors=%d search_failures=%d failed_niches=%d",
+            total_added, total_skipped, total_errors, total_search_failures, failed_niches,
         )
     except Exception as e:
         logger.error("Harvest failed: %s", e)

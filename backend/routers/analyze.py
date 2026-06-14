@@ -18,7 +18,7 @@ from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
 from services.seed_promote import promote_analysis_to_seed
 from services.rate_limit import get_rate_limit
-from auth import optional_user, require_user
+from auth import optional_user, require_user, is_minor
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
@@ -432,7 +432,7 @@ async def seed_consent_decision(
     analysis.pending_seed_consent = False
     # Minors can never opt in (their consent is locked to "no" at signup —
     # this guard is defense in depth in case of a stale token/state).
-    minor = user.birth_year is not None and (datetime.utcnow().year - user.birth_year) < 18
+    minor = is_minor(user)
     if payload.remember in ("yes", "no") and not minor:
         user.seed_consent = payload.remember
     await db.commit()
@@ -544,6 +544,9 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "verdict": analysis.verdict,
         "actual_views": None,
         "actual_likes": None,
+        "video_url": None,
+        "counts_fetched_at": None,
+        "pending_seed_consent": False,
         "mode": analysis.mode or "quick",
         "created_at": analysis.created_at,
     }

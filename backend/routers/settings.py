@@ -6,8 +6,7 @@ from sqlalchemy import select, delete, update
 from database import get_db
 from models import User, UserProfile, UserAnalysis, PasswordResetToken
 from schemas import ConsentIn
-from auth import require_user, hash_password, verify_password
-from routers.auth import is_minor
+from auth import require_user, hash_password, verify_password, is_minor
 
 router = APIRouter(prefix="/api/me", tags=["settings"])
 
@@ -54,8 +53,8 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
-    if len(body.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
 
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect current password.")

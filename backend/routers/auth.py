@@ -18,7 +18,7 @@ from sqlalchemy import select, or_, func
 from database import get_db
 from models import User, PasswordResetToken
 from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn
-from auth import hash_password, verify_password, create_access_token, require_user
+from auth import hash_password, verify_password, create_access_token, require_user, is_minor
 from services.throttle import check_rate
 
 _RESET_TTL = timedelta(hours=1)
@@ -45,21 +45,6 @@ def _client_ip(request: Request) -> str:
     if xff:
         return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
-
-
-def is_minor(user: User) -> bool:
-    """Under 18 by exact date when available; falls back to year for legacy accounts."""
-    today = date.today()
-    if user.birth_date:
-        try:
-            bd = date.fromisoformat(user.birth_date)
-            age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
-            return age < 18
-        except ValueError:
-            pass
-    if user.birth_year is None:
-        return False
-    return (today.year - user.birth_year) < 18
 
 
 def user_to_out(user: User) -> dict:

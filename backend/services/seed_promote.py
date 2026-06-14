@@ -22,6 +22,7 @@ from sqlalchemy import select
 
 from datetime import datetime
 
+from auth import is_minor
 from database import AsyncSessionLocal
 from models import SeedVideo, UserAnalysis, User
 from services.seed_analysis import analyze_seed_video
@@ -29,12 +30,6 @@ from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok
 
 logger = logging.getLogger("seed_promote")
-
-
-def _is_minor(user: User) -> bool:
-    if user.birth_year is None:
-        return False
-    return (datetime.utcnow().year - user.birth_year) < 18
 
 
 async def _download(video_url: str, path: str) -> None:
@@ -83,7 +78,7 @@ async def promote_analysis_to_seed(
                 owner = ures.scalar_one_or_none()
                 if owner is None:
                     return
-                if _is_minor(owner):
+                if is_minor(owner):
                     return  # minors are excluded unconditionally
                 consent = owner.seed_consent or "ask"
             if consent == "no":

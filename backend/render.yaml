@@ -24,3 +24,17 @@ services:
         sync: false          # python -c "import secrets; print(secrets.token_urlsafe(48))"
       - key: ALLOWED_ORIGINS
         sync: false          # e.g. https://viraliq.vercel.app (set after Vercel deploy)
+      - key: HIKERAPI_KEY
+        sync: false          # HikerAPI key for Instagram seed harvest (api.hikerapi.com)
+      - key: SMTP_HOST
+        sync: false          # e.g. smtp-relay.brevo.com
+      - key: SMTP_PORT
+        sync: false          # e.g. 587
+      - key: SMTP_USER
+        sync: false          # Brevo login (email address)
+      - key: SMTP_PASS
+        sync: false          # Brevo SMTP password — ROTATE if exposed
+      - key: EMAIL_FROM
+        sync: false          # e.g. "Surge <noreply@yourdomain.com>"
+      - key: FRONTEND_URL
+        sync: false          # e.g. https://surge-chi-khaki.vercel.app

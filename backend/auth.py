@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -13,6 +13,23 @@ from models import User
 
 JWT_ALGORITHM = "HS256"
 TOKEN_TTL_DAYS = 30
+
+
+def is_minor(user: User) -> bool:
+    """Under 18 by exact date when available; falls back to year for legacy accounts.
+    This is the single authoritative implementation — import from here, don't reimplement.
+    """
+    today = date.today()
+    if user.birth_date:
+        try:
+            bd = date.fromisoformat(user.birth_date)
+            age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+            return age < 18
+        except ValueError:
+            pass
+    if user.birth_year is None:
+        return False
+    return (today.year - user.birth_year) < 18
 
 
 def _secret() -> str:
