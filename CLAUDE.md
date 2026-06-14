@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## Dev commands
 
 ```bash
@@ -35,15 +37,15 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 **Key backend files:**
 - `main.py` — CORS, lifespan (`create_all` → `_ensure_columns`/`_ensure_columns_pg`), router registration, `_assert_prod_secrets()` (refuses prod boot with default JWT_SECRET/ADMIN_PASSWORD).
 - `database.py` — Async SQLAlchemy. SQLite locally, Neon in prod. asyncpg needs: scheme normalisation, strip `?sslmode=` from URL, SSL via certifi, `statement_cache_size=0`.
-- `auth.py` — bcrypt (direct, no passlib), PyJWT 30-day tokens. `require_user` (401) / `optional_user` (None).
+- `auth.py` — bcrypt (direct, no passlib), PyJWT 30-day tokens. `require_user` (401) / `optional_user` (None). **`is_minor(user)` lives here — single canonical implementation; import from here, never reimplement inline.** Uses `birth_date` for exact day-level check, falls back to `birth_year` for legacy accounts.
 - `routers/auth.py` — signup (`email+username+password+birth_date`), login (email or username), password reset (6-digit code via Brevo SMTP/`aiosmtplib`+certifi). Rate limits via `services/throttle.py`. Welcome email on signup.
 - `routers/analyze.py` — `POST /api/analyze` (multipart, optional auth). Three-mode engine: Quick (video+caption), Thinking (+seed buckets+benchmark), Deep (+channel profile). `resolve_mode()` degrades gracefully. Gemini 429/403 caught before DB write → 503. `PATCH .../feedback`, `POST .../video-link` (TikTok only, auto-fetches stats, triggers seed promotion). `POST .../seed-consent`. Rate limit: 10 uploads/3h, +1 per verified link (max 20). v1.28: Instagram analyses pass `creator_like_baseline` if ≥2 verified posts.
 - `routers/profile.py` — GET/PUT `/api/me/profile/{platform}` (upsert).
 - `routers/settings.py` — username/password change, consent (minors hard-blocked), `DELETE /api/me/account` (FK-order: reset tokens → profile → nullify analyses → user).
 - `routers/admin.py` — `X-Admin-Password` header. Seed CRUD, `POST /api/admin/seed/from-url` (tikwm for TikTok, HikerAPI for Instagram), `POST /api/admin/harvest` (BackgroundTask), `GET /api/admin/harvest/status` → `{tiktok: ..., instagram: ...}`.
 - `services/gemini.py` — Upload → poll ACTIVE → generate → delete. `google.genai.errors.ClientError` (NOT `google.api_core`). `select_seed_examples()`: HIGH (rating≥6) / LOW (rating≤4). Platform-aware: Instagram outputs `predicted_likes`, TikTok outputs `predicted_views`. v1.28: personalized calibration block when `creator_like_baseline` present.
-- `services/seed_harvest.py` — TikTok auto-harvest via tikwm. `NICHE_KEYWORDS` (50 niches × 3–4 keywords). Dedupes via `vid:{video_id}` in notes.
-- `services/instagram_harvest.py` — Instagram auto-harvest via HikerAPI (`HIKERAPI_KEY`). 100 req/month free tier: 2 keywords/niche × 50 niches = 100 calls. Filters `media_type==2 && product_type=="clips"`. Dedupes via `ig:{media_pk}`.
+- `services/seed_harvest.py` — TikTok auto-harvest via tikwm. `NICHE_KEYWORDS` (50 niches × 3–4 keywords). `asyncio.gather + Semaphore(3)`. Dedupes via `vid:{video_id}` in notes.
+- `services/instagram_harvest.py` — Instagram auto-harvest via HikerAPI (`HIKERAPI_KEY`). 100 req/month free tier: 2 keywords/niche × 50 niches = 100 calls. `asyncio.gather + Semaphore(3)`. Filters `media_type==2 && product_type=="clips"`. Dedupes via `ig:{media_pk}`.
 - `services/seed_promote.py` — Background promotion of verified user videos into seed library. Idempotent via `promoted_seed_id`. Consent gate: minors never promote; `"ask"` parks (sets `pending_seed_consent`); `"yes"` proceeds.
 - `services/niche_classifier.py` — Free-text → one of 50 `CANONICAL_NICHES` via small Gemini call. Fails → `"Lifestyle & Vlogs"`. Never blocks analysis.
 - `services/channel_profile.py` — `build_channel_profile()`: prompt block from ≥2 analyses. Tier A = verified performance, Tier B = self-assessment trends.
@@ -73,11 +75,15 @@ Next.js 15 App Router. `"use client"` required for `useParams()`, `useSearchPara
 
 **PWA:** `manifest.json` + `sw.js` (cache-first for `/_next/static/` only) + `InstallBanner.tsx`. `next.config.mjs` sets `Cache-Control: no-cache` for sw.js + manifest.
 
+**Analytics:** `@vercel/analytics` — `<Analytics />` in `app/layout.tsx`. No config needed; tracks page views automatically once deployed to Vercel.
+
 ---
 
 ## Key conventions
 
 **Self-migrating schema:** No migration framework. On boot: `create_all` (new tables) → `_ensure_columns` (SQLite, PRAGMA) or `_ensure_columns_pg` (Postgres, `ADD COLUMN IF NOT EXISTS`). **To add a column:** update `models.py` + add guard to BOTH shims + deploy. **To add a table:** just add the model + deploy. Shims are ADDITIVE ONLY — destructive changes are manual on Neon before deploy. SQLite can't add UNIQUE columns via ALTER; email uniqueness falls back to app-layer check.
+
+**Age gate:** Signup collects full birthday (MM/DD/YYYY → sent as YYYY-MM-DD ISO). Backend parses with `date.fromisoformat`, computes exact age. `is_minor()` in `auth.py` is the single source of truth for all age checks — 4 callers import from there. Never reimplement inline.
 
 **Adding a platform:** Add to `VALID_PLATFORMS` in `routers/profile.py`, `_PLATFORM_CONTEXT` in `services/gemini.py`, and `PLATFORM_CONFIG` in `app/page.tsx`.
 
