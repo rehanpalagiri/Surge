@@ -7,7 +7,7 @@
 #       DATABASE_URL should be your Neon DIRECT (non-pooler) connection string.
 services:
   - type: web
-    name: viraliq-api
+    name: Surge
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
