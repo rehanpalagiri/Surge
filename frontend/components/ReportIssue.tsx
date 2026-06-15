@@ -77,7 +77,14 @@ export default function ReportIssue() {
             </div>
 
             <p className="text-text-muted/40 text-xs text-center">
-              Opens your email app · sent to support
+              Opens your email app · or email{" "}
+              <a
+                href="mailto:irehan29@icloud.com"
+                className="underline hover:text-text-muted transition-colors"
+              >
+                irehan29@icloud.com
+              </a>{" "}
+              directly
             </p>
           </div>
         </div>

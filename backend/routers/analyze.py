@@ -61,15 +61,8 @@ async def analyze(
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
     requested_mode = mode if mode in VALID_MODES else "quick"
 
-    # Free-text niche: store what the user typed, classify to a canonical
-    # niche for seed matching. Truncate before any processing.
-    raw_niche = niche.strip()[:200]
-    if not raw_niche:
-        raise HTTPException(status_code=400, detail="Please provide your content niche.")
-    canonical_niche = await classify_niche(raw_niche)
-
-    # Rate limit guests by IP (3 per 3 hours) to cap Gemini API liability.
-    # Authenticated users use the DB-backed per-account limiter below.
+    # Rate limits first — before any Gemini calls so we don't burn API quota
+    # on requests we're going to reject anyway.
     if user is None:
         ip = (
             request.headers.get("x-forwarded-for", "").split(",")[0].strip()
@@ -94,6 +87,13 @@ async def analyze(
                     + (f" Resets at {rl['resets_at']}." if rl["resets_at"] else "")
                 ),
             )
+
+    # Free-text niche: store what the user typed, classify to a canonical
+    # niche for seed matching. Truncate before any processing.
+    raw_niche = niche.strip()[:200]
+    if not raw_niche:
+        raise HTTPException(status_code=400, detail="Please provide your content niche.")
+    canonical_niche = await classify_niche(raw_niche)
 
     # Validate content type (client-declared; best-effort guard)
     if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:

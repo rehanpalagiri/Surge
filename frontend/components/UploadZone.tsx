@@ -332,7 +332,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
               <p className="text-white/50 text-sm">
                 .mp4 or .mov · up to 100MB
               </p>
-              <p className="text-white/30 text-xs">
+              <p className="text-white/50 text-xs">
                 iPhone: trim in Photos first to shrink large files
               </p>
             </>
