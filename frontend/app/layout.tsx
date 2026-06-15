@@ -21,6 +21,20 @@ export const metadata: Metadata = {
   icons: {
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
+  openGraph: {
+    title: "Surge — Will your video go viral?",
+    description:
+      "Upload your TikTok or Instagram Reel and get an AI breakdown in seconds — hook strength, pacing, audio, captions, trend alignment, and a full improvement plan.",
+    url: "https://surge-chi-khaki.vercel.app",
+    siteName: "Surge",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Surge — Will your video go viral?",
+    description:
+      "Upload your TikTok or Instagram Reel and get an AI breakdown in seconds — hook strength, pacing, audio, captions, trend alignment, and a full improvement plan.",
+  },
 };
 
 export const viewport: Viewport = {

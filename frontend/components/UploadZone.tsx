@@ -200,13 +200,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    // When advanced settings are open and niche is empty, require it.
-    // When collapsed, default to "General" so the user can analyze without filling it in.
-    if (showAdvanced && !niche.trim()) {
-      setError("Tell us your content niche — type it or tap a suggestion below.");
+    if (!niche.trim()) {
+      setError("Select a content niche above — tap any chip to get started.");
       return;
     }
-    const effectiveNiche = niche.trim() || "General";
+    const effectiveNiche = niche.trim();
     setError("");
     setLoading(true);
     setTipIndex(0);
@@ -340,7 +338,79 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
         </div>
 
 
-        {/* ── Advanced settings toggle ─────────────────────────────────── */}
+        {/* ── Niche chips ─────────────────────────────────────────────── */}
+        <div>
+          <label className="block text-sm font-medium text-text-muted mb-2">
+            Content Niche
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {NICHE_SUGGESTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setNiche(n)}
+                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                  niche === n
+                    ? "border-purple-to bg-purple-from/10 text-text-primary"
+                    : "border-border bg-card text-text-muted hover:border-purple-from/50 hover:text-text-primary"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          {niche && !NICHE_SUGGESTIONS.includes(niche) && (
+            <p className="text-xs text-text-muted mt-2">
+              Custom: <span className="text-text-primary font-medium">{niche}</span>
+            </p>
+          )}
+        </div>
+
+        {/* ── Analysis depth (always visible for logged-in users) ───────── */}
+        {loggedIn ? (
+          <div>
+            <label className="block text-sm font-medium text-text-muted mb-2">
+              Analysis depth
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => pickMode(m.id)}
+                  aria-pressed={mode === m.id}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+                    mode === m.id
+                      ? "border-purple-to bg-purple-from/10"
+                      : "border-border bg-card hover:border-purple-from/50"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-text-primary">
+                    {m.label}
+                  </span>
+                  <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
+                    {m.time}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {MODES.find((m) => m.id === mode) && (
+              <p className="text-text-muted/70 text-xs mt-2">
+                {MODES.find((m) => m.id === mode)!.desc}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-text-muted text-xs text-center px-2">
+            Running a <span className="text-text-primary font-medium">Quick</span> analysis.{" "}
+            <Link href="/login" className="text-purple-to hover:underline">
+              Sign in
+            </Link>{" "}
+            for Thinking &amp; Deep modes.
+          </p>
+        )}
+
+        {/* ── Advanced settings (caption + custom niche) ────────────────── */}
         <div>
           <button
             type="button"
@@ -351,19 +421,19 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
               ▾
             </span>
             Advanced settings
-            {(niche || caption) && !showAdvanced && (
-              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-to inline-block" title="Custom settings active" />
+            {caption && !showAdvanced && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-to inline-block" title="Caption set" />
             )}
           </button>
         </div>
 
         {showAdvanced && (
           <>
-            {/* ── Niche ─────────────────────────────────────────────────── */}
+            {/* ── Custom niche text input ────────────────────────────────── */}
             <div>
               <label className="block text-sm font-medium text-text-muted mb-2">
-                Content Niche
-                <span className="text-text-muted/50 font-normal ml-1">(defaults to General)</span>
+                Custom niche
+                <span className="text-text-muted/50 font-normal ml-1">(overrides chip selection)</span>
               </label>
               <input
                 type="text"
@@ -373,29 +443,13 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
                 placeholder='e.g. "Dark humor skits", "Calisthenics", "Day trading"…'
                 className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
               />
-              <div className="flex flex-wrap gap-2 mt-2">
-                {NICHE_SUGGESTIONS.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setNiche(n)}
-                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                      niche === n
-                        ? "border-purple-to bg-purple-from/10 text-text-primary"
-                        : "border-border bg-card text-text-muted hover:border-purple-from/50 hover:text-text-primary"
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* ── Caption ───────────────────────────────────────────────── */}
             <div>
               <label className="block text-sm font-medium text-text-muted mb-2">
                 Caption{" "}
-                <span className="text-text-muted/60 font-normal">(optional)</span>
+                <span className="text-text-muted/60 font-normal">(optional — improves accuracy)</span>
               </label>
               <textarea
                 value={caption}
@@ -406,50 +460,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
                 className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to resize-none"
               />
             </div>
-
-            {/* ── Analysis depth ────────────────────────────────────────── */}
-            {loggedIn ? (
-              <div>
-                <label className="block text-sm font-medium text-text-muted mb-2">
-                  Analysis depth
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {MODES.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => pickMode(m.id)}
-                      aria-pressed={mode === m.id}
-                      className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
-                        mode === m.id
-                          ? "border-purple-to bg-purple-from/10"
-                          : "border-border bg-card hover:border-purple-from/50"
-                      }`}
-                    >
-                      <span className="block text-sm font-semibold text-text-primary">
-                        {m.label}
-                      </span>
-                      <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
-                        {m.time}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {MODES.find((m) => m.id === mode) && (
-                  <p className="text-text-muted/70 text-xs mt-2">
-                    {MODES.find((m) => m.id === mode)!.desc}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-text-muted text-xs text-center px-2">
-                Running a <span className="text-text-primary font-medium">Quick</span> analysis.{" "}
-                <Link href="/login" className="text-purple-to hover:underline">
-                  Sign in
-                </Link>{" "}
-                for Thinking &amp; Deep modes.
-              </p>
-            )}
           </>
         )}
 
