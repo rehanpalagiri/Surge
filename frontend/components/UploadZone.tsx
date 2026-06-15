@@ -268,7 +268,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             </p>
             <p className="text-text-muted text-sm mt-1">
               {waking
-                ? "First request after a quiet period can take up to a minute — hang tight"
+                ? mode === "deep_thinking" && loggedIn
+                  ? "Server wakeup + Deep analysis — up to 2 minutes total"
+                  : "First request after a quiet period can take up to a minute — hang tight"
                 : `This usually takes ${ANALYSIS_TIME[loggedIn ? mode : "quick"]}`}
             </p>
           </div>
