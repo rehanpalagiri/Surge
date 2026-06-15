@@ -116,6 +116,14 @@ function SplashScreen({ onGuest, deleted }: { onGuest: () => void; deleted: bool
               Results are locked · no history saved
             </p>
           </div>
+
+          {/* Sample report link */}
+          <p className="text-text-muted/40 text-xs pt-1">
+            Not sure what you&apos;ll get?{" "}
+            <Link href="/sample" className="hover:text-text-muted underline transition-colors">
+              See a sample report →
+            </Link>
+          </p>
         </div>
       </div>
     </main>
@@ -128,10 +136,13 @@ export default function Home() {
   const [platform, setPlatform] = useState<Platform>("tiktok");
   // null = still checking localStorage (avoids flash); true = show splash; false = show app
   const [showSplash, setShowSplash] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
-    setShowSplash(!getToken());
+    const token = getToken();
+    setShowSplash(!token);
+    setIsLoggedIn(!!token);
     const params = new URLSearchParams(window.location.search);
     if (params.get("deleted") === "1") {
       setDeleted(true);
@@ -172,23 +183,36 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Hero */}
-      <section id="upload" className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center scroll-mt-20">
+      {/* Hero — abbreviated for logged-in users, full marketing pitch for guests */}
+      <section id="upload" className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-14 text-center scroll-mt-20">
         <div className="max-w-3xl mx-auto space-y-8">
-          <div className="space-y-4">
-            <div
-              className={`inline-block border text-xs font-semibold px-3 py-1 rounded-full mb-2 uppercase tracking-widest ${cfg.badgeClass}`}
-            >
-              {cfg.badge}
+          {isLoggedIn ? (
+            /* Compact header — logged-in users already know what Surge does */
+            <div className="space-y-1">
+              <h1 className="text-3xl font-bold text-text-primary">
+                Analyze your next {cfg.label} video
+              </h1>
+              <p className="text-text-muted text-sm">
+                Upload, pick your niche, and get an AI score in seconds.
+              </p>
             </div>
-            <h1 className="text-5xl md:text-7xl font-extrabold leading-tight">
-              {cfg.headlinePre}{" "}
-              <span className={cfg.accentClass}>{cfg.headlineAccent}</span>
-            </h1>
-            <p className="text-text-muted text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
-              {cfg.sub}
-            </p>
-          </div>
+          ) : (
+            /* Full marketing hero for guests */
+            <div className="space-y-4">
+              <div
+                className={`inline-block border text-xs font-semibold px-3 py-1 rounded-full mb-2 uppercase tracking-widest ${cfg.badgeClass}`}
+              >
+                {cfg.badge}
+              </div>
+              <h1 className="text-5xl md:text-7xl font-extrabold leading-tight">
+                {cfg.headlinePre}{" "}
+                <span className={cfg.accentClass}>{cfg.headlineAccent}</span>
+              </h1>
+              <p className="text-text-muted text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
+                {cfg.sub}
+              </p>
+            </div>
+          )}
 
           {/* Upload zone */}
           <div className={`w-full rounded-2xl ${cfg.uploadZoneExtra}`}>
@@ -198,49 +222,6 @@ export default function Home() {
           <p className="text-text-muted text-xs">
             Your video is analyzed privately and not stored permanently.
           </p>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="border-t border-border bg-surface/30 px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-center text-text-primary mb-10">
-            How it works
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { icon: "📤", title: "Upload your video", desc: cfg.uploadDesc },
-              { icon: "🤖", title: "AI analyzes it",   desc: "Google Gemini 2.5 Flash reviews hook, pacing, audio, captions, and trend alignment." },
-              { icon: "📈", title: "Get your score",   desc: "Receive a full performance breakdown with specific, actionable improvements." },
-            ].map((step) => (
-              <div
-                key={step.title}
-                className="bg-card border border-border rounded-2xl p-6 text-center"
-              >
-                <div className="text-4xl mb-3">{step.icon}</div>
-                <h3 className="font-semibold text-text-primary mb-1">{step.title}</h3>
-                <p className="text-text-muted text-sm">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Closing CTA */}
-      <section className="border-t border-border px-4 py-16 text-center">
-        <div className="max-w-xl mx-auto space-y-5">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-text-primary">
-            Know before you post.
-          </h2>
-          <p className="text-text-muted text-lg">
-            Stop guessing which videos will hit. Get an honest AI score in seconds — free.
-          </p>
-          <a
-            href="#upload"
-            className={`inline-block ${cfg.btnGradient} text-white font-bold py-4 px-8 rounded-xl text-lg shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform`}
-          >
-            Score my {cfg.label} video →
-          </a>
         </div>
       </section>
 

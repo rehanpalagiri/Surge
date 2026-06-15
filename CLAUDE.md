@@ -32,7 +32,7 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 - `seed_videos` — niche + `view_count` (NULL for Instagram) + `like_count` + `rating` (0–10) + `gemini_analysis` JSON. `performed` is a **deprecated vestigial column** — never read it.
 - `user_analyses` — every analysis. `user_id` nullable (anon). Has `platform`, `mode` (effective: quick/thinking/deep_thinking), `pending_seed_consent`.
 - `password_reset_tokens` — 6-digit code, 1h TTL, `used` bool.
-- `fetch_status` — yt-dlp fetch log.
+- `fetch_status` — log of admin URL fetches (TikTok and Instagram). Surfaces the warning banner in the admin panel.
 
 **Key backend files:**
 - `main.py` — CORS, lifespan (`create_all` → `_ensure_columns`/`_ensure_columns_pg`), router registration, `_assert_prod_secrets()` (refuses prod boot with default JWT_SECRET/ADMIN_PASSWORD).
@@ -41,7 +41,7 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 - `routers/auth.py` — signup (`email+username+password+birth_date`), login (email or username), password reset (6-digit code via Brevo SMTP/`aiosmtplib`+certifi). Rate limits via `services/throttle.py`. Welcome email on signup.
 - `routers/analyze.py` — `POST /api/analyze` (multipart, optional auth). Three-mode engine: Quick (video+caption), Thinking (+seed buckets+benchmark), Deep (+channel profile). `resolve_mode()` degrades gracefully. Gemini 429/403 caught before DB write → 503. `PATCH .../feedback`, `POST .../video-link` (TikTok only, auto-fetches stats, triggers seed promotion). `POST .../seed-consent`. Rate limit: 10 uploads/3h, +1 per verified link (max 20). v1.28: Instagram analyses pass `creator_like_baseline` if ≥2 verified posts.
 - `routers/profile.py` — GET/PUT `/api/me/profile/{platform}` (upsert).
-- `routers/settings.py` — username/password change, consent (minors hard-blocked), `DELETE /api/me/account` (FK-order: reset tokens → profile → nullify analyses → user).
+- `routers/settings.py` — username/password change (both require current password; password minimum **8 chars**), consent (minors hard-blocked via `is_minor()`), `DELETE /api/me/account` (FK-order: reset tokens → profile → nullify analyses → user).
 - `routers/admin.py` — `X-Admin-Password` header. Seed CRUD, `POST /api/admin/seed/from-url` (tikwm for TikTok, HikerAPI for Instagram), `POST /api/admin/harvest` (BackgroundTask), `GET /api/admin/harvest/status` → `{tiktok: ..., instagram: ...}`.
 - `services/gemini.py` — Upload → poll ACTIVE → generate → delete. `google.genai.errors.ClientError` (NOT `google.api_core`). `select_seed_examples()`: HIGH (rating≥6) / LOW (rating≤4). Platform-aware: Instagram outputs `predicted_likes`, TikTok outputs `predicted_views`. v1.28: personalized calibration block when `creator_like_baseline` present.
 - `services/seed_harvest.py` — TikTok auto-harvest via tikwm. `NICHE_KEYWORDS` (50 niches × 3–4 keywords). `asyncio.gather + Semaphore(3)`. Dedupes via `vid:{video_id}` in notes.
@@ -57,13 +57,13 @@ Browser → Next.js (Vercel) → FastAPI (Render) → Neon Postgres
 Next.js 15 App Router. `"use client"` required for `useParams()`, `useSearchParams()`, auth state.
 
 **Key frontend files:**
-- `app/page.tsx` — Platform switcher (TikTok/Instagram). `PLATFORM_CONFIG` drives all platform visuals.
+- `app/page.tsx` — Platform switcher (TikTok/Instagram). `PLATFORM_CONFIG` drives all platform visuals. Reads `?deleted=1` on mount to show account-deletion confirmation banner; cleans URL with `history.replaceState`.
 - `app/signup/page.tsx` — email + username + password + birthday (MM/DD/YYYY, full date age check) + ToS checkbox.
 - `app/login/page.tsx` — email or username in one field.
-- `app/forgot-password/page.tsx` — 4-step reset: email → 6-digit OTP (auto-advance boxes) → new password → success.
+- `app/forgot-password/page.tsx` — 4-step reset: email → 6-digit OTP (auto-advance boxes) → new password → success. OTP uses `padEnd(6, " ")` (space, not empty string) so digit slots fill correctly; spaces are stripped in `handleChange`.
 - `app/results/[id]/page.tsx` — Locked for anon (`_to_locked()`). `SeedConsentBanner` when `pending_seed_consent`.
 - `app/admin/page.tsx` — Seed panel. Platform toggle; per-platform harvest status. `NICHES` list must stay in sync with `CANONICAL_NICHES`.
-- `app/settings/page.tsx` — Username/password, seed-consent card (minors excluded), `DeleteAccountCard`.
+- `app/settings/page.tsx` — Username/password (current password required for both; "Forgot your password?" link to reset flow), seed-consent card (minors excluded), `DeleteAccountCard`.
 - `components/UploadZone.tsx` — `wakeBackend()` before upload. Free-text niche (max 80 chars). Quick/Thinking/Deep selector (localStorage `surge_mode`); guests always Quick.
 - `components/VerdictBanner.tsx` — Instagram: `predictedLikes` only (no views). TikTok: `predictedViews` + `predictedLikes`.
 - `components/FeedbackModal.tsx` — TikTok: link-first (auto-fetch), manual toggle. Instagram: manual likes only.
@@ -91,7 +91,7 @@ Next.js 15 App Router. `"use client"` required for `useParams()`, `useSearchPara
 
 **Gemini:** Always guard with `_error_dict()`. `google.genai.errors.ClientError` (not `google.api_core`). Re-raise 429/403 before writing to DB.
 
-**Async:** Always use `AsyncSession` via `get_db()` or `async with engine.begin()` — never `engine.execute()`.
+**Async:** Always use `AsyncSession` via `get_db()` or `async with AsyncSessionLocal()` — never synchronous engine calls.
 
 ---
 
@@ -112,7 +112,7 @@ Next.js 15 App Router. `"use client"` required for `useParams()`, `useSearchPara
 
 ## Production
 
-- **Backend:** Render — Docker (`backend/Dockerfile`, `backend/render.yaml`). `wakeBackend()` in UploadZone mitigates cold starts for video upload only.
+- **Backend:** Render — Docker (`backend/Dockerfile`, `backend/render.yaml`, service name: `Surge`). `wakeBackend()` in UploadZone mitigates cold starts.
 - **Frontend:** Vercel — auto-deploys from `main`. `https://surge-chi-khaki.vercel.app`
 - **Database:** Neon Postgres (AWS US East 1) — use direct (non-pooler) URL
 - **Repo:** `https://github.com/rehanpalagiri/Surge` (private)

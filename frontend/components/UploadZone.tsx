@@ -55,6 +55,12 @@ const TIPS = [
   "Generating your performance score...",
 ];
 
+const ANALYSIS_TIME: Record<ModeId, string> = {
+  quick: "~20 seconds",
+  thinking: "~30 seconds",
+  deep_thinking: "~60 seconds",
+};
+
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
 function TikTokIcon() {
@@ -108,6 +114,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [niche, setNiche] = useState("");
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
   const [waking, setWaking] = useState(false);
   const [tipIndex, setTipIndex] = useState(0);
@@ -193,17 +200,20 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    if (!niche.trim()) {
+    // When advanced settings are open and niche is empty, require it.
+    // When collapsed, default to "General" so the user can analyze without filling it in.
+    if (showAdvanced && !niche.trim()) {
       setError("Tell us your content niche — type it or tap a suggestion below.");
       return;
     }
+    const effectiveNiche = niche.trim() || "General";
     setError("");
     setLoading(true);
     setTipIndex(0);
 
     const interval = setInterval(() => {
       setTipIndex((i) => (i + 1) % TIPS.length);
-    }, 5000);
+    }, 4000);
 
     try {
       // Ping the backend with a tiny request first and wait for it to respond.
@@ -217,7 +227,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       if (!awake) throw new Error("load failed");
 
       const effectiveMode = loggedIn ? mode : "quick";
-      const { id } = await analyzeVideo(file, niche.trim(), caption, bio, platform, effectiveMode);
+      const { id } = await analyzeVideo(file, effectiveNiche, caption, bio, platform, effectiveMode);
       getRateLimit().then(setRateLimit).catch(() => {});
       router.push(`/results/${id}`);
     } catch (err: unknown) {
@@ -261,7 +271,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             <p className="text-text-muted text-sm mt-1">
               {waking
                 ? "First request after a quiet period can take up to a minute — hang tight"
-                : "This can take 15–30 seconds"}
+                : `This usually takes ${ANALYSIS_TIME[loggedIn ? mode : "quick"]}`}
             </p>
           </div>
           <div className="bg-card border border-border rounded-xl px-6 py-3 text-text-muted text-sm animate-pulse">
@@ -278,7 +288,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           onDragLeave={onDragLeave}
           onClick={() => inputRef.current?.click()}
           className={`cursor-pointer rounded-2xl border-2 border-dashed transition-all
-            p-6 sm:p-10 min-h-[120px]
+            p-8 sm:p-12 min-h-[220px]
             flex flex-col items-center justify-center gap-3 text-center
             ${
               dragging
@@ -322,100 +332,125 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
               <p className="text-white/50 text-sm">
                 .mp4 or .mov · up to 100MB
               </p>
+              <p className="text-white/30 text-xs">
+                iPhone: trim in Photos first to shrink large files
+              </p>
             </>
           )}
         </div>
 
 
-        {/* ── Niche ────────────────────────────────────────────────────────── */}
+        {/* ── Advanced settings toggle ─────────────────────────────────── */}
         <div>
-          <label className="block text-sm font-medium text-text-muted mb-2">
-            Content Niche
-          </label>
-          <input
-            type="text"
-            value={niche}
-            onChange={(e) => setNiche(e.target.value)}
-            maxLength={80}
-            placeholder='e.g. "Dark humor skits", "Calisthenics", "Day trading"…'
-            className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
-          />
-          <div className="flex flex-wrap gap-2 mt-2">
-            {NICHE_SUGGESTIONS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setNiche(n)}
-                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                  niche === n
-                    ? "border-purple-to bg-purple-from/10 text-text-primary"
-                    : "border-border bg-card text-text-muted hover:border-purple-from/50 hover:text-text-primary"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex items-center gap-1.5 text-text-muted text-sm hover:text-text-primary transition-colors mx-auto"
+          >
+            <span className={`transition-transform duration-200 ${showAdvanced ? "rotate-180" : ""}`}>
+              ▾
+            </span>
+            Advanced settings
+            {(niche || caption) && !showAdvanced && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-to inline-block" title="Custom settings active" />
+            )}
+          </button>
         </div>
 
-        {/* ── Caption ──────────────────────────────────────────────────────── */}
-        <div>
-          <label className="block text-sm font-medium text-text-muted mb-2">
-            Caption{" "}
-            <span className="text-text-muted/60 font-normal">(optional)</span>
-          </label>
-          <textarea
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            rows={2}
-            maxLength={2200}
-            placeholder="The caption you plan to post with this video, including hashtags…"
-            className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to resize-none"
-          />
-        </div>
-
-        {/* ── Analysis depth ───────────────────────────────────────────────── */}
-        {loggedIn ? (
-          <div>
-            <label className="block text-sm font-medium text-text-muted mb-2">
-              Analysis depth
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {MODES.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => pickMode(m.id)}
-                  aria-pressed={mode === m.id}
-                  className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
-                    mode === m.id
-                      ? "border-purple-to bg-purple-from/10"
-                      : "border-border bg-card hover:border-purple-from/50"
-                  }`}
-                >
-                  <span className="block text-sm font-semibold text-text-primary">
-                    {m.label}
-                  </span>
-                  <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
-                    {m.time}
-                  </span>
-                </button>
-              ))}
+        {showAdvanced && (
+          <>
+            {/* ── Niche ─────────────────────────────────────────────────── */}
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-2">
+                Content Niche
+                <span className="text-text-muted/50 font-normal ml-1">(defaults to General)</span>
+              </label>
+              <input
+                type="text"
+                value={niche}
+                onChange={(e) => setNiche(e.target.value)}
+                maxLength={80}
+                placeholder='e.g. "Dark humor skits", "Calisthenics", "Day trading"…'
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+              />
+              <div className="flex flex-wrap gap-2 mt-2">
+                {NICHE_SUGGESTIONS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setNiche(n)}
+                    className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                      niche === n
+                        ? "border-purple-to bg-purple-from/10 text-text-primary"
+                        : "border-border bg-card text-text-muted hover:border-purple-from/50 hover:text-text-primary"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-            {MODES.find((m) => m.id === mode) && (
-              <p className="text-text-muted/70 text-xs mt-2">
-                {MODES.find((m) => m.id === mode)!.desc}
+
+            {/* ── Caption ───────────────────────────────────────────────── */}
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-2">
+                Caption{" "}
+                <span className="text-text-muted/60 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                rows={2}
+                maxLength={2200}
+                placeholder="The caption you plan to post with this video, including hashtags…"
+                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to resize-none"
+              />
+            </div>
+
+            {/* ── Analysis depth ────────────────────────────────────────── */}
+            {loggedIn ? (
+              <div>
+                <label className="block text-sm font-medium text-text-muted mb-2">
+                  Analysis depth
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {MODES.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => pickMode(m.id)}
+                      aria-pressed={mode === m.id}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+                        mode === m.id
+                          ? "border-purple-to bg-purple-from/10"
+                          : "border-border bg-card hover:border-purple-from/50"
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-text-primary">
+                        {m.label}
+                      </span>
+                      <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
+                        {m.time}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {MODES.find((m) => m.id === mode) && (
+                  <p className="text-text-muted/70 text-xs mt-2">
+                    {MODES.find((m) => m.id === mode)!.desc}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-text-muted text-xs text-center px-2">
+                Running a <span className="text-text-primary font-medium">Quick</span> analysis.{" "}
+                <Link href="/login" className="text-purple-to hover:underline">
+                  Sign in
+                </Link>{" "}
+                for Thinking &amp; Deep modes.
               </p>
             )}
-          </div>
-        ) : (
-          <p className="text-text-muted text-xs text-center px-2">
-            Running a <span className="text-text-primary font-medium">Quick</span> analysis.{" "}
-            <Link href="/login" className="text-purple-to hover:underline">
-              Sign in
-            </Link>{" "}
-            for Thinking &amp; Deep modes.
-          </p>
+          </>
         )}
 
         {/* ── Rate limit bar (logged-in only) ─────────────────────────────── */}

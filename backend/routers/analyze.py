@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from statistics import median
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -18,6 +18,7 @@ from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
 from services.seed_promote import promote_analysis_to_seed
 from services.rate_limit import get_rate_limit
+from services.throttle import check_rate
 from auth import optional_user, require_user, is_minor
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -47,6 +48,7 @@ def resolve_mode(requested: str, user, has_usable_seeds: bool, channel_profile) 
 
 @router.post("/analyze", response_model=AnalysisOut)
 async def analyze(
+    request: Request,
     file: UploadFile = File(...),
     niche: str = Form(...),
     caption: str = Form(""),
@@ -66,7 +68,20 @@ async def analyze(
         raise HTTPException(status_code=400, detail="Please provide your content niche.")
     canonical_niche = await classify_niche(raw_niche)
 
-    # Rate limit authenticated users (guests are unmetered)
+    # Rate limit guests by IP (3 per 3 hours) to cap Gemini API liability.
+    # Authenticated users use the DB-backed per-account limiter below.
+    if user is None:
+        ip = (
+            request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            or (request.client.host if request.client else "unknown")
+        )
+        if not check_rate(f"guest:{ip}", 3, 3 * 3600):
+            raise HTTPException(
+                status_code=429,
+                detail="Guest analysis limit reached. Sign up free to get 10 analyses per session.",
+            )
+
+    # Rate limit authenticated users (DB-backed, resets on a rolling window)
     if user:
         rl = await get_rate_limit(user.id, db)
         if not rl["allowed"]:
