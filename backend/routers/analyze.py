@@ -477,17 +477,20 @@ async def submit_feedback(
         raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
 
     # Hard sanity blocks — keep impossible numbers out of the channel-profile anchor.
-    if feedback.actual_views < 0:
-        raise HTTPException(status_code=400, detail="Views can't be negative.")
-    if feedback.actual_views > MAX_ACTUAL_VIEWS:
-        raise HTTPException(status_code=400, detail="That view count is too high to be real.")
+    if feedback.actual_views is not None:
+        if feedback.actual_views < 0:
+            raise HTTPException(status_code=400, detail="Views can't be negative.")
+        if feedback.actual_views > MAX_ACTUAL_VIEWS:
+            raise HTTPException(status_code=400, detail="That view count is too high to be real.")
     if feedback.actual_likes is not None:
         if feedback.actual_likes < 0:
             raise HTTPException(status_code=400, detail="Likes can't be negative.")
-        if feedback.actual_likes > feedback.actual_views:
+        # Only compare likes vs views when both are supplied (not meaningful for Instagram).
+        if feedback.actual_views is not None and feedback.actual_likes > feedback.actual_views:
             raise HTTPException(status_code=400, detail="Likes can't exceed views.")
 
-    analysis.actual_views = feedback.actual_views
+    if feedback.actual_views is not None:
+        analysis.actual_views = feedback.actual_views
     if feedback.actual_likes is not None:
         analysis.actual_likes = feedback.actual_likes
     await db.commit()
@@ -554,6 +557,7 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "scores_json": {
             "verdict": scores.get("verdict", analysis.verdict),
             "predicted_views": scores.get("predicted_views", "Unknown"),
+            "predicted_likes": scores.get("predicted_likes", "Unknown"),
             "locked": True,
         },
         "verdict": analysis.verdict,

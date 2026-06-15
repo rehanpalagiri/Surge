@@ -16,7 +16,7 @@ function verdictColor(verdict: string): string {
 function scoreColor(score: number | null): string {
   if (score === null) return "text-text-muted";
   if (score >= 7) return "text-success";
-  if (score >= 5) return "text-warning";
+  if (score >= 4) return "text-warning";
   return "text-danger";
 }
 

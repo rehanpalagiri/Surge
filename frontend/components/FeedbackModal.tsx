@@ -43,16 +43,28 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
 
   async function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const viewNum = parseInt(views, 10);
-    if (isNaN(viewNum) || viewNum < 0) {
-      setError("Please enter a valid view count.");
-      return;
+
+    let viewNum: number | undefined = undefined;
+    if (isTikTok) {
+      const parsed = parseInt(views, 10);
+      if (isNaN(parsed) || parsed < 0) {
+        setError("Please enter a valid view count.");
+        return;
+      }
+      viewNum = parsed;
     }
+
     const likeNum = likes.trim() ? parseInt(likes, 10) : undefined;
     if (likeNum !== undefined && (isNaN(likeNum) || likeNum < 0)) {
       setError("Please enter a valid like count.");
       return;
     }
+    // For Instagram, likes are the only meaningful metric — require them.
+    if (!isTikTok && likeNum === undefined) {
+      setError("Please enter your like count.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -125,18 +137,20 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
       ) : (
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3">
+            {isTikTok && (
+              <input
+                type="number"
+                min="0"
+                placeholder="Views (e.g. 15000)"
+                value={views}
+                onChange={(e) => setViews(e.target.value)}
+                className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+              />
+            )}
             <input
               type="number"
               min="0"
-              placeholder="Views (e.g. 15000)"
-              value={views}
-              onChange={(e) => setViews(e.target.value)}
-              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
-            />
-            <input
-              type="number"
-              min="0"
-              placeholder="Likes (optional)"
+              placeholder={isTikTok ? "Likes (optional)" : "Likes your Reel got"}
               value={likes}
               onChange={(e) => setLikes(e.target.value)}
               className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"

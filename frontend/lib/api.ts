@@ -289,14 +289,14 @@ export async function claimAnalysis(
 
 export async function submitFeedback(
   id: string | number,
-  actualViews: number,
+  actualViews: number | undefined,
   actualLikes?: number
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/feedback`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
-      actual_views: actualViews,
+      ...(actualViews !== undefined ? { actual_views: actualViews } : {}),
       ...(actualLikes !== undefined ? { actual_likes: actualLikes } : {}),
     }),
   });

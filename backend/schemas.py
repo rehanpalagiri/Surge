@@ -76,7 +76,7 @@ class AnalysisOut(BaseModel):
 
 
 class FeedbackIn(BaseModel):
-    actual_views: int
+    actual_views: Optional[int] = None  # None for Instagram (platform hides views)
     actual_likes: Optional[int] = None
 
 
