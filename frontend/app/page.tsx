@@ -193,7 +193,7 @@ export default function Home() {
                 Analyze your next {cfg.label} video
               </h1>
               <p className="text-text-muted text-sm">
-                Upload, pick your niche, and get an AI score in seconds.
+                Drop your video and get an AI score in seconds.
               </p>
             </div>
           ) : (
