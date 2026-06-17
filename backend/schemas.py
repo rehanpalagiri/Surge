@@ -150,7 +150,6 @@ class AnalysisSummaryOut(BaseModel):
     niche: str
     verdict: str
     overall_score: Optional[int] = None
-    predicted_views: Optional[str] = None
     caption_preview: Optional[str] = None
     actual_views: Optional[int] = None
     actual_likes: Optional[int] = None
@@ -162,13 +161,17 @@ class AnalysisSummaryOut(BaseModel):
 
 class ScoreResult(BaseModel):
     overall_score: int
-    hook_strength: int
-    pacing_score: int
-    audio_score: int
-    caption_score: int
-    trend_alignment: int
-    predicted_views: str
+    hook_velocity: int
+    cut_frequency: int
+    text_scannability: int
+    curiosity_gap: int
+    audio_visual_sync: int
+    loop_seamlessness: int
     strengths: list[str]
     improvements: list[str]
     verdict: str
     analysis_summary: str
+    improvement_plan: list[Any] = []
+    hook_rewrite: Optional[str] = None
+    caption_rewrite: Optional[str] = None
+    projected_verdict: Optional[str] = None

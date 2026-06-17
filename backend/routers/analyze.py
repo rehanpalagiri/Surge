@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from database import get_db
-from models import SeedVideo, UserAnalysis, UserProfile, User
+from models import SeedVideo, UserAnalysis, UserProfile, User, NicheInsight, TrendSummary
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn, SeedConsentDecisionIn
 from services.gemini import analyze_video, select_seed_examples
 from google.genai.errors import ClientError as _GeminiClientError
@@ -23,25 +23,24 @@ from auth import optional_user, require_user, is_minor
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
-VALID_MODES = {"quick", "thinking", "deep_thinking"}
 MAX_ACTUAL_VIEWS = 500_000_000  # sanity ceiling for feedback (no real video tops this)
 REFRESH_COOLDOWN = timedelta(hours=24)  # min gap between video-link count refreshes
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
 
-def resolve_mode(requested: str, user, has_usable_seeds: bool, channel_profile) -> str:
-    """Authoritative server-side resolution of the EFFECTIVE mode that will run.
-    Degrades gracefully so the badge can never overclaim:
-      - guests are always Quick;
-      - Deep needs a channel profile (>= 2 analyses), else falls back;
-      - Thinking/Deep need usable seed buckets, else fall back to Quick.
+def resolve_mode(user, has_usable_seeds: bool, channel_profile) -> str:
+    """Auto-escalate to the best mode available — users never choose.
+    Guests always get Quick. Auth users get the best mode the data supports:
+      Deep  → needs a channel profile (>= 2 prior analyses)
+      Thinking → needs usable seed buckets
+      Quick → fallback when no enrichment data exists yet
     """
     if user is None:
         return "quick"
-    if requested == "deep_thinking" and channel_profile:
+    if channel_profile:
         return "deep_thinking"
-    if requested in ("thinking", "deep_thinking") and has_usable_seeds:
+    if has_usable_seeds:
         return "thinking"
     return "quick"
 
@@ -54,12 +53,10 @@ async def analyze(
     caption: str = Form(""),
     bio: str = Form(""),
     platform: str = Form("tiktok"),
-    mode: str = Form("quick"),
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(optional_user),
 ):
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
-    requested_mode = mode if mode in VALID_MODES else "quick"
 
     # Rate limits first — before any Gemini calls so we don't burn API quota
     # on requests we're going to reject anyway.
@@ -68,10 +65,10 @@ async def analyze(
             request.headers.get("x-forwarded-for", "").split(",")[0].strip()
             or (request.client.host if request.client else "unknown")
         )
-        if not check_rate(f"guest:{ip}", 3, 3 * 3600):
+        if not check_rate(f"guest:{ip}", 5, 24 * 3600):
             raise HTTPException(
                 status_code=429,
-                detail="Guest analysis limit reached. Sign up free to get 10 analyses per session.",
+                detail="You've used your 5 free analyses. Sign up free to get 10 analyses every 3 hours.",
             )
 
     # Rate limit authenticated users (DB-backed, resets on a rolling window)
@@ -113,20 +110,50 @@ async def analyze(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # --- Seed reference (Thinking / Deep) ---
+    # --- Niche intelligence + seed reference (auth users always get enrichment) ---
     high_seeds: list = []
     low_seeds: list = []
-    if requested_mode in ("thinking", "deep_thinking") and user:
-        seeds_result = await db.execute(
-            select(SeedVideo).where(SeedVideo.platform == platform)
+    niche_insight: str | None = None
+    trend_context: str | None = None
+    if user:
+        # Prefer the synthesized niche insight block; fall back to raw seed lists.
+        insight_result = await db.execute(
+            select(NicheInsight).where(
+                NicheInsight.platform == platform,
+                NicheInsight.niche == canonical_niche,
+            )
         )
-        seeds = seeds_result.scalars().all()
-        high_seeds, low_seeds = select_seed_examples(seeds, canonical_niche)
-    has_usable_seeds = bool(high_seeds or low_seeds)
+        insight_row = insight_result.scalar_one_or_none()
+        if insight_row and (insight_row.insight or "").strip():
+            niche_insight = insight_row.insight
+        else:
+            seeds_result = await db.execute(
+                select(SeedVideo).where(SeedVideo.platform == platform)
+            )
+            seeds = seeds_result.scalars().all()
+            high_seeds, low_seeds = select_seed_examples(seeds, canonical_niche)
 
-    # --- Creator channel profile (Deep only, needs >= 2 prior analyses) ---
+        # Trend intelligence: inject if generated within the last 7 days.
+        from datetime import timezone
+        trend_result = await db.execute(
+            select(TrendSummary).where(
+                TrendSummary.platform == platform,
+                TrendSummary.niche == canonical_niche,
+            )
+        )
+        trend_row = trend_result.scalar_one_or_none()
+        if trend_row and trend_row.trend_text.strip():
+            ref = trend_row.generated_at
+            if ref.tzinfo is None:
+                ref = ref.replace(tzinfo=timezone.utc)
+            if ref >= datetime.now(timezone.utc) - timedelta(days=7):
+                trend_context = trend_row.trend_text
+
+    has_usable_seeds = bool(niche_insight or high_seeds or low_seeds)
+
+    # --- Creator channel profile (needs >= 2 prior analyses — always attempt for auth users) ---
     channel_profile = None
-    if requested_mode == "deep_thinking" and user:
+    if user:
         hist_result = await db.execute(
             select(UserAnalysis).where(
                 UserAnalysis.user_id == user.id,
@@ -135,7 +162,7 @@ async def analyze(
         )
         channel_profile = build_channel_profile(hist_result.scalars().all())
 
-    effective_mode = resolve_mode(requested_mode, user, has_usable_seeds, channel_profile)
+    effective_mode = resolve_mode(user, has_usable_seeds, channel_profile)
 
     # --- Per-creator like baseline (all modes — personalises the 1–10 calibration) ---
     # Uses verified actual_likes from this user's past analyses on this platform.
@@ -203,6 +230,8 @@ async def analyze(
             effective_mode,
             niche_raw=raw_niche,
             creator_like_baseline=creator_like_baseline,
+            niche_insight=niche_insight if effective_mode in ("thinking", "deep_thinking") else None,
+            trend_context=trend_context if effective_mode in ("thinking", "deep_thinking") else None,
         )
     except _GeminiClientError as e:
         if e.code in (429, 403):
@@ -295,7 +324,6 @@ async def my_analyses(
                 "niche": a.niche,
                 "verdict": a.verdict,
                 "overall_score": scores.get("overall_score"),
-                "predicted_views": scores.get("predicted_views"),
                 "caption_preview": caption_preview,
                 "actual_views": a.actual_views,
                 "actual_likes": a.actual_likes,
@@ -541,12 +569,14 @@ def _to_out(analysis: UserAnalysis) -> dict:
 
 
 def _to_locked(analysis: UserAnalysis) -> dict:
-    """Anonymous (free-tier) view: only the headline prediction is exposed.
-    All locked fields are stripped server-side, not just hidden in the UI."""
+    """Anonymous (free-tier) view: overall score, verdict, and the single highest-priority
+    improvement are exposed as a teaser. Full plan, rewrites, and all detail are locked."""
     try:
         scores = json.loads(analysis.scores_json)
     except (ValueError, TypeError):
         scores = {}
+    plan = scores.get("improvement_plan") or []
+    first_improvement = plan[0] if plan else None
     return {
         "id": analysis.id,
         "platform": analysis.platform or "tiktok",
@@ -556,8 +586,8 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "bio": None,
         "scores_json": {
             "verdict": scores.get("verdict", analysis.verdict),
-            "predicted_views": scores.get("predicted_views", "Unknown"),
-            "predicted_likes": scores.get("predicted_likes", "Unknown"),
+            "overall_score": scores.get("overall_score"),
+            "first_improvement": first_improvement,
             "locked": True,
         },
         "verdict": analysis.verdict,
