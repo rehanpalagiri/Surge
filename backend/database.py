@@ -1,14 +1,14 @@
 import os
 import ssl
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 import certifi
 
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Local dev default: SQLite file in the repo root (zero config).
-# In production (Render), set DATABASE_URL to a Neon direct connection string:
+# In production, set DATABASE_URL to a Neon direct connection string:
 #   postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require
 #
 # IMPORTANT Neon / asyncpg quirks handled below:
@@ -16,11 +16,9 @@ from sqlalchemy.orm import sessionmaker
 #   2. SSL                   — asyncpg needs ssl via connect_args, NOT ?sslmode=…
 #                              Strip sslmode & channel_binding from the query string
 #                              and pass an ssl.SSLContext instead.
-#   3. Pooled vs direct URL  — Use the DIRECT (non-pooler) URL on Render; it's a
-#                              long-lived process and direct connections are faster.
-#                              If you must use a -pooler URL (pgbouncer), set
-#                              statement_cache_size=0 — pgbouncer rejects prepared
-#                              statements which asyncpg uses by default.
+#   3. Pooled vs direct URL  — Use the DIRECT (non-pooler) URL; it's a long-lived
+#                              process. If you must use a -pooler URL (pgbouncer),
+#                              set statement_cache_size=0.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _RAW_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./viraliq.db")
@@ -40,17 +38,14 @@ def _build_engine(raw_url: str):
             url = "postgresql+asyncpg://" + url[len(old_prefix):]
             break
 
-    # 2. Strip query params that asyncpg / SQLAlchemy don't understand
-    parsed = urlparse(url)
-    qs = parse_qs(parsed.query, keep_blank_values=True)
-    qs.pop("sslmode", None)
-    qs.pop("channel_binding", None)
-    clean_query = urlencode({k: v[0] for k, v in qs.items()})
-    clean_url = urlunparse(parsed._replace(query=clean_query))
+    # 2. Use SQLAlchemy's URL parser (handles special chars in passwords safely)
+    #    then strip query params asyncpg doesn't understand.
+    parsed = make_url(url)
+    clean_query = {k: v for k, v in parsed.query.items()
+                   if k not in ("sslmode", "channel_binding")}
+    clean = parsed.set(query=clean_query)
 
     # 3. asyncpg TLS must go through connect_args, not the URL.
-    #    Use certifi's CA bundle — works on macOS (Python from python.org doesn't
-    #    trust the system keychain) and on Linux/Render equally well.
     ssl_ctx = ssl.create_default_context(cafile=certifi.where())
     connect_args: dict = {"ssl": ssl_ctx}
 
@@ -58,7 +53,7 @@ def _build_engine(raw_url: str):
     if "-pooler" in raw_url:
         connect_args["statement_cache_size"] = 0
 
-    return create_async_engine(clean_url, echo=False, connect_args=connect_args)
+    return create_async_engine(clean, echo=False, connect_args=connect_args)
 
 
 engine = _build_engine(_RAW_URL)
