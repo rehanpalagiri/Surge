@@ -11,10 +11,21 @@ import {
   getApiUsage,
   triggerHarvest,
   getHarvestStatus,
+  generateInsights,
+  getInsights,
+  triggerTrendHarvest,
+  getTrendHarvestStatus,
+  generateTrends,
+  getTrends,
   SeedVideoOut,
   FetchStatus,
   ApiUsage,
   HarvestStatus,
+  NicheInsightRow,
+  GenerateInsightsResult,
+  TrendHarvestStatus,
+  TrendRow,
+  GenerateTrendsResult,
 } from "@/lib/api";
 
 // Must stay in sync with CANONICAL_NICHES in backend/services/niche_classifier.py —
@@ -140,6 +151,25 @@ export default function AdminPage() {
   const [harvestMaxPer, setHarvestMaxPer] = useState("3");
   const [harvestPlatform, setHarvestPlatform] = useState<"tiktok" | "instagram">("tiktok");
 
+  // Niche Intelligence state
+  const [insights, setInsights] = useState<NicheInsightRow[]>([]);
+  const [generatingInsights, setGeneratingInsights] = useState(false);
+  const [insightError, setInsightError] = useState("");
+  const [insightResult, setInsightResult] = useState<GenerateInsightsResult | null>(null);
+  const [insightNiche, setInsightNiche] = useState("");
+
+  // Trend Intelligence state
+  const [trendHarvestStatus, setTrendHarvestStatus] = useState<TrendHarvestStatus | null>(null);
+  const [trendHarvesting, setTrendHarvesting] = useState(false);
+  const [trendHarvestError, setTrendHarvestError] = useState("");
+  const [trendMinVelocity, setTrendMinVelocity] = useState("20000");
+  const [trendMaxAge, setTrendMaxAge] = useState("30");
+  const [trends, setTrends] = useState<TrendRow[]>([]);
+  const [generatingTrends, setGeneratingTrends] = useState(false);
+  const [trendError, setTrendError] = useState("");
+  const [trendResult, setTrendResult] = useState<GenerateTrendsResult | null>(null);
+  const [trendNiche, setTrendNiche] = useState("");
+
   // Manual upload state
   const [file, setFile] = useState<File | null>(null);
   const [niche, setNiche] = useState("Fitness & Gym");
@@ -176,6 +206,18 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadInsights = useCallback(async (pw: string, platform: string) => {
+    try { setInsights(await getInsights(pw, platform)); } catch { /* non-fatal */ }
+  }, []);
+
+  const loadTrends = useCallback(async (pw: string, platform: string) => {
+    try { setTrends(await getTrends(pw, platform)); } catch { /* non-fatal */ }
+  }, []);
+
+  const refreshTrendHarvestStatus = useCallback(async (pw: string) => {
+    try { setTrendHarvestStatus(await getTrendHarvestStatus(pw)); } catch { /* non-fatal */ }
+  }, []);
+
   useEffect(() => {
     const saved = localStorage.getItem("viraliq_admin_pw");
     if (saved) {
@@ -185,13 +227,20 @@ export default function AdminPage() {
       refreshFetchStatus(saved);
       refreshApiUsage(saved);
       refreshHarvestStatus(saved);
+      loadInsights(saved, "tiktok");
+      loadTrends(saved, "tiktok");
+      refreshTrendHarvestStatus(saved);
     }
-  }, [loadSeeds, refreshFetchStatus, refreshApiUsage, refreshHarvestStatus]);
+  }, [loadSeeds, refreshFetchStatus, refreshApiUsage, refreshHarvestStatus, loadInsights, loadTrends, refreshTrendHarvestStatus]);
 
-  // Reset view count when switching platforms
+  // Reset view count + refresh insights/trends when switching platforms
   useEffect(() => {
     setViewCount("");
-  }, [activePlatform]);
+    if (authed) {
+      loadInsights(password, activePlatform);
+      loadTrends(password, activePlatform);
+    }
+  }, [activePlatform]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -204,6 +253,9 @@ export default function AdminPage() {
       refreshFetchStatus(password);
       refreshApiUsage(password);
       refreshHarvestStatus(password);
+      loadInsights(password, activePlatform);
+      loadTrends(password, activePlatform);
+      refreshTrendHarvestStatus(password);
     } catch { setAuthError("Invalid password."); }
   }
 
@@ -294,6 +346,67 @@ export default function AdminPage() {
     } catch (err: unknown) {
       setHarvestError(err instanceof Error ? err.message : "Harvest failed");
       setHarvesting(false);
+    }
+  }
+
+  async function handleGenerateInsights() {
+    setGeneratingInsights(true);
+    setInsightError("");
+    setInsightResult(null);
+    try {
+      const result = await generateInsights(password, activePlatform, insightNiche || undefined);
+      setInsightResult(result);
+      await loadInsights(password, activePlatform);
+    } catch (err: unknown) {
+      setInsightError(err instanceof Error ? err.message : "Generation failed");
+    } finally {
+      setGeneratingInsights(false);
+    }
+  }
+
+  async function handleTrendHarvest() {
+    setTrendHarvesting(true);
+    setTrendHarvestError("");
+    try {
+      await triggerTrendHarvest(password, {
+        max_age_days: parseInt(trendMaxAge) || 30,
+        min_velocity: parseInt(trendMinVelocity) || 20_000,
+        max_per_niche: 2,
+      });
+      const poll = async () => {
+        try {
+          const s = await getTrendHarvestStatus(password);
+          setTrendHarvestStatus(s);
+          if (s.status === "running") {
+            setTimeout(poll, 8000);
+          } else {
+            setTrendHarvesting(false);
+            loadSeeds(password);
+            loadTrends(password, activePlatform);
+          }
+        } catch {
+          setTrendHarvesting(false);
+        }
+      };
+      setTimeout(poll, 5000);
+    } catch (err: unknown) {
+      setTrendHarvestError(err instanceof Error ? err.message : "Trend harvest failed");
+      setTrendHarvesting(false);
+    }
+  }
+
+  async function handleGenerateTrends() {
+    setGeneratingTrends(true);
+    setTrendError("");
+    setTrendResult(null);
+    try {
+      const result = await generateTrends(password, activePlatform, trendNiche || undefined);
+      setTrendResult(result);
+      await loadTrends(password, activePlatform);
+    } catch (err: unknown) {
+      setTrendError(err instanceof Error ? err.message : "Generation failed");
+    } finally {
+      setGeneratingTrends(false);
     }
   }
 
@@ -636,7 +749,15 @@ export default function AdminPage() {
               }`}>
                 <p className="text-xs text-text-muted/60 uppercase tracking-widest mb-1">{p === "tiktok" ? "TikTok" : "Instagram"}</p>
                 {s.status === "running" ? (
-                  <p>Harvest in progress — checking every 8s…</p>
+                  <div className="space-y-0.5">
+                    <p>Harvest in progress — checking every 8s…</p>
+                    {(s.niches_processed ?? 0) > 0 && (
+                      <p className="text-xs opacity-70">
+                        {s.niches_processed} niches done · +{s.total_added ?? 0} seeds
+                        {(s.total_gemini_calls ?? 0) > 0 && ` · ${s.total_gemini_calls} Gemini calls`}
+                      </p>
+                    )}
+                  </div>
                 ) : s.status === "failed" ? (
                   <div className="space-y-1">
                     <p className="font-medium">Error — harvest failed</p>
@@ -650,9 +771,14 @@ export default function AdminPage() {
                       {s.niches_processed} niches · {s.total_skipped} skipped
                       {s.finished_at && ` · ${new Date(s.finished_at).toLocaleString()}`}
                     </p>
+                    {(s.total_gemini_calls ?? 0) > 0 && (
+                      <p className="text-text-muted text-xs">
+                        🤖 {s.total_gemini_calls} Gemini video upload{s.total_gemini_calls !== 1 ? "s" : ""} used this run
+                      </p>
+                    )}
                     {(s.total_errors ?? 0) > 0 && (
                       <p className="text-yellow-400 text-xs mt-1">
-                        ⚠ {s.total_errors} video{s.total_errors !== 1 ? "s" : ""} failed — check Render logs
+                        ⚠ {s.total_errors} video{s.total_errors !== 1 ? "s" : ""} failed — check Railway logs
                       </p>
                     )}
                     {(s.total_search_failures ?? 0) > 0 && (
@@ -662,7 +788,7 @@ export default function AdminPage() {
                     )}
                     {(s.failed_niches ?? 0) > 0 && (
                       <p className="text-yellow-400 text-xs mt-1">
-                        ⚠ {s.failed_niches} niche{s.failed_niches !== 1 ? "s" : ""} crashed — check Render logs
+                        ⚠ {s.failed_niches} niche{s.failed_niches !== 1 ? "s" : ""} crashed — check Railway logs
                       </p>
                     )}
                   </div>
@@ -670,6 +796,274 @@ export default function AdminPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* Niche Intelligence */}
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-text-primary font-semibold text-lg">Niche Intelligence</h2>
+              <p className="text-text-muted text-sm mt-1">
+                Synthesizes all rated seeds into a single pattern block per niche. Run after harvesting.
+                Thinking/Deep analyses use this instead of raw seed lists.
+              </p>
+            </div>
+            <span className="flex-shrink-0 text-[10px] font-semibold text-purple-to bg-purple-to/10 px-2 py-1 rounded-full whitespace-nowrap">
+              Step 2
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Niche (optional — blank = all)</label>
+              <select
+                value={insightNiche}
+                onChange={(e) => setInsightNiche(e.target.value)}
+                className="w-52 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
+              >
+                <option value="">All niches with ≥3 seeds</option>
+                {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
+              </select>
+            </div>
+            <button
+              onClick={handleGenerateInsights}
+              disabled={generatingInsights}
+              className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm"
+            >
+              {generatingInsights
+                ? "Synthesizing…"
+                : insightNiche
+                  ? `Generate for ${insightNiche}`
+                  : `Generate All (${activePlatform === "tiktok" ? "TikTok" : "Instagram"})`}
+            </button>
+          </div>
+
+          {insightError && <p className="text-danger text-sm">{insightError}</p>}
+
+          {insightResult && (
+            <div className="bg-surface border border-border rounded-xl px-4 py-3 text-sm space-y-1">
+              <p className="text-text-primary font-medium">
+                Generated {insightResult.generated} / {insightResult.total} niches
+              </p>
+              <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                {insightResult.results.map((r) => (
+                  <p key={r.niche} className={`text-xs ${
+                    r.status === "generated" ? "text-success" :
+                    r.status === "error" ? "text-danger" : "text-text-muted"
+                  }`}>
+                    {r.status === "generated" ? "✓" : r.status === "error" ? "✗" : "–"}{" "}
+                    {r.niche}
+                    {r.status === "generated" && r.seed_count != null && ` (${r.seed_count} seeds)`}
+                    {r.status === "skipped" && r.reason && ` — ${r.reason}`}
+                    {r.status === "error" && r.reason && `: ${r.reason}`}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.length > 0 && (
+            <div>
+              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">
+                Generated insights — {activePlatform === "tiktok" ? "TikTok" : "Instagram"} ({insights.length})
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {insights.map((ins) => (
+                  <div key={ins.niche} className="bg-surface border border-border rounded-xl px-4 py-3">
+                    <div className="flex justify-between items-center gap-2 mb-1">
+                      <span className="text-text-primary text-sm font-medium">{ins.niche}</span>
+                      <span className="text-text-muted text-xs flex-shrink-0">
+                        {ins.seed_count} seeds · {new Date(ins.generated_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-text-muted text-xs leading-relaxed line-clamp-2">{ins.insight_preview}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.length === 0 && !generatingInsights && (
+            <p className="text-text-muted text-sm text-center py-4">
+              No insights generated yet. Run after harvesting seeds.
+            </p>
+          )}
+        </div>
+
+        {/* Trend Feed Harvest */}
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-text-primary font-semibold text-lg">Trend Feed Harvest</h2>
+              <p className="text-text-muted text-sm mt-1">
+                Pulls TikTok videos published in the last <strong>N days</strong> that are already accumulating
+                views fast. Viral velocity (views/day) is the trend signal — a 500K view video in 7 days
+                is a very different signal than one from 6 months ago.
+              </p>
+            </div>
+            <span className="flex-shrink-0 text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full whitespace-nowrap">
+              📈 Trending
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Max video age (days)</label>
+              <input type="number" min="7" max="90" value={trendMaxAge}
+                onChange={(e) => setTrendMaxAge(e.target.value)}
+                className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Min velocity (views/day)</label>
+              <input type="number" min="1000" value={trendMinVelocity}
+                onChange={(e) => setTrendMinVelocity(e.target.value)}
+                className="w-40 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+            </div>
+            <button onClick={handleTrendHarvest} disabled={trendHarvesting}
+              className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
+              {trendHarvesting ? "Harvesting trends…" : "Run Trend Harvest (TikTok)"}
+            </button>
+          </div>
+
+          {trendHarvestError && <p className="text-danger text-sm">{trendHarvestError}</p>}
+
+          {trendHarvestStatus && trendHarvestStatus.status !== "never_run" && (
+            <div className={`rounded-xl px-4 py-3 text-sm border ${
+              trendHarvestStatus.status === "running" ? "bg-yellow-400/5 border-yellow-400/20 text-yellow-400"
+              : trendHarvestStatus.status === "failed" ? "bg-danger/5 border-danger/20 text-danger"
+              : "bg-success/5 border-success/20 text-text-primary"
+            }`}>
+              {trendHarvestStatus.status === "running" ? (
+                <div className="space-y-0.5">
+                  <p>Trend harvest in progress — checking every 8s…</p>
+                  {(trendHarvestStatus.niches_processed ?? 0) > 0 && (
+                    <p className="text-xs opacity-70">
+                      {trendHarvestStatus.niches_processed} niches done · +{trendHarvestStatus.total_added ?? 0} trending seeds
+                      {(trendHarvestStatus.total_gemini_calls ?? 0) > 0 && ` · ${trendHarvestStatus.total_gemini_calls} Gemini calls`}
+                    </p>
+                  )}
+                </div>
+              ) : trendHarvestStatus.status === "failed" ? (
+                <div>
+                  <p className="font-medium">Trend harvest failed</p>
+                  {trendHarvestStatus.error && <p className="text-xs opacity-80 font-mono mt-1">{trendHarvestStatus.error}</p>}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-medium text-success">Complete · +{trendHarvestStatus.total_added} trending seeds added</p>
+                  <p className="text-text-muted text-xs">
+                    {trendHarvestStatus.niches_processed} niches · {trendHarvestStatus.total_skipped} skipped
+                    {trendHarvestStatus.finished_at && ` · ${new Date(trendHarvestStatus.finished_at).toLocaleString()}`}
+                  </p>
+                  {(trendHarvestStatus.total_gemini_calls ?? 0) > 0 && (
+                    <p className="text-text-muted text-xs">
+                      🤖 {trendHarvestStatus.total_gemini_calls} Gemini video uploads used this run
+                    </p>
+                  )}
+                  {(trendHarvestStatus.total_errors ?? 0) > 0 && (
+                    <p className="text-yellow-400 text-xs">⚠ {trendHarvestStatus.total_errors} failed — check Railway logs</p>
+                  )}
+                  {(trendHarvestStatus.total_search_failures ?? 0) > 0 && (
+                    <p className="text-yellow-400 text-xs">
+                      ⚠ {trendHarvestStatus.total_search_failures} search{trendHarvestStatus.total_search_failures !== 1 ? "es" : ""} failed (likely API rate limit) — fewer trend seeds than expected
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Trend Intelligence */}
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-text-primary font-semibold text-lg">Trend Intelligence</h2>
+              <p className="text-text-muted text-sm mt-1">
+                Synthesizes what has <strong>changed</strong> in the last 30 days — compares recent seeds
+                vs established ones to detect rising formats, fading patterns, and velocity signals.
+                Injected into Thinking/Deep analyses alongside niche intelligence. Expires after 7 days.
+              </p>
+            </div>
+            <span className="flex-shrink-0 text-[10px] font-semibold text-purple-to bg-purple-to/10 px-2 py-1 rounded-full whitespace-nowrap">
+              Step 3
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Niche (optional — blank = all)</label>
+              <select value={trendNiche} onChange={(e) => setTrendNiche(e.target.value)}
+                className="w-52 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to">
+                <option value="">All niches with recent seeds</option>
+                {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
+              </select>
+            </div>
+            <button onClick={handleGenerateTrends} disabled={generatingTrends}
+              className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
+              {generatingTrends
+                ? "Analyzing trends…"
+                : trendNiche
+                  ? `Generate for ${trendNiche}`
+                  : `Generate All (${activePlatform === "tiktok" ? "TikTok" : "Instagram"})`}
+            </button>
+          </div>
+
+          {trendError && <p className="text-danger text-sm">{trendError}</p>}
+
+          {trendResult && (
+            <div className="bg-surface border border-border rounded-xl px-4 py-3 text-sm space-y-1">
+              <p className="text-text-primary font-medium">
+                Generated {trendResult.generated} / {trendResult.total} niches
+              </p>
+              <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                {trendResult.results.map((r) => (
+                  <p key={r.niche} className={`text-xs ${
+                    r.status === "generated" ? "text-success" :
+                    r.status === "error" ? "text-danger" : "text-text-muted"
+                  }`}>
+                    {r.status === "generated" ? "✓" : r.status === "error" ? "✗" : "–"}{" "}
+                    {r.niche}
+                    {r.status === "generated" && r.recent_count != null && ` (${r.recent_count} recent seeds)`}
+                    {r.status === "skipped" && r.reason && ` — ${r.reason}`}
+                    {r.status === "error" && r.reason && `: ${r.reason}`}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {trends.length > 0 && (
+            <div>
+              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">
+                Active trend summaries — {activePlatform === "tiktok" ? "TikTok" : "Instagram"} ({trends.length})
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {trends.map((t) => {
+                  const age = Math.floor((Date.now() - new Date(t.generated_at).getTime()) / 86400000);
+                  const stale = age >= 7;
+                  return (
+                    <div key={t.niche} className={`bg-surface border rounded-xl px-4 py-3 ${stale ? "border-yellow-400/30" : "border-border"}`}>
+                      <div className="flex justify-between items-center gap-2 mb-1">
+                        <span className="text-text-primary text-sm font-medium">{t.niche}</span>
+                        <span className={`text-xs flex-shrink-0 ${stale ? "text-yellow-400" : "text-text-muted"}`}>
+                          {t.recent_seed_count} recent · {t.established_seed_count} established
+                          {" · "}{stale ? `⚠ ${age}d old` : `${age}d old`}
+                        </span>
+                      </div>
+                      <p className="text-text-muted text-xs leading-relaxed line-clamp-2">{t.trend_preview}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {trends.length === 0 && !generatingTrends && (
+            <p className="text-text-muted text-sm text-center py-4">
+              No trend summaries yet. Run Trend Harvest first, then generate here.
+            </p>
+          )}
         </div>
 
         {/* Seed table */}
@@ -731,6 +1125,14 @@ export default function AdminPage() {
                                   className="text-[10px] font-semibold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full"
                                 >
                                   🤖 auto
+                                </span>
+                              )}
+                              {seed.source === "trending" && (
+                                <span
+                                  title="Harvested from trend feed — velocity-filtered recent video"
+                                  className="text-[10px] font-semibold text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded-full"
+                                >
+                                  📈 trend
                                 </span>
                               )}
                             </div>

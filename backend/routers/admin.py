@@ -12,12 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, func
 
 from database import get_db
-from models import SeedVideo, FetchStatus
+from models import SeedVideo, FetchStatus, NicheInsight, TrendSummary
 from schemas import SeedVideoOut
 from services.seed_analysis import analyze_seed_video
+from services.seed_insights import generate_niche_insight
 from services.tiktok_fetch import fetch_tiktok
 from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
 from services.instagram_harvest import harvest_instagram_all, get_last_instagram_harvest
+from services.trend_harvest import harvest_trending, get_last_trend_harvest
+from services.trend_insights import generate_trend_insight
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -366,6 +369,229 @@ async def get_harvest_status(
     tiktok = get_last_harvest() or {"status": "never_run"}
     instagram = get_last_instagram_harvest() or {"status": "never_run"}
     return {"tiktok": tiktok, "instagram": instagram}
+
+
+@router.post("/insights/generate")
+async def generate_insights(
+    platform: str = Form("tiktok"),
+    niche: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Generate (or regenerate) niche intelligence summaries from the seed library.
+    If niche is provided, regenerate only that niche. Otherwise regenerate all niches
+    that have enough rated seeds (>= 3). Returns a summary of what was generated.
+    """
+    seeds_result = await db.execute(
+        select(SeedVideo).where(SeedVideo.platform == platform)
+    )
+    all_seeds = seeds_result.scalars().all()
+
+    # Group by niche, filter to only niches with rated seeds
+    from collections import defaultdict
+    by_niche: dict[str, list] = defaultdict(list)
+    for s in all_seeds:
+        if s.rating is not None:
+            by_niche[s.niche].append(s)
+
+    target_niches = [niche] if niche else list(by_niche.keys())
+    results = []
+
+    for n in target_niches:
+        seeds = by_niche.get(n, [])
+        if len(seeds) < 3:
+            results.append({"niche": n, "status": "skipped", "reason": f"only {len(seeds)} rated seeds"})
+            continue
+        try:
+            insight_text = await generate_niche_insight(seeds, platform, n)
+        except Exception as e:
+            results.append({"niche": n, "status": "error", "reason": str(e)})
+            continue
+
+        # Upsert — update if exists, insert if not
+        existing_result = await db.execute(
+            select(NicheInsight).where(
+                NicheInsight.platform == platform,
+                NicheInsight.niche == n,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            existing.insight = insight_text
+            existing.seed_count = len(seeds)
+            existing.generated_at = datetime.utcnow()
+        else:
+            db.add(NicheInsight(
+                platform=platform,
+                niche=n,
+                insight=insight_text,
+                seed_count=len(seeds),
+            ))
+        await db.commit()
+        results.append({"niche": n, "status": "generated", "seed_count": len(seeds)})
+
+    generated = sum(1 for r in results if r["status"] == "generated")
+    return {"platform": platform, "generated": generated, "total": len(target_niches), "results": results}
+
+
+@router.get("/insights")
+async def get_insights(
+    platform: str = "tiktok",
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """List all generated niche insights for a platform."""
+    result = await db.execute(
+        select(NicheInsight)
+        .where(NicheInsight.platform == platform)
+        .order_by(NicheInsight.niche)
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "niche": r.niche,
+            "seed_count": r.seed_count,
+            "generated_at": r.generated_at,
+            "insight_preview": r.insight[:200] + "..." if len(r.insight) > 200 else r.insight,
+        }
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Trend Feed harvest (recently viral videos — velocity-filtered)
+# ---------------------------------------------------------------------------
+
+class TrendHarvestRequest(BaseModel):
+    niches: Optional[list[str]] = None
+    max_age_days: int = 30
+    min_velocity: float = 20_000   # views/day
+    max_per_niche: int = 2
+
+
+@router.post("/trends/harvest")
+async def trigger_trend_harvest(
+    background_tasks: BackgroundTasks,
+    req: TrendHarvestRequest = TrendHarvestRequest(),
+    _: None = Depends(check_admin),
+):
+    """Trigger a trending video harvest. Pulls recent viral TikTok videos
+    (published in last max_age_days) filtered by viral velocity (views/day).
+    Run after regular harvest to populate the trend signal layer."""
+    target = req.niches or list(NICHE_KEYWORDS.keys())
+    background_tasks.add_task(
+        harvest_trending, target, req.max_age_days, req.min_velocity, req.max_per_niche
+    )
+    return {
+        "status": "trend harvest started",
+        "niches": len(target),
+        "max_age_days": req.max_age_days,
+        "min_velocity": req.min_velocity,
+    }
+
+
+@router.get("/trends/harvest/status")
+async def get_trend_harvest_status(_: None = Depends(check_admin)):
+    return get_last_trend_harvest() or {"status": "never_run"}
+
+
+# ---------------------------------------------------------------------------
+# Trend Intelligence — delta synthesis from recent vs established seeds
+# ---------------------------------------------------------------------------
+
+@router.post("/trends/generate")
+async def generate_trends(
+    platform: str = Form("tiktok"),
+    niche: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Generate (or regenerate) trend delta summaries for niches that have
+    enough recent seeds (< 30 days old). If niche is provided, only that niche.
+    """
+    seeds_result = await db.execute(
+        select(SeedVideo).where(SeedVideo.platform == platform)
+    )
+    all_seeds = seeds_result.scalars().all()
+
+    from collections import defaultdict
+    by_niche: dict[str, list] = defaultdict(list)
+    for s in all_seeds:
+        if s.rating is not None:
+            by_niche[s.niche].append(s)
+
+    target_niches = [niche] if niche else list(by_niche.keys())
+    results = []
+
+    for n in target_niches:
+        seeds = by_niche.get(n, [])
+        try:
+            trend_text = await generate_trend_insight(seeds, platform, n)
+        except ValueError as e:
+            results.append({"niche": n, "status": "skipped", "reason": str(e)})
+            continue
+        except Exception as e:
+            results.append({"niche": n, "status": "error", "reason": str(e)})
+            continue
+
+        from datetime import timezone, timedelta
+        from services.trend_insights import RECENT_WINDOW_DAYS, ESTABLISHED_MIN_DAYS, _ref_date
+        now_utc = datetime.now(timezone.utc)
+        recent_cutoff = now_utc - timedelta(days=RECENT_WINDOW_DAYS)
+        established_cutoff = now_utc - timedelta(days=ESTABLISHED_MIN_DAYS)
+        recent_count = sum(1 for s in seeds if _ref_date(s) and _ref_date(s) >= recent_cutoff)
+        established_count = sum(1 for s in seeds if _ref_date(s) and _ref_date(s) < established_cutoff)
+
+        existing_result = await db.execute(
+            select(TrendSummary).where(
+                TrendSummary.platform == platform,
+                TrendSummary.niche == n,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            existing.trend_text = trend_text
+            existing.recent_seed_count = recent_count
+            existing.established_seed_count = established_count
+            existing.generated_at = datetime.utcnow()
+        else:
+            db.add(TrendSummary(
+                platform=platform,
+                niche=n,
+                trend_text=trend_text,
+                recent_seed_count=recent_count,
+                established_seed_count=established_count,
+            ))
+        await db.commit()
+        results.append({"niche": n, "status": "generated", "recent_count": recent_count})
+
+    generated = sum(1 for r in results if r["status"] == "generated")
+    return {"platform": platform, "generated": generated, "total": len(target_niches), "results": results}
+
+
+@router.get("/trends")
+async def get_trends(
+    platform: str = "tiktok",
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """List all generated trend summaries for a platform."""
+    result = await db.execute(
+        select(TrendSummary)
+        .where(TrendSummary.platform == platform)
+        .order_by(TrendSummary.niche)
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "niche": r.niche,
+            "recent_seed_count": r.recent_seed_count,
+            "established_seed_count": r.established_seed_count,
+            "generated_at": r.generated_at,
+            "trend_preview": r.trend_text[:200] + "..." if len(r.trend_text) > 200 else r.trend_text,
+        }
+        for r in rows
+    ]
 
 
 @router.get("/api-usage")

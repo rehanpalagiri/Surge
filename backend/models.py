@@ -5,6 +5,33 @@ from datetime import datetime
 Base = declarative_base()
 
 
+class TrendSummary(Base):
+    __tablename__ = "trend_summaries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    platform = Column(String, nullable=False)
+    niche = Column(String, nullable=False)
+    trend_text = Column(Text, nullable=False)
+    recent_seed_count = Column(Integer, nullable=False)
+    established_seed_count = Column(Integer, nullable=False)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_trend"),)
+
+
+class NicheInsight(Base):
+    __tablename__ = "niche_insights"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    platform = Column(String, nullable=False)   # "tiktok" | "instagram"
+    niche = Column(String, nullable=False)       # canonical niche
+    insight = Column(Text, nullable=False)       # synthesized pattern block
+    seed_count = Column(Integer, nullable=False) # how many seeds were analyzed
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_insight"),)
+
+
 class User(Base):
     __tablename__ = "users"
 

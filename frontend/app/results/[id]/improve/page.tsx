@@ -97,8 +97,7 @@ export default function ImprovePage() {
     ? [...s.improvement_plan].sort((a, b) => a.priority - b.priority)
     : [];
   const hasPlan = plan.length > 0;
-  const isInstagram = (analysis.platform ?? "tiktok") === "instagram";
-  const hasProjection = !!(s.projected_verdict || (isInstagram ? s.projected_likes : s.projected_views));
+  const hasProjection = !!s.projected_verdict;
 
   return (
     <main className="min-h-screen bg-background">
@@ -127,19 +126,9 @@ export default function ImprovePage() {
               <p className="text-text-muted text-sm uppercase tracking-widest font-semibold mb-1">
                 Apply this plan →
               </p>
-              <p className="text-xl font-bold text-text-primary">
-                {s.projected_verdict && (
-                  <span className="gradient-text">{s.projected_verdict}</span>
-                )}
-                {!isInstagram && s.projected_verdict && s.projected_views && " · "}
-                {!isInstagram && s.projected_views}
+              <p className="text-xl font-bold">
+                <span className="gradient-text">{s.projected_verdict}</span>
               </p>
-              {s.projected_likes && s.projected_likes !== "Unknown" && (
-                <p className="text-text-muted text-sm mt-1">
-                  {isInstagram ? "Projected likes: " : "Projected likes: "}
-                  <span className="text-text-primary font-semibold">{s.projected_likes}</span>
-                </p>
-              )}
             </div>
           </div>
         )}

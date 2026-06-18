@@ -4,7 +4,8 @@ When an admin uploads a reference ("seed") video, we send it to Gemini ONCE to
 produce a causal, AI-consumption-only performance writeup. That JSON is stored on
 the seed row (`gemini_analysis`) and the extracted `virality_rating` becomes the
 seed's `rating`. The video file itself is deleted afterwards — the JSON is the
-durable artifact, read back into the live scoring prompt for Thinking/Deep modes.
+durable artifact, read back into the niche intelligence synthesis and live scoring
+prompt for Thinking/Deep modes.
 
 This module deliberately reuses the Gemini client, `_PLATFORM_CONTEXT`, and the
 upload→poll-ACTIVE→generate→delete pattern from `services.gemini` so there is one
@@ -26,76 +27,118 @@ def _build_seed_prompt(
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
 
-    # Instagram hides view counts — anchor on likes only when view_count is None.
     if view_count is not None:
-        perf_line = f"It received {view_count:,} views and {like_count:,} likes."
+        perf_line = f"Performance: {view_count:,} views · {like_count:,} likes"
         rating_anchor = (
-            "virality_rating: anchor directly to the view/like count as evidence. "
-            "2M views = proof of 8–9. 800 views = proof of 1–3. Score what the data confirms."
+            "2M+ views=8-9 | 800K-2M=6-7 | 100K-800K=4-5 | <100K=2-3 | <10K=0-1. "
+            "Score the outcome, not production quality. Views are ground truth."
         )
-        perf_reason_ref = f"exactly why this got {view_count:,} views and {like_count:,} likes"
+        perf_ref = f"{view_count:,}v / {like_count:,}l"
     else:
-        perf_line = (
-            f"It received {like_count:,} likes "
-            f"(view count not available — {pname} does not expose it publicly)."
-        )
+        perf_line = f"Performance: {like_count:,} likes (views hidden — {pname} does not expose them)"
         rating_anchor = (
-            "virality_rating: anchor to the like count as evidence since views are unavailable. "
-            "18M likes = proof of 8–9. 500 likes = proof of 1–3. Score what the data confirms."
+            "100K+ likes=8-9 | 20K-100K=6-7 | 2K-20K=4-5 | <2K=2-3 | <200=0-1. "
+            "Likes are ground truth since views are unavailable."
         )
-        perf_reason_ref = f"exactly why this got {like_count:,} likes"
+        perf_ref = f"{like_count:,} likes"
 
-    return f"""You are building a performance reference library for a video scoring AI.
-This analysis is NOT user-facing — it will be read by another AI instance when
-scoring new creator videos. Write everything with that reader in mind: specific,
-causal, pattern-focused. Never use vague descriptors.
+    return f"""ROLE: You are writing a machine-readable performance record for a video scoring AI.
+Your reader is another AI. Optimize for information density — every token must carry signal.
+No prose filler. No hedging. No "it's worth noting that". State mechanisms directly.
 
-This is a {pname} video in the {niche} niche.
+SUBJECT: {pname} video | Niche: {niche}
 {perf_line}
-
-PLATFORM CONTEXT ({pname}):
-Distribution surface: {ctx["algorithm"]}
-Key engagement signals: {ctx["signals"]}
+Platform distribution: {ctx["algorithm"]}
+Key signals: {ctx["signals"]}
 {ctx["platform_tips"]}
 
-Your job: explain exactly WHY it performed this way. What specific elements caused
-these results? What should a future AI look for — or warn against — when it sees
-similar patterns in a new video?
+--- DIMENSION SCORING (0-10) ---
+Use these exact shorthand codes in your output.
 
-SCORING RULES (0–10):
-- {rating_anchor}
-- hook_strength: did the first 1–3 seconds eliminate the viewer's reason to scroll?
-- pacing_score: do cuts and energy sustain watch time to the end?
-- audio_score: does the sound serve the content or fight it?
-- visual_score: framing, lighting, on-screen text, production quality.
-- trend_alignment: is this riding a current format, sound, or topic trend on {pname}?
+HV (hook_velocity): How fast is the viewer's scroll-reason eliminated?
+  10 = premise + open question established within 2s, zero warm-up, viewer MUST stay to resolve
+  7  = clear value signal by s3-4, mild pull to continue
+  4  = premise eventually clear but no urgency, viewer could scroll with no loss
+  0  = opens with creator intro / logo / context-setting / "hey guys" — no hook at all
 
-SEED SUMMARY RULES — most important field, target 150 words:
-- Written entirely for AI consumption — never for a human reader.
-- Lead with the single most causally important factor driving performance.
-- Be precise: not "good hook" but "creator displays the end result in frame 1
-  before any explanation, removing the viewer's reason to scroll".
-- Explain causality: not just what happened but why it produced this specific
-  outcome given {pname}'s algorithm.
-- Close with 1–2 sentences telling a future AI exactly what to look for or flag
-  when it sees similar patterns in a new video.
-- Do NOT write a "high/low performer" label — that is applied separately.
+CF (cut_frequency): Does edit pacing sustain watch-time without losing clarity?
+  10 = every cut earns its place, rhythm matches content energy, no dead air anywhere
+  7  = active pacing with occasional dead holds that don't hurt
+  4  = some cuts but irregular or energy-less, multiple unnecessary holds
+  0  = single static shot, >10s holds, zero visual rhythm
 
-Return ONLY valid JSON with exactly this structure:
+TS (text_scannability): Does on-screen text deliver value with sound muted?
+  10 = muted viewer loses nothing — kinetic text, key moments highlighted, strategic placement
+  7  = helpful text overlays covering most important moments
+  4  = text present but only captions audio (no added signal)
+  0  = no text, or text that actively clutters without informing
+
+CG (curiosity_gap): Does the opening force a specific unresolved question?
+  10 = viewer has a named question by s5 that CANNOT be answered without watching through
+  7  = clear interest hook, probable completion, mild open loop
+  4  = some interest but no specific question, easy to scroll without loss
+  0  = no tension, starts with context or a resolved statement, no loop created
+
+AVS (audio_visual_sync): Does audio amplify and sync with visual information?
+  10 = beat drops on cuts, spoken emphasis lands with visual emphasis, sound cues info delivery
+  7  = good audio choice, roughly synced, adds energy even if not frame-perfect
+  4  = audio is acceptable but generic, ignores the visual rhythm
+  0  = audio fights content energy, or voice-over mismatches cuts entirely
+
+LS (loop_seamlessness): Does the ending create rewatch impulse or convert to share/save?
+  10 = ending loops back to beginning (implicit rewatch) OR delivers CTA that converts
+  7  = satisfying close with weak loop or soft CTA
+  4  = clean ending but nothing pulls viewer back or forward
+  0  = hard cut / fade-out that signals "done" — maximum scroll-away signal
+
+--- VIRALITY RATING ---
+virality_rating is anchored to real performance data, NOT video quality:
+{rating_anchor}
+Dimension scores must cohere with virality_rating. A 9/10 video cannot have all 2/10 dimensions.
+If one dimension clearly drove/killed distribution, let the score spread show it.
+
+--- OUTPUT FIELD RULES ---
+
+what_happens: Pure timestamped description, zero evaluation. 2 sentences max.
+  Format: "s0: [what viewer sees/hears]. s[N]-[M]: [events]. Ends: [final frame/action]."
+  BAD: "creator effectively demonstrates..." GOOD: "s0: creator holds phone showing 847K views, no audio."
+
+performance_reason: 3 sentences. Top 2 dimensions that drove the outcome. Use HV/CF/TS/CG/AVS/LS codes.
+  Each sentence = one causal chain: [element at sN] → [mechanism] → [algorithmic effect on {perf_ref}].
+
+patterns — 6 items each, one per dimension in order [HV, CF, TS, CG, AVS, LS]. Under 15 words per item.
+  replicate: "HV: [specific replicable structure]"
+  avoid:     "HV: [specific failure pattern + scroll-away signal]"
+
+seed_summary: Dense structured shorthand. No prose. Each line = code + score + mechanism.
+  Required format:
+  HV:[score] [exact opening format at s0-s2 and whether it eliminates scroll-reason]
+  CF:[score] [edit pattern — avg cut interval if notable, energy match or mismatch]
+  TS:[score] [text strategy — what shown, when, muted-watchable yes/no]
+  CG:[score] [open loop type — question formed, claim made, or gap created]
+  AVS:[score] [audio type — trending/original/voiceover, sync quality]
+  LS:[score] [ending type — loop/CTA/hard-cut/fade; rewatch signal strength]
+  DRIVER: [single element most responsible for {perf_ref} — one causal sentence]
+  WEAK: [single biggest drag on score — what a future creator must fix]
+  RULE: [name the specific {pname} algorithm signal (watch-time/completion/rewatch/shares) this pattern drives or kills, and the scoring implication — e.g. "CG≥8 in Fitness forces completion → watch-time signal crosses FYP push threshold; score ≥7 when present"]
+
+--- JSON SCHEMA ---
+Return ONLY valid JSON. No markdown. No explanation outside the JSON.
 {{
   "virality_rating": <0-10>,
-  "hook_strength": <0-10>,
-  "pacing_score": <0-10>,
-  "audio_score": <0-10>,
-  "visual_score": <0-10>,
-  "trend_alignment": <0-10>,
-  "what_happens": "<2-3 sentences: literal events start to finish, no evaluation>",
-  "performance_reason": "<3-4 sentences: causal explanation for {perf_reason_ref}. Name the elements that drove or killed distribution.>",
+  "hook_velocity": <0-10>,
+  "cut_frequency": <0-10>,
+  "text_scannability": <0-10>,
+  "curiosity_gap": <0-10>,
+  "audio_visual_sync": <0-10>,
+  "loop_seamlessness": <0-10>,
+  "what_happens": "<2 timestamped sentences, pure description, zero evaluation>",
+  "performance_reason": "<3 sentences, HV/CF/TS/CG/AVS/LS codes, causal chains with timestamps>",
   "patterns": {{
-    "replicate": ["<pattern worth copying, as an instruction>", "<pattern 2>"],
-    "avoid": ["<pattern to warn against, as a flag>", "<pattern 2>"]
+    "replicate": ["HV: <15 words>", "CF: <15 words>", "TS: <15 words>", "CG: <15 words>", "AVS: <15 words>", "LS: <15 words>"],
+    "avoid":     ["HV: <15 words>", "CF: <15 words>", "TS: <15 words>", "CG: <15 words>", "AVS: <15 words>", "LS: <15 words>"]
   }},
-  "seed_summary": "<150 words, AI-consumption only, causal and self-contained.>"
+  "seed_summary": "<HV/CF/TS/CG/AVS/LS lines + DRIVER + WEAK + RULE — structured shorthand, no prose>"
 }}"""
 
 

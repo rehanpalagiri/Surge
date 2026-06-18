@@ -36,6 +36,7 @@ DEFAULT_MAX_PER_NICHE = 3
 _IG_KEYWORDS_PER_NICHE = 2   # 50 niches × 2 = 100 calls = fits free tier exactly
 _IG_RESULTS_PER_CALL = 50    # max candidates per hashtag search
 _IG_CONCURRENCY = 3          # niches processed in parallel
+_CIRCUIT_BREAKER_THRESHOLD = 3  # stop niche after this many consecutive Gemini failures
 
 _last_instagram_harvest: dict = {}
 
@@ -90,10 +91,17 @@ async def harvest_instagram_niche(
 ) -> dict:
     # Use only the first N keywords to stay within HikerAPI free-tier budget.
     keywords = NICHE_KEYWORDS.get(niche, [niche])[:_IG_KEYWORDS_PER_NICHE]
-    added = skipped = errors = search_failures = 0
+    added = skipped = errors = search_failures = gemini_calls = 0
+    consecutive_errors = 0  # circuit breaker counter — resets on any success
 
     for keyword in keywords:
         if added >= max_videos:
+            break
+        if consecutive_errors >= _CIRCUIT_BREAKER_THRESHOLD:
+            logger.warning(
+                "Circuit breaker: stopping niche=%s after %d consecutive Gemini errors",
+                niche, consecutive_errors,
+            )
             break
         hashtag = _hashtag(keyword)
         try:
@@ -106,6 +114,14 @@ async def harvest_instagram_niche(
 
         for media in medias:
             if added >= max_videos:
+                break
+
+            # Circuit breaker: stop this niche if Gemini is consistently failing.
+            if consecutive_errors >= _CIRCUIT_BREAKER_THRESHOLD:
+                logger.warning(
+                    "Circuit breaker: stopping niche=%s after %d consecutive Gemini errors",
+                    niche, consecutive_errors,
+                )
                 break
 
             # Only process Reels (media_type=2, product_type="clips")
@@ -131,13 +147,16 @@ async def harvest_instagram_niche(
             os.close(fd)  # _download reopens by path; we don't need the fd
             try:
                 await _download(video_url, tmp)
+                gemini_calls += 1
                 result = await analyze_seed_video(tmp, "instagram", niche, None, like_count)
 
                 if "error" in result or "virality_rating" not in result:
                     logger.warning("Analysis failed ig:%s — %s", media_pk, result.get("error"))
                     errors += 1
+                    consecutive_errors += 1
                     continue
 
+                consecutive_errors = 0  # success — reset the circuit breaker
                 rating = max(0, min(10, int(round(float(result["virality_rating"])))))
                 caption = str(media.get("caption_text") or "").strip()[:300]
                 note_parts = [f"Auto-harvested Instagram · hashtag: #{hashtag} · ig:{media_pk}"]
@@ -168,6 +187,7 @@ async def harvest_instagram_niche(
             except Exception as e:
                 logger.error("Instagram harvest error niche=%s ig=%s: %s", niche, media_pk, e)
                 errors += 1
+                consecutive_errors += 1
             finally:
                 if os.path.exists(tmp):
                     os.remove(tmp)
@@ -178,6 +198,7 @@ async def harvest_instagram_niche(
         "skipped": skipped,
         "errors": errors,
         "search_failures": search_failures,
+        "gemini_calls": gemini_calls,
     }
 
 
@@ -199,10 +220,29 @@ async def harvest_instagram_all(
     )
     try:
         sem = asyncio.Semaphore(_IG_CONCURRENCY)
+        # Live running totals — updated after each niche so polling shows progress.
+        _running: dict = {"added": 0, "skipped": 0, "errors": 0, "gemini_calls": 0,
+                          "search_failures": 0, "niches_done": 0, "failed_niches": 0}
 
         async def _run(niche: str) -> dict:
             async with sem:
-                return await harvest_instagram_niche(niche, min_likes, max_per_niche)
+                result = await harvest_instagram_niche(niche, min_likes, max_per_niche)
+            # Update live totals immediately after each niche finishes.
+            _running["added"] += result["added"]
+            _running["skipped"] += result["skipped"]
+            _running["errors"] += result["errors"]
+            _running["gemini_calls"] += result.get("gemini_calls", 0)
+            _running["search_failures"] += result.get("search_failures", 0)
+            _running["niches_done"] += 1
+            _last_instagram_harvest.update({
+                "niches_processed": _running["niches_done"],
+                "total_added": _running["added"],
+                "total_skipped": _running["skipped"],
+                "total_errors": _running["errors"],
+                "total_gemini_calls": _running["gemini_calls"],
+                "total_search_failures": _running["search_failures"],
+            })
+            return result
 
         # return_exceptions=True: one niche crashing must not discard every other
         # niche's completed work (this is a budgeted, paid API run).
@@ -214,10 +254,11 @@ async def harvest_instagram_all(
                 failed_niches += 1
                 logger.error("Instagram niche task crashed: %s", r)
 
-        total_added = sum(r["added"] for r in results)
-        total_skipped = sum(r["skipped"] for r in results)
-        total_errors = sum(r["errors"] for r in results)
-        total_search_failures = sum(r.get("search_failures", 0) for r in results)
+        total_added = _running["added"]
+        total_skipped = _running["skipped"]
+        total_errors = _running["errors"]
+        total_gemini_calls = _running["gemini_calls"]
+        total_search_failures = _running["search_failures"]
 
         _last_instagram_harvest = {
             "status": "done",
@@ -227,13 +268,14 @@ async def harvest_instagram_all(
             "total_added": total_added,
             "total_skipped": total_skipped,
             "total_errors": total_errors,
+            "total_gemini_calls": total_gemini_calls,
             "total_search_failures": total_search_failures,
             "failed_niches": failed_niches,
             "detail": results,
         }
         logger.info(
-            "Instagram harvest done: added=%d skipped=%d errors=%d search_failures=%d failed_niches=%d",
-            total_added, total_skipped, total_errors, total_search_failures, failed_niches,
+            "Instagram harvest done: added=%d skipped=%d errors=%d gemini_calls=%d search_failures=%d failed_niches=%d",
+            total_added, total_skipped, total_errors, total_gemini_calls, total_search_failures, failed_niches,
         )
     except Exception as e:
         logger.error("Instagram harvest failed: %s", e)

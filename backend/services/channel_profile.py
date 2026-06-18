@@ -22,11 +22,12 @@ from statistics import median
 
 # Dimensions present in every user-analysis scores_json (NOT the seed dims).
 _DIMENSIONS = [
-    ("hook_strength", "hook"),
-    ("pacing_score", "pacing"),
-    ("audio_score", "audio"),
-    ("caption_score", "caption"),
-    ("trend_alignment", "trend alignment"),
+    ("hook_velocity", "hook velocity"),
+    ("cut_frequency", "cut frequency"),
+    ("text_scannability", "text scannability"),
+    ("curiosity_gap", "curiosity gap"),
+    ("audio_visual_sync", "audio-visual sync"),
+    ("loop_seamlessness", "loop seamlessness"),
 ]
 
 MIN_ANALYSES = 2          # below this → no profile at all (Deep → Thinking)

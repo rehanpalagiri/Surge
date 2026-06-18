@@ -13,52 +13,54 @@ const SAMPLE = {
   predicted_views: "180K–350K",
   predicted_likes: "12K–28K",
   overall_score: 8,
-  hook_strength: 9,
-  pacing_score: 7,
-  audio_score: 8,
-  caption_score: 6,
-  trend_alignment: 8,
+  hook_velocity: 9,
+  cut_frequency: 7,
+  text_scannability: 6,
+  curiosity_gap: 8,
+  audio_visual_sync: 8,
+  loop_seamlessness: 4,
   strengths: [
-    "Hook is exceptional — the first 0.8 seconds create instant pattern interruption with an unexpected transformation cut that stops the scroll reflex.",
-    "Audio layering is professional: trending sound selected at near-peak velocity, background music supports speech without competing with it.",
-    "Trend alignment is strong — transformation-reveal formats in fitness are seeing 20–35% above-average save rates this week.",
+    "Hook velocity is exceptional — transformation cut lands on frame 1 with bold text overlay, eliminating the viewer's reason to scroll before they consciously decide to.",
+    "Curiosity gap is strong: opening line 'Most people train wrong for years and never know it' creates an immediate open loop that demands resolution.",
+    "Audio-visual sync is tight throughout — every major cut lands on a beat drop or audio transient, making the pacing feel intentional and professional.",
   ],
   improvements: [
-    "Caption is generic: 'gym motivation 💪 #fitness' won't surface in Explore. Rewrite to 'Why 99% of people never see results (it's not what you think)' to trigger curiosity clicks.",
-    "Pacing sags at 0:12–0:18 — tighten this section to 3 seconds max to keep the momentum from the hook alive.",
-    "No closing CTA — add 'Save this for your next training block' at the end to push save rate up by an estimated 15–25%.",
+    "Loop seamlessness fails at the end — the sign-off 'hope this helped, follow for more' explicitly tells the viewer the video is over and triggers the scroll reflex. The rewatch multiplier is being thrown away.",
+    "Text scannability drops at 0:08–0:14 — caption overlay appears in the bottom 20% of frame and will be covered by TikTok's description UI on most devices.",
+    "Cut frequency sags at 0:12–0:18 — a 4.2-second static talking-head shot after the hook loses the attention the opening earned.",
   ],
   analysis_summary:
-    "This video has the raw ingredients to break through — a powerful hook, great audio instincts, and solid trend awareness. The biggest opportunity is the caption and the mid-video pacing drag. Fix those two and this is a realistic Explore-tab candidate. The transformation format is working; lean into it harder in the CTA.",
+    "Strong hook and curiosity gap give this video a real shot at FYP distribution — the first 3 seconds do their job. The loop ending is the single biggest missed opportunity: replacing the sign-off with a callback to the opening hook could push rewatches up significantly, which is the metric TikTok weighs most. Fix the caption position and mid-video pacing drag and this is a legitimate Explore candidate.",
   improvement_plan: [
     {
       priority: "High",
-      action: "Rewrite the caption",
+      action: "Fix the loop ending",
       detail:
-        "Replace 'gym motivation 💪 #fitness' with a curiosity-gap hook: 'Why 99% of gym-goers never actually change their body (it's not effort)'. Add 3–5 niche-specific hashtags (#calisthenics, #naturalbodybuilding) rather than broad ones.",
+        "Delete 'hope this helped, follow for more.' Replace the final line with an open-ended callback to the hook: 'So the next time you think you're training hard enough...' — this pulls viewers back to the start and triggers the rewatch signal the algorithm responds to most.",
     },
     {
       priority: "High",
-      action: "Trim the 0:12–0:18 section",
+      action: "Move text out of the UI collision zone",
       detail:
-        "Cut or speed-ramp the transition sequence in the middle third. The hook earns you ~2 seconds of audience patience — don't spend it on a slow reveal. Target: under 1.5 seconds for that cut.",
+        "At 0:08–0:14, your caption text sits in the bottom 20% of frame. On most devices, TikTok's username and description overlay will cover it entirely. Move all on-screen text to the center or upper third of the frame.",
     },
     {
       priority: "Medium",
-      action: "Add a closing CTA",
+      action: "Cut the 0:12–0:18 static hold",
       detail:
-        "End with text overlay: 'Save this for your next workout'. Save rate is the single highest-weight signal for the Explore algorithm in fitness content right now.",
+        "You hold a talking-head shot for 4.2 seconds with no cut, zoom, or B-roll. Insert a 1.2× digital zoom at the 3-second mark or cut to a B-roll clip to reset the viewer's attention clock before retention drops.",
     },
   ],
 };
 
 const SCORES = [
-  { label: "Overall Score",   score: SAMPLE.overall_score },
-  { label: "Hook Strength",   score: SAMPLE.hook_strength },
-  { label: "Pacing",          score: SAMPLE.pacing_score },
-  { label: "Audio",           score: SAMPLE.audio_score },
-  { label: "Captions",        score: SAMPLE.caption_score },
-  { label: "Trend Alignment", score: SAMPLE.trend_alignment },
+  { label: "Overall Score",     score: SAMPLE.overall_score },
+  { label: "Hook Velocity",     score: SAMPLE.hook_velocity },
+  { label: "Cut Frequency",     score: SAMPLE.cut_frequency },
+  { label: "Text Scannability", score: SAMPLE.text_scannability },
+  { label: "Curiosity Gap",     score: SAMPLE.curiosity_gap },
+  { label: "Audio-Visual Sync", score: SAMPLE.audio_visual_sync },
+  { label: "Loop Seamlessness", score: SAMPLE.loop_seamlessness },
 ];
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -91,9 +93,7 @@ export default function SamplePage() {
         {/* Verdict */}
         <VerdictBanner
           verdict={SAMPLE.verdict}
-          predictedViews={SAMPLE.predicted_views}
-          predictedLikes={SAMPLE.predicted_likes}
-          platform={SAMPLE.platform}
+          overallScore={SAMPLE.overall_score}
         />
 
         {/* Scores */}

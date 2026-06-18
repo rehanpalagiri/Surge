@@ -162,12 +162,13 @@ export default function ResultsPage() {
   }
 
   const scores = [
-    { label: "Overall Score", score: s.overall_score },
-    { label: "Hook Strength", score: s.hook_strength },
-    { label: "Pacing", score: s.pacing_score },
-    { label: "Audio", score: s.audio_score },
-    { label: "Captions", score: s.caption_score },
-    { label: "Trend Alignment", score: s.trend_alignment },
+    { label: "Overall Score",       score: s.overall_score },
+    { label: "Hook Velocity",       score: s.hook_velocity },
+    { label: "Cut Frequency",       score: s.cut_frequency },
+    { label: "Text Scannability",   score: s.text_scannability },
+    { label: "Curiosity Gap",       score: s.curiosity_gap },
+    { label: "Audio-Visual Sync",   score: s.audio_visual_sync },
+    { label: "Loop Seamlessness",   score: s.loop_seamlessness },
   ];
 
   const MODE_LABEL: Record<string, string> = {
@@ -190,67 +191,54 @@ export default function ResultsPage() {
         </div>
 
         {/* Verdict banner — always shown */}
-        <VerdictBanner verdict={analysis.verdict} predictedViews={s.predicted_views} predictedLikes={s.predicted_likes} platform={analysis.platform ?? "tiktok"} />
+        <VerdictBanner verdict={analysis.verdict} overallScore={s.overall_score ?? 0} />
 
         {locked ? (
           /* ---------- FREE TIER (anonymous): locked teaser ---------- */
           <>
-            <div className="relative overflow-hidden rounded-2xl border border-border">
-              {/* Blurred placeholder content */}
-              <div className="p-6 space-y-5 blur-[6px] select-none pointer-events-none">
-                <h2 className="text-text-primary font-semibold text-lg">
-                  Performance Scores
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {["Overall", "Hook", "Pacing", "Audio", "Captions", "Trend"].map(
-                    (l, i) => (
-                      <ScoreBar
-                        key={l}
-                        label={l}
-                        score={[8, 6, 5, 7, 5, 6][i]}
-                        animate={false}
-                      />
-                    )
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-success/5 border border-success/20 rounded-2xl p-5 h-28" />
-                  <div className="bg-danger/5 border border-danger/20 rounded-2xl p-5 h-28" />
+            {/* First improvement point — visible teaser */}
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-3">
+                Top improvement
+              </p>
+              <div className="flex items-start gap-3">
+                <span className="text-danger mt-0.5 text-base flex-shrink-0">→</span>
+                <div>
+                  <p className="text-text-primary font-semibold text-sm mb-1">
+                    {analysis.verdict === "High potential"
+                      ? "A few small tweaks could push this to viral"
+                      : analysis.verdict === "Average potential"
+                      ? "Your hook isn't grabbing attention fast enough"
+                      : "Multiple structural issues are limiting your reach"}
+                  </p>
+                  <p className="text-text-muted text-sm">
+                    Sign up to see the exact fix, plus a rewritten hook and caption tailored to your video.
+                  </p>
                 </div>
               </div>
+            </div>
 
-              {/* Unlock overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/50 to-background/80 text-center px-6">
-                <p className="text-text-primary font-bold text-xl">
-                  Your full breakdown is ready 🎉
+            {/* Remaining improvement points — blurred with unlock overlay */}
+            <div className="relative overflow-hidden rounded-2xl">
+              <div className="space-y-3 blur-[6px] select-none pointer-events-none">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-card border border-border rounded-2xl p-5 h-[72px]" />
+                ))}
+              </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/40 to-background/90 text-center px-6 py-8">
+                <p className="text-text-primary font-bold text-lg">
+                  Sign up to unlock your full improvement plan
                 </p>
-                <ul className="text-text-muted text-sm space-y-2 text-left">
-                  {[
-                    "All 6 performance scores, explained",
-                    "Your strengths & priority fixes",
-                    "Rewritten hook & caption",
-                  ].map((item) => (
-                    <li key={item} className="flex items-center gap-2.5">
-                      <span className="text-success flex-shrink-0">✓</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
                 <Link
                   href={`/signup?next=/results/${analysis.id}`}
-                  className="gradient-btn text-white font-semibold px-7 py-3 rounded-xl mt-1 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  className="gradient-btn text-white font-semibold px-7 py-3 rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
                 >
-                  Sign up free to unlock
+                  Sign up free
                 </Link>
-                <p className="text-text-muted/70 text-xs">
-                  Free forever · no credit card
-                </p>
+                <p className="text-text-muted/70 text-xs">Free forever · no credit card</p>
                 <p className="text-text-muted text-xs">
                   Already have an account?{" "}
-                  <Link
-                    href={`/login?next=/results/${analysis.id}`}
-                    className="text-purple-to hover:underline"
-                  >
+                  <Link href={`/login?next=/results/${analysis.id}`} className="text-purple-to hover:underline">
                     Log in
                   </Link>
                 </p>
