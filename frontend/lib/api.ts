@@ -37,11 +37,12 @@ export interface AnalysisOut {
   bio: string | null;
   scores_json: {
     overall_score: number;
-    hook_strength: number;
-    pacing_score: number;
-    audio_score: number;
-    caption_score: number;
-    trend_alignment: number;
+    hook_velocity: number;
+    cut_frequency: number;
+    text_scannability: number;
+    curiosity_gap: number;
+    audio_visual_sync: number;
+    loop_seamlessness: number;
     predicted_views: string;
     predicted_likes?: string;
     strengths: string[];
@@ -158,16 +159,11 @@ export function apiErrorDetail(err: unknown, fallback: string): string {
 }
 
 /**
- * Render's free tier spins the backend down after ~15 min idle, so the very
- * first request after a lull can take 20-60s to wake it up. If that wake-up
- * happens *during* the big multipart video upload, mobile Safari tends to
- * drop the connection entirely and throw a generic "Load failed" — instead,
- * ping the lightweight /health endpoint first (small, cheap requests) and
- * keep retrying until the backend responds, THEN kick off the real upload
- * once it's already warm. Returns true once the backend answers, or false if
- * it never wakes within maxWaitMs (caller can still try the real request).
+ * Ping /health before kicking off the real upload so mobile Safari doesn't
+ * drop the multipart request if the backend is mid-restart. Railway stays
+ * always-on so 20s covers the worst-case container restart; 90s was Render-era.
  */
-export async function wakeBackend(maxWaitMs: number = 90_000): Promise<boolean> {
+export async function wakeBackend(maxWaitMs: number = 20_000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     try {
@@ -186,8 +182,7 @@ export async function analyzeVideo(
   niche: string,
   caption: string = "",
   bio: string = "",
-  platform: string = "tiktok",
-  mode: string = "quick"
+  platform: string = "tiktok"
 ): Promise<{ id: number }> {
   const form = new FormData();
   form.append("file", file);
@@ -195,7 +190,6 @@ export async function analyzeVideo(
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
-  form.append("mode", mode);
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",
     headers: authHeaders(),
@@ -520,10 +514,11 @@ export interface SingleHarvestStatus {
   total_added?: number;
   total_skipped?: number;
   total_errors?: number;
+  total_gemini_calls?: number;      // Gemini video upload+analysis calls made this run
   total_search_failures?: number;   // keyword/hashtag searches that failed (likely API rate limit)
-  failed_niches?: number;           // Instagram only — niche tasks that crashed outright
+  failed_niches?: number;           // niche tasks that crashed outright
   error?: string;
-  detail?: { niche: string; added: number; skipped: number; errors: number; search_failures?: number }[];
+  detail?: { niche: string; added: number; skipped: number; errors: number; search_failures?: number; gemini_calls?: number }[];
 }
 
 export interface HarvestStatus {
@@ -566,4 +561,114 @@ export async function getHarvestStatus(password: string): Promise<HarvestStatus>
     headers: { "X-Admin-Password": password },
   });
   return handleResponse<HarvestStatus>(res);
+}
+
+export interface NicheInsightRow {
+  niche: string;
+  seed_count: number;
+  generated_at: string;
+  insight_preview: string;
+}
+
+export interface GenerateInsightsResult {
+  platform: string;
+  generated: number;
+  total: number;
+  results: { niche: string; status: "generated" | "skipped" | "error"; seed_count?: number; reason?: string }[];
+}
+
+export async function generateInsights(
+  password: string,
+  platform: string,
+  niche?: string
+): Promise<GenerateInsightsResult> {
+  const form = new FormData();
+  form.append("platform", platform);
+  if (niche) form.append("niche", niche);
+  const res = await fetch(`${BASE}/api/admin/insights/generate`, {
+    method: "POST",
+    headers: { "X-Admin-Password": password },
+    body: form,
+  });
+  return handleResponse<GenerateInsightsResult>(res);
+}
+
+export async function getInsights(password: string, platform: string): Promise<NicheInsightRow[]> {
+  const res = await fetch(`${BASE}/api/admin/insights?platform=${encodeURIComponent(platform)}`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<NicheInsightRow[]>(res);
+}
+
+// ── Trend Intelligence ────────────────────────────────────────────────────────
+
+export interface TrendHarvestStatus {
+  status: "never_run" | "running" | "done" | "failed";
+  started_at?: string;
+  finished_at?: string;
+  niches_processed?: number;
+  total_added?: number;
+  total_skipped?: number;
+  total_errors?: number;
+  total_gemini_calls?: number;
+  total_search_failures?: number;
+  failed_niches?: number;
+  error?: string;
+}
+
+export interface TrendRow {
+  niche: string;
+  recent_seed_count: number;
+  established_seed_count: number;
+  generated_at: string;
+  trend_preview: string;
+}
+
+export interface GenerateTrendsResult {
+  platform: string;
+  generated: number;
+  total: number;
+  results: { niche: string; status: "generated" | "skipped" | "error"; recent_count?: number; reason?: string }[];
+}
+
+export async function triggerTrendHarvest(
+  password: string,
+  options?: { max_age_days?: number; min_velocity?: number; max_per_niche?: number }
+): Promise<{ status: string; niches: number }> {
+  const res = await fetch(`${BASE}/api/admin/trends/harvest`, {
+    method: "POST",
+    headers: { "X-Admin-Password": password, "Content-Type": "application/json" },
+    body: JSON.stringify(options ?? {}),
+  });
+  return handleResponse(res);
+}
+
+export async function getTrendHarvestStatus(password: string): Promise<TrendHarvestStatus> {
+  const res = await fetch(`${BASE}/api/admin/trends/harvest/status`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<TrendHarvestStatus>(res);
+}
+
+export async function generateTrends(
+  password: string,
+  platform: string,
+  niche?: string
+): Promise<GenerateTrendsResult> {
+  const form = new FormData();
+  form.append("platform", platform);
+  if (niche) form.append("niche", niche);
+  const res = await fetch(`${BASE}/api/admin/trends/generate`, {
+    method: "POST",
+    headers: { "X-Admin-Password": password },
+    body: form,
+  });
+  return handleResponse<GenerateTrendsResult>(res);
+}
+
+export async function getTrends(password: string, platform: string): Promise<TrendRow[]> {
+  const res = await fetch(`${BASE}/api/admin/trends?platform=${encodeURIComponent(platform)}`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<TrendRow[]>(res);
 }

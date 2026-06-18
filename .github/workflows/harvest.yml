@@ -17,16 +17,16 @@ jobs:
   harvest:
     runs-on: ubuntu-latest
     steps:
-      - name: Wake backend
+      - name: Health check
         run: |
-          for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://viraliq-api.onrender.com/health)
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://surge-production-8973.up.railway.app/health)
             if [ "$STATUS" = "200" ]; then
-              echo "Backend awake (attempt $i)"
+              echo "Backend healthy (attempt $i)"
               break
             fi
-            echo "Attempt $i: status=$STATUS — waiting 20s"
-            sleep 20
+            echo "Attempt $i: status=$STATUS — waiting 10s"
+            sleep 10
           done
 
       - name: Trigger harvest
@@ -35,4 +35,4 @@ jobs:
             -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
             -H "Content-Type: application/json" \
             -d '{"min_views": ${{ github.event.inputs.min_views || 500000 }}, "max_per_niche": ${{ github.event.inputs.max_per_niche || 3 }}}' \
-            https://viraliq-api.onrender.com/api/admin/harvest
+            https://surge-production-8973.up.railway.app/api/admin/harvest
