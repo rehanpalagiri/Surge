@@ -3,7 +3,9 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ## General Behavior
 
-Do not make any changes until you have 95% confidence in what you need to build. Ask me follow-up questions until you reach that confidence.
+Do not make any changes until you have 95% confidence in what you need to build. Ask me follow-up questions until you reach that confidence.\
+
+Make sure to Update this Claud.md file whenever needed, and you should be updating it constantly to make sure it is up to date.
 
 
 Keep the Claude.md file under 200 lines
