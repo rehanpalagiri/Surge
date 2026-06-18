@@ -126,6 +126,9 @@ class UserAnalysis(Base):
     # May differ from what the user requested if the run degraded (e.g. Deep with
     # no channel profile → Thinking). The results badge reads this.
     mode = Column(String, nullable=True, default="quick")
+    # Async analysis lifecycle: "pending" → "processing" → "complete" | "error".
+    # Defaults to "complete" so all pre-existing rows are treated as finished.
+    status = Column(String, nullable=True, default="complete")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

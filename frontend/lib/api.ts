@@ -55,6 +55,7 @@ export interface AnalysisOut {
     projected_verdict?: string;
     projected_views?: string;
     projected_likes?: string;
+    first_improvement?: ImprovementItem | null;
     locked?: boolean;
     error?: string;
   };
@@ -178,14 +179,16 @@ export async function wakeBackend(maxWaitMs: number = 20_000): Promise<boolean> 
 }
 
 export async function analyzeVideo(
-  file: File,
+  file: File | null,
   niche: string,
   caption: string = "",
   bio: string = "",
-  platform: string = "tiktok"
+  platform: string = "tiktok",
+  videoUrl: string = ""
 ): Promise<{ id: number }> {
   const form = new FormData();
-  form.append("file", file);
+  if (file) form.append("file", file);
+  if (videoUrl) form.append("video_url", videoUrl);
   form.append("niche", niche);
   form.append("caption", caption);
   form.append("bio", bio);
@@ -554,6 +557,67 @@ export async function getRateLimit(): Promise<RateLimitStatus> {
     headers: authHeaders(),
   });
   return handleResponse<RateLimitStatus>(res);
+}
+
+export async function getPresignedUploadUrl(
+  filename: string,
+  contentType: string
+): Promise<{ upload_url: string; key: string }> {
+  const form = new FormData();
+  form.append("filename", filename);
+  form.append("content_type", contentType);
+  const res = await fetch(`${BASE}/api/upload/presigned-url`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  return handleResponse<{ upload_url: string; key: string }>(res);
+}
+
+export function uploadFileToR2(
+  url: string,
+  file: File,
+  onProgress: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)));
+    xhr.onerror = () => reject(new Error("Upload failed — check your connection and try again."));
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+    xhr.send(file);
+  });
+}
+
+export async function analyzeFromR2(
+  r2Key: string,
+  niche: string,
+  caption: string = "",
+  bio: string = "",
+  platform: string = "tiktok"
+): Promise<{ id: number; status: string }> {
+  const form = new FormData();
+  form.append("r2_key", r2Key);
+  form.append("niche", niche);
+  form.append("caption", caption);
+  form.append("bio", bio);
+  form.append("platform", platform);
+  const res = await fetch(`${BASE}/api/analyze`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
+  return handleResponse<{ id: number; status: string }>(res);
+}
+
+export async function getAnalysisStatus(
+  id: number
+): Promise<{ id: number; status: string }> {
+  const res = await fetch(`${BASE}/api/analyses/${id}/status`);
+  return handleResponse<{ id: number; status: string }>(res);
 }
 
 export async function getHarvestStatus(password: string): Promise<HarvestStatus> {

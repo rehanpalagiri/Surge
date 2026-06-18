@@ -122,6 +122,10 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN pending_seed_consent BOOLEAN DEFAULT 0"
         )
+    if "status" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN status TEXT DEFAULT 'complete'"
+        )
 
     # --- users: email auth + age gate + seed consent (v1.24) ---
     # NOTE: SQLite forbids adding a UNIQUE column via ALTER TABLE, so email
@@ -180,6 +184,7 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'complete'",
     ]
     for stmt in statements:
         await conn.exec_driver_sql(stmt)
@@ -204,7 +209,7 @@ def _assert_prod_secrets() -> None:
         raise RuntimeError(
             "Refusing to start in production with insecure default(s): "
             + ", ".join(insecure)
-            + ". Set each to a strong, unique value in the Render environment."
+            + ". Set each to a strong, unique value in the Railway environment."
         )
 
 

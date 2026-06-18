@@ -8,18 +8,19 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from database import get_db
+from database import get_db, AsyncSessionLocal
 from models import SeedVideo, UserAnalysis, UserProfile, User, NicheInsight, TrendSummary
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn, SeedConsentDecisionIn
 from services.gemini import analyze_video, select_seed_examples
 from google.genai.errors import ClientError as _GeminiClientError
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
-from services.tiktok_fetch import fetch_tiktok, is_tiktok_url
+from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
 from services.seed_promote import promote_analysis_to_seed
 from services.rate_limit import get_rate_limit
 from services.throttle import check_rate
 from auth import optional_user, require_user, is_minor
+import services.r2 as r2
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
@@ -45,11 +46,211 @@ def resolve_mode(user, has_usable_seeds: bool, channel_profile) -> str:
     return "quick"
 
 
-@router.post("/analyze", response_model=AnalysisOut)
+@router.post("/upload/presigned-url")
+async def get_upload_presigned_url(
+    filename: str = Form(...),
+    content_type: str = Form(...),
+):
+    if not os.getenv("R2_ACCOUNT_ID"):
+        raise HTTPException(status_code=503, detail="File upload service not configured.")
+    ct = (content_type or "").lower()
+    if ct not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
+    key = f"uploads/{uuid.uuid4()}_{os.path.basename(filename or 'upload')}"
+    upload_url = r2.presigned_upload_url(key, ct)
+    return {"upload_url": upload_url, "key": key}
+
+
+async def _run_r2_analysis(
+    analysis_id: int,
+    r2_key: str,
+    uploads_dir: str,
+    user_id: Optional[int],
+    raw_niche: str,
+    canonical_niche: str,
+    caption: str,
+    bio: str,
+    platform: str,
+) -> None:
+    file_path = os.path.join(uploads_dir, f"{uuid.uuid4()}_r2upload.mp4")
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
+        if row:
+            row.status = "processing"
+            await db.commit()
+
+    try:
+        video_bytes = await r2.download(r2_key)
+        with open(file_path, "wb") as fh:
+            fh.write(video_bytes)
+
+        # Re-query context with a fresh session so we get up-to-date data.
+        async with AsyncSessionLocal() as db:
+            user = None
+            if user_id is not None:
+                user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+
+            high_seeds: list = []
+            low_seeds: list = []
+            niche_insight: str | None = None
+            trend_context: str | None = None
+            if user:
+                from datetime import timezone
+                insight_row = (await db.execute(
+                    select(NicheInsight).where(
+                        NicheInsight.platform == platform,
+                        NicheInsight.niche == canonical_niche,
+                    )
+                )).scalar_one_or_none()
+                if insight_row and (insight_row.insight or "").strip():
+                    niche_insight = insight_row.insight
+                else:
+                    seeds = (await db.execute(select(SeedVideo).where(SeedVideo.platform == platform))).scalars().all()
+                    high_seeds, low_seeds = select_seed_examples(seeds, canonical_niche)
+
+                trend_row = (await db.execute(
+                    select(TrendSummary).where(
+                        TrendSummary.platform == platform,
+                        TrendSummary.niche == canonical_niche,
+                    )
+                )).scalar_one_or_none()
+                if trend_row and (trend_row.trend_text or "").strip():
+                    ref = trend_row.generated_at
+                    if ref.tzinfo is None:
+                        ref = ref.replace(tzinfo=timezone.utc)
+                    if ref >= datetime.now(timezone.utc) - timedelta(days=7):
+                        trend_context = trend_row.trend_text
+
+            has_usable_seeds = bool(niche_insight or high_seeds or low_seeds)
+
+            channel_profile = None
+            if user:
+                hist = (await db.execute(
+                    select(UserAnalysis).where(
+                        UserAnalysis.user_id == user.id,
+                        UserAnalysis.platform == platform,
+                    )
+                )).scalars().all()
+                channel_profile = build_channel_profile(hist)
+
+            effective_mode = resolve_mode(user, has_usable_seeds, channel_profile)
+
+            creator_like_baseline: dict | None = None
+            if user:
+                past_likes = [
+                    r for r in (await db.execute(
+                        select(UserAnalysis.actual_likes).where(
+                            UserAnalysis.user_id == user.id,
+                            UserAnalysis.platform == platform,
+                            UserAnalysis.actual_likes.is_not(None),
+                        ).order_by(UserAnalysis.created_at.desc()).limit(10)
+                    )).scalars().all()
+                    if r is not None and r >= 0
+                ]
+                if len(past_likes) >= 2:
+                    med = int(median(past_likes))
+                    creator_like_baseline = {
+                        "median_likes": med,
+                        "sample_count": len(past_likes),
+                        "min_likes": min(past_likes),
+                        "max_likes": max(past_likes),
+                    }
+
+            profile_context = ""
+            if user and effective_mode in ("thinking", "deep_thinking"):
+                prof = (await db.execute(
+                    select(UserProfile).where(
+                        UserProfile.user_id == user.id,
+                        UserProfile.platform == platform,
+                    )
+                )).scalar_one_or_none()
+                if prof:
+                    parts = []
+                    if prof.display_name:
+                        parts.append(f"Creator name: {prof.display_name}")
+                    if prof.handle:
+                        parts.append(f"Handle: @{prof.handle.lstrip('@')}")
+                    if prof.niche:
+                        parts.append(f"Primary niche: {prof.niche}")
+                    if prof.bio:
+                        parts.append(f"Profile bio: {prof.bio}")
+                    if prof.target_audience:
+                        parts.append(f"Target audience: {prof.target_audience}")
+                    profile_context = "\n".join(parts)
+
+        seeds_high = high_seeds if effective_mode in ("thinking", "deep_thinking") else []
+        seeds_low = low_seeds if effective_mode in ("thinking", "deep_thinking") else []
+        profile_arg = channel_profile if effective_mode == "deep_thinking" else None
+
+        result = await analyze_video(
+            file_path,
+            canonical_niche,
+            seeds_high,
+            seeds_low,
+            caption,
+            bio,
+            platform,
+            profile_context,
+            profile_arg,
+            effective_mode,
+            niche_raw=raw_niche,
+            creator_like_baseline=creator_like_baseline,
+            niche_insight=niche_insight if effective_mode in ("thinking", "deep_thinking") else None,
+            trend_context=trend_context if effective_mode in ("thinking", "deep_thinking") else None,
+        )
+
+        async with AsyncSessionLocal() as db:
+            row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
+            if row:
+                row.scores_json = json.dumps(result)
+                row.verdict = result.get("verdict", "Needs work")
+                row.mode = effective_mode
+                row.status = "complete"
+                await db.commit()
+
+    except Exception as exc:
+        err_msg = "AI analysis is temporarily unavailable." if isinstance(exc, _GeminiClientError) and exc.code in (429, 403) else "Analysis failed."
+        async with AsyncSessionLocal() as db:
+            row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
+            if row:
+                row.scores_json = json.dumps({"error": err_msg})
+                row.verdict = "Error"
+                row.status = "error"
+                await db.commit()
+
+    finally:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+        try:
+            await r2.delete(r2_key)
+        except Exception:
+            pass
+
+
+@router.get("/analyses/{analysis_id}/status")
+async def analysis_status(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserAnalysis.id, UserAnalysis.status).where(UserAnalysis.id == analysis_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {"id": row.id, "status": row.status or "complete"}
+
+
+@router.post("/analyze")
 async def analyze(
     request: Request,
-    file: UploadFile = File(...),
-    niche: str = Form(...),
+    background_tasks: BackgroundTasks,
+    file: Optional[UploadFile] = File(None),
+    video_url: str = Form(""),
+    r2_key: str = Form(""),
+    niche: str = Form(""),
     caption: str = Form(""),
     bio: str = Form(""),
     platform: str = Form("tiktok"),
@@ -57,6 +258,12 @@ async def analyze(
     user: Optional[User] = Depends(optional_user),
 ):
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
+
+    has_file = bool(file and file.filename)
+    has_url = bool(video_url.strip())
+    has_r2 = bool(r2_key.strip())
+    if not has_file and not has_url and not has_r2:
+        raise HTTPException(status_code=400, detail="Provide a video file or a TikTok URL.")
 
     # Rate limits first — before any Gemini calls so we don't burn API quota
     # on requests we're going to reject anyway.
@@ -85,30 +292,81 @@ async def analyze(
                 ),
             )
 
-    # Free-text niche: store what the user typed, classify to a canonical
-    # niche for seed matching. Truncate before any processing.
-    raw_niche = niche.strip()[:200]
-    if not raw_niche:
-        raise HTTPException(status_code=400, detail="Please provide your content niche.")
+    # Niche: optional — auto-classify empty input to "Lifestyle & Vlogs"
+    raw_niche = niche.strip()[:200] or "Lifestyle & Vlogs"
     canonical_niche = await classify_niche(raw_niche)
-
-    # Validate content type (client-declared; best-effort guard)
-    if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
 
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
 
-    # Sanitize filename — strip any path separators the client may have supplied
-    original_name = os.path.basename(file.filename or "upload")
-    safe_name = f"{uuid.uuid4()}_{original_name}"
-    file_path = os.path.join(uploads_dir, safe_name)
-    content = await file.read()
-    # Enforce size limit server-side (the 100MB UI check is bypassed by direct API calls)
-    if len(content) > MAX_FILE_BYTES:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB.")
-    with open(file_path, "wb") as f:
-        f.write(content)
+    # --- R2 async path: file already in cloud storage, process in background ---
+    if has_r2:
+        analysis = UserAnalysis(
+            user_id=user.id if user else None,
+            platform=platform,
+            filename=os.path.basename(r2_key),
+            niche=raw_niche,
+            caption=caption or None,
+            bio=bio or None,
+            scores_json="{}",
+            verdict="",
+            mode="quick",
+            status="pending",
+        )
+        db.add(analysis)
+        await db.commit()
+        await db.refresh(analysis)
+        background_tasks.add_task(
+            _run_r2_analysis,
+            analysis.id,
+            r2_key.strip(),
+            uploads_dir,
+            user.id if user else None,
+            raw_niche,
+            canonical_niche,
+            caption,
+            bio,
+            platform,
+        )
+        return {"id": analysis.id, "status": "pending"}
+
+    if has_url and not has_file:
+        url_stripped = video_url.strip()
+        # Auto-detect platform from URL
+        if "instagram.com" in url_stripped:
+            raise HTTPException(
+                status_code=400,
+                detail="Instagram URL analysis is not yet supported. Please upload an MP4 file.",
+            )
+        if not is_tiktok_url(url_stripped):
+            raise HTTPException(
+                status_code=400,
+                detail="Only TikTok URLs are supported for direct link analysis. Please upload an MP4 or .MOV file.",
+            )
+        platform = "tiktok"
+        try:
+            video_bytes, auto_caption = await download_tiktok_video(url_stripped)
+        except (ValueError, Exception) as exc:
+            raise HTTPException(status_code=400, detail=f"Could not fetch TikTok video: {exc}")
+        if not caption and auto_caption:
+            caption = auto_caption
+        safe_name = f"{uuid.uuid4()}_tiktok.mp4"
+        file_path = os.path.join(uploads_dir, safe_name)
+        with open(file_path, "wb") as fh:
+            fh.write(video_bytes)
+    else:
+        # File upload path
+        if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
+        original_name = os.path.basename(file.filename or "upload")
+        safe_name = f"{uuid.uuid4()}_{original_name}"
+        file_path = os.path.join(uploads_dir, safe_name)
+        content = await file.read()
+        # Enforce size limit server-side (the 100MB UI check is bypassed by direct API calls)
+        if len(content) > MAX_FILE_BYTES:
+            raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB.")
+        with open(file_path, "wb") as fh:
+            fh.write(content)
 
     # --- Niche intelligence + seed reference (auth users always get enrichment) ---
     high_seeds: list = []
@@ -142,7 +400,7 @@ async def analyze(
             )
         )
         trend_row = trend_result.scalar_one_or_none()
-        if trend_row and trend_row.trend_text.strip():
+        if trend_row and (trend_row.trend_text or "").strip():
             ref = trend_row.generated_at
             if ref.tzinfo is None:
                 ref = ref.replace(tzinfo=timezone.utc)

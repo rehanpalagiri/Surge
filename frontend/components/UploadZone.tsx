@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { UploadCloud, CheckCircle2, Loader2 } from "lucide-react";
-import { analyzeVideo, getProfile, wakeBackend, getRateLimit, RateLimitStatus } from "@/lib/api";
+import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUploadUrl, uploadFileToR2, analyzeFromR2, getAnalysisStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 const NICHE_SUGGESTIONS = [
@@ -172,6 +172,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const [compressPhase, setCompressPhase] = useState("");
   const [compressProgress, setCompressProgress] = useState(0);
 
+  // Upload state
+  const [uploadPhase, setUploadPhase] = useState<"idle" | "uploading" | "analyzing">("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   useEffect(() => {
     const authed = !!getToken();
     setLoggedIn(authed);
@@ -274,9 +278,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
     }
     setError("");
     setLoading(true);
+    setUploadPhase("idle");
+    setUploadProgress(0);
     setTipIndex(0);
 
-    const interval = setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 4000);
+    let tipInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
       setWaking(true);
@@ -284,9 +290,23 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       setWaking(false);
       if (!awake) throw new Error("load failed");
 
-      const { id } = await analyzeVideo(file, niche.trim(), caption, bio, platform);
+      // Phase 1: get presigned upload URL
+      const { upload_url, key } = await getPresignedUploadUrl(
+        file.name,
+        file.type || "video/mp4"
+      );
 
-      // Track guest usage
+      // Phase 2: upload directly to R2
+      setUploadPhase("uploading");
+      await uploadFileToR2(upload_url, file, setUploadProgress);
+
+      // Phase 3: trigger async analysis
+      setUploadPhase("analyzing");
+      tipInterval = setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 4000);
+
+      const { id } = await analyzeFromR2(key, niche.trim(), caption, bio, platform);
+
+      // Track guest usage immediately after analysis is accepted
       if (!loggedIn) {
         const newCount = guestCount + 1;
         writeGuestCount(newCount);
@@ -295,7 +315,20 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
         getRateLimit().then(setRateLimit).catch(() => {});
       }
 
-      router.push(`/results/${id}`);
+      // Phase 4: poll until Gemini finishes (max 5 min)
+      const MAX_POLLS = 100;
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const { status } = await getAnalysisStatus(id);
+        if (status === "complete") {
+          router.push(`/results/${id}`);
+          return;
+        }
+        if (status === "error") {
+          throw new Error("Analysis failed. Please try again.");
+        }
+      }
+      throw new Error("Analysis timed out. Please try again.");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("429")) {
@@ -310,8 +343,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       }
       setLoading(false);
       setWaking(false);
+      setUploadPhase("idle");
     } finally {
-      clearInterval(interval);
+      if (tipInterval) clearInterval(tipInterval);
     }
   };
 
@@ -326,23 +360,47 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       {/* ── Analysis loading overlay ── */}
       {loading && (
         <div className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-sm flex flex-col items-center justify-center gap-6 px-4">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center text-2xl">🎬</div>
-          </div>
-          <div className="text-center">
-            <p className="text-xl font-bold text-white animate-pulse">
-              {waking ? "Waking up the server…" : "Surge is analyzing your video..."}
-            </p>
-            <p className="text-zinc-400 text-sm mt-1">
-              {waking
-                ? "First request after a quiet period can take up to a minute — hang tight"
-                : "Analyzing your hook, pacing, structure, and content quality..."}
-            </p>
-          </div>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-6 py-3 text-zinc-400 text-sm animate-pulse">
-            {waking ? "Connecting to Surge's analysis engine…" : TIPS[tipIndex]}
-          </div>
+          {uploadPhase === "uploading" ? (
+            <>
+              <div className="w-20 h-20 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
+              <div className="text-center">
+                <p className="text-xl font-bold text-white">Uploading your video...</p>
+                <p className="text-zinc-400 text-sm mt-1">Going straight to the cloud — no server in the way</p>
+              </div>
+              <div className="w-full max-w-xs">
+                <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
+                  <span>Uploading</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center text-2xl">🎬</div>
+              </div>
+              <div className="text-center">
+                <p className="text-xl font-bold text-white animate-pulse">
+                  {waking ? "Waking up the server…" : "Surge is analyzing your video..."}
+                </p>
+                <p className="text-zinc-400 text-sm mt-1">
+                  {waking
+                    ? "First request after a quiet period can take up to 20 seconds — hang tight"
+                    : "Analyzing your hook, pacing, structure, and content quality..."}
+                </p>
+              </div>
+              <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-6 py-3 text-zinc-400 text-sm animate-pulse">
+                {waking ? "Connecting to Surge's analysis engine…" : TIPS[tipIndex]}
+              </div>
+            </>
+          )}
         </div>
       )}
 

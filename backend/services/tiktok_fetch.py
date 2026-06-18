@@ -5,6 +5,8 @@ from datetime import datetime
 
 import httpx
 
+MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
+
 
 def is_tiktok_url(url: str) -> bool:
     u = (url or "").strip().lower()
@@ -43,3 +45,16 @@ async def fetch_tiktok(url: str) -> dict:
         # @handle of the uploader — used for the soft ownership check
         "author_handle": str((data.get("author") or {}).get("unique_id") or "").strip(),
     }
+
+
+async def download_tiktok_video(tiktok_url: str) -> tuple[bytes, str]:
+    """Download a TikTok video's bytes. Returns (video_bytes, caption).
+    Raises ValueError on fetch failure, or if the downloaded file exceeds 100 MB."""
+    meta = await fetch_tiktok(tiktok_url)
+    play_url = meta["video_url"]
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+        r = await client.get(play_url, headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+    if len(r.content) > MAX_DOWNLOAD_BYTES:
+        raise ValueError("Video exceeds 100 MB — try a shorter clip.")
+    return r.content, meta.get("caption", "")

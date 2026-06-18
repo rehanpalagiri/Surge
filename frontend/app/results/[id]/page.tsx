@@ -196,44 +196,66 @@ export default function ResultsPage() {
         {locked ? (
           /* ---------- FREE TIER (anonymous): locked teaser ---------- */
           <>
-            {/* First improvement point — visible teaser */}
-            <div className="bg-card border border-border rounded-2xl p-5">
-              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-3">
-                Top improvement
-              </p>
-              <div className="flex items-start gap-3">
-                <span className="text-danger mt-0.5 text-base flex-shrink-0">→</span>
+            {/* Viral score callout */}
+            {s.overall_score != null && (
+              <div className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-text-primary font-semibold text-sm mb-1">
-                    {analysis.verdict === "High potential"
-                      ? "A few small tweaks could push this to viral"
-                      : analysis.verdict === "Average potential"
-                      ? "Your hook isn't grabbing attention fast enough"
-                      : "Multiple structural issues are limiting your reach"}
+                  <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-1">
+                    Viral Score
                   </p>
-                  <p className="text-text-muted text-sm">
-                    Sign up to see the exact fix, plus a rewritten hook and caption tailored to your video.
+                  <p className="text-text-primary text-4xl font-extrabold tabular-nums">
+                    {Math.round(s.overall_score * 10)}
+                    <span className="text-text-muted text-xl font-normal">/100</span>
+                  </p>
+                </div>
+                <div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-extrabold border-4 ${
+                    s.overall_score >= 7
+                      ? "border-success text-success bg-success/10"
+                      : s.overall_score >= 4
+                      ? "border-warning text-warning bg-warning/10"
+                      : "border-danger text-danger bg-danger/10"
+                  }`}
+                >
+                  {s.overall_score >= 7 ? "🔥" : s.overall_score >= 4 ? "⚡" : "⚠️"}
+                </div>
+              </div>
+            )}
+
+            {/* First improvement — visible teaser */}
+            {s.first_improvement && (
+              <div className="bg-card border border-border rounded-2xl p-5">
+                <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-3">
+                  Top issue detected
+                </p>
+                <div className="flex items-start gap-3">
+                  <span className="text-danger mt-0.5 text-base flex-shrink-0">→</span>
+                  <p className="text-text-primary text-sm leading-relaxed">
+                    <span className="font-semibold">{s.first_improvement.area}:</span>{" "}
+                    {s.first_improvement.problem}
                   </p>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Remaining improvement points — blurred with unlock overlay */}
+            {/* Blurred remaining report + lock gate */}
             <div className="relative overflow-hidden rounded-2xl">
               <div className="space-y-3 blur-[6px] select-none pointer-events-none">
-                {[1, 2, 3].map((i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="bg-card border border-border rounded-2xl p-5 h-[72px]" />
                 ))}
               </div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/40 to-background/90 text-center px-6 py-8">
-                <p className="text-text-primary font-bold text-lg">
-                  Sign up to unlock your full improvement plan
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-b from-background/30 to-background/95 text-center px-6 py-10">
+                <div className="text-3xl">🔒</div>
+                <p className="text-text-primary font-bold text-lg max-w-xs">
+                  Your video has {s.overall_score != null && s.overall_score < 5 ? "3" : "multiple"} critical flaws.
+                  Create an account to unlock your full analysis report and see the exact timestamps.
                 </p>
                 <Link
                   href={`/signup?next=/results/${analysis.id}`}
-                  className="gradient-btn text-white font-semibold px-7 py-3 rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  className="gradient-btn text-white font-bold px-8 py-3.5 rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform text-base"
                 >
-                  Sign up free
+                  Create free account
                 </Link>
                 <p className="text-text-muted/70 text-xs">Free forever · no credit card</p>
                 <p className="text-text-muted text-xs">
