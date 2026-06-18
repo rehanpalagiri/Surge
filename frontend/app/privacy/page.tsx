@@ -41,7 +41,7 @@ export default function PrivacyPage() {
           <ul className="list-disc pl-5 space-y-1.5">
             <li>Your email address and a username</li>
             <li>Your password — stored only as a secure hash, never in plain text</li>
-            <li>Your birth year (used solely for age requirements)</li>
+            <li>Your full date of birth (used solely to verify the age requirement)</li>
             <li>Your content niche (the free-text description you provide)</li>
             <li>Video captions and profile bios you type into the analyzer</li>
             <li>TikTok or Instagram post URLs you choose to link to an analysis</li>

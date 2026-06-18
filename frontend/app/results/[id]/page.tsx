@@ -8,7 +8,7 @@ import VerdictBanner from "@/components/VerdictBanner";
 import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
-import { getAnalysis, claimAnalysis, seedConsentDecision, AnalysisOut } from "@/lib/api";
+import { getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus, AnalysisOut } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
@@ -82,7 +82,8 @@ export default function ResultsPage() {
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
 
   const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
-  const [status, setStatus] = useState<"loading" | "ok" | "notfound">("loading");
+  const [status, setStatus] = useState<"loading" | "ok" | "notfound" | "timeout">("loading");
+  const [loadingText, setLoadingText] = useState("Loading your results…");
   const [showUpsell, setShowUpsell] = useState(false);
 
   useEffect(() => {
@@ -91,6 +92,33 @@ export default function ResultsPage() {
     async function load() {
       const token = getToken();
       let a = await getAnalysis(id, token);
+
+      // If scores are absent, the analysis is still processing — poll until done.
+      const isPending = (scores: AnalysisOut["scores_json"]) =>
+        Object.keys(scores).length === 0 ||
+        (scores.overall_score == null && !scores.error && !scores.locked);
+
+      if (isPending(a.scores_json)) {
+        if (!cancelled) setLoadingText("Still analyzing your video — this can take up to 60 seconds…");
+
+        let timedOut = true;
+        for (let i = 0; i < 100; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          if (cancelled) return;
+
+          const { status: pollStatus } = await getAnalysisStatus(Number(id));
+          if (pollStatus === "complete" || pollStatus === "error") {
+            a = await getAnalysis(id, token);
+            timedOut = false;
+            break;
+          }
+        }
+
+        if (timedOut) {
+          if (!cancelled) setStatus("timeout");
+          return;
+        }
+      }
 
       // If the result is locked but the user is logged in, the analysis may
       // not have been claimed yet (e.g., a previous claim failed silently).
@@ -138,9 +166,18 @@ export default function ResultsPage() {
       <main className="min-h-screen bg-background">
         <Nav />
         <div className="max-w-3xl mx-auto px-4 py-16 text-center text-text-muted">
-          Loading your results…
+          {loadingText}
         </div>
       </main>
+    );
+  }
+
+  if (status === "timeout") {
+    return (
+      <ErrorScreen
+        title="Analysis timed out"
+        message="Analysis timed out. Please try again."
+      />
     );
   }
 

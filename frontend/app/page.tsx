@@ -61,6 +61,8 @@ function ProcessingOverlay({ step }: { step: number }) {
 
 // ─── Landing hero (anonymous users) ───────────────────────────────────────────
 
+const MAX_BYTES = 100 * 1024 * 1024;
+
 function LandingHero({ deleted }: { deleted: boolean }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,8 +84,33 @@ function LandingHero({ deleted }: { deleted: boolean }) {
     return () => clearInterval(interval);
   }, [processing]);
 
-  const handleFile = (f: File) => {
+  const handleFile = async (f: File) => {
     setError("");
+
+    if (!f.type.startsWith("video/")) {
+      setError("Please upload a video file (.mp4 or .mov).");
+      return;
+    }
+
+    if (f.size > MAX_BYTES) {
+      setError("Your video is too large. Maximum size is 100 MB — try exporting at 720p from your camera app.");
+      return;
+    }
+
+    const duration = await new Promise<number>((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      const url = URL.createObjectURL(f);
+      video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(video.duration); };
+      video.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+      video.src = url;
+    });
+
+    if (duration > 600) {
+      setError("Your video is over 10 minutes. Please trim it before uploading.");
+      return;
+    }
+
     setFile(f);
   };
 
@@ -112,6 +139,8 @@ function LandingHero({ deleted }: { deleted: boolean }) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("429")) {
         setError("You've used your free analyses for today. Sign up free to get more.");
+      } else if (msg.includes("400")) {
+        setError(msg.replace("API error 400: ", "") || "Analysis failed. Please try again.");
       } else {
         setError(msg || "Analysis failed. Please try again.");
       }
