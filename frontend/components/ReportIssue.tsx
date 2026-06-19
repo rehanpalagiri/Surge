@@ -9,7 +9,7 @@ export default function ReportIssue() {
   function submit() {
     const subject = encodeURIComponent("Surge Bug Report");
     const body = encodeURIComponent(text.trim() || "(no description provided)");
-    window.open(`mailto:irehan29@icloud.com?subject=${subject}&body=${body}`);
+    window.open(`mailto:surgeprivacy@gmail.com?subject=${subject}&body=${body}`);
     setOpen(false);
     setText("");
   }
@@ -79,10 +79,10 @@ export default function ReportIssue() {
             <p className="text-text-muted/40 text-xs text-center">
               Opens your email app · or email{" "}
               <a
-                href="mailto:irehan29@icloud.com"
+                href="mailto:surgeprivacy@gmail.com"
                 className="underline hover:text-text-muted transition-colors"
               >
-                irehan29@icloud.com
+                surgeprivacy@gmail.com
               </a>{" "}
               directly
             </p>

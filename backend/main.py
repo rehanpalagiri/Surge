@@ -220,9 +220,18 @@ def _assert_prod_secrets() -> None:
         )
 
 
+import logging as _logging
+_boot_logger = _logging.getLogger("surge.boot")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _assert_prod_secrets()
+    if not os.getenv("SMTP_USER") or not os.getenv("SMTP_PASS"):
+        _boot_logger.warning(
+            "SMTP NOT CONFIGURED — forgot-password and welcome emails will NOT send. "
+            "Add SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / EMAIL_FROM to Railway env vars."
+        )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # _ensure_columns uses SQLite-only PRAGMA syntax; _ensure_columns_pg is

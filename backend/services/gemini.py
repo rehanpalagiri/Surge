@@ -265,7 +265,23 @@ def _build_system_prompt(
 
     projection_schema = '  "projected_verdict": "<honest verdict if they apply the full plan: High potential | Average potential | Needs work>"'
 
-    hierarchy_block = get_dimension_hierarchy_block(niche, platform)
+    # Use dynamically-generated weights from the niche insight when available.
+    # Fall back to the static niche_weights.py profile when no insight exists yet.
+    if niche_insight and show_seeds:
+        hierarchy_block = (
+            f"DIMENSION HIERARCHY — {niche} on {pname} (data-derived, overrides static defaults):\n"
+            "The DIMENSION WEIGHTS section at the end of the NICHE INTELLIGENCE block above "
+            "defines the exact scoring hierarchy for this niche. Apply those tier assignments "
+            "and percentages when computing overall_score.\n\n"
+            "Scoring cap rules derived from the weights above:\n"
+            "- Any dimension marked CRITICAL: if its score is ≤ 3, cap overall_score at 4.\n"
+            "- HIGH and STANDARD dimensions: weight proportionally per the percentages listed.\n"
+            "- LOW dimensions: score independently; a low score here has minimal effect on overall_score.\n\n"
+            "improvement_plan ordering: CRITICAL fixes first, then HIGH, then STANDARD, then LOW — "
+            "unless a higher-tier dimension is already ≥ 6."
+        )
+    else:
+        hierarchy_block = get_dimension_hierarchy_block(niche, platform)
 
     return f"""You are an {ctx["analyst_title"]}. Your job is to give BRUTALLY HONEST, unfiltered feedback. Creators come to Surge because they want the truth — not validation. Be direct, be specific, be harsh.
 {benchmark_block}

@@ -120,7 +120,29 @@ What is unique about the {niche} niche on {pname} that a general scoring AI woul
 SCORING CALIBRATION FOR THIS NICHE:
 Based on this data, what does a typical {niche} video on {pname} score overall (0–10)? What specific characteristics push a video into the 7–9 range? What guarantees a 2–4?
 
-Target 500 words per section (~4,000 words total). Dense and specific. No padding. Each section must contain enough specific, causal observations that a future AI could apply them without needing to see a single individual seed example."""
+DIMENSION WEIGHTS:
+Based ONLY on what you observe in the data above — not on general assumptions — assign each of the 6 scoring dimensions to exactly one tier. A tier is earned by what the data shows.
+
+Tier definitions:
+- CRITICAL: Failing this dimension (score ≤ 3) alone makes viral success impossible regardless of other strengths. High performers almost universally excel here; low performers almost universally fail here.
+- HIGH: Strongly shapes overall_score. Clear separation between high and low performers. A low score here significantly drags the overall even when other dimensions are strong.
+- STANDARD: Normal weight. Contributes proportionally. Some differentiation between high and low performers but not decisive.
+- LOW: Minimal weight. A low score here barely affects overall_score when other dimensions are strong. High and low performers show little consistent difference here.
+
+Rules:
+- At most 2 dimensions may be CRITICAL.
+- At least 1 dimension must be LOW.
+- All 6 dimensions must be assigned. The percentages must sum to 100%.
+
+Format this section EXACTLY as follows (preserve the arrows and tier labels):
+hook_velocity → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [one sentence citing specific counts from the data, e.g. "11 of 14 high performers opened with movement or text in the first 2 seconds vs 1 of 8 low performers"]
+cut_frequency → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [data-grounded rationale]
+text_scannability → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [data-grounded rationale]
+curiosity_gap → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [data-grounded rationale]
+audio_visual_sync → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [data-grounded rationale]
+loop_seamlessness → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [data-grounded rationale]
+
+Target 500 words per section for the pattern sections (~4,000 words total). Dense and specific. No padding. Each section must contain enough specific, causal observations that a future AI could apply them without needing to see a single individual seed example."""
 
     response = await client.aio.models.generate_content(
         model="gemini-2.5-flash",

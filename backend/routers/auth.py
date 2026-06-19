@@ -234,7 +234,12 @@ async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSe
 
 async def _send_reset_email(to_email: str, username: str, code: str) -> None:
     if not _SMTP_USER or not _SMTP_PASS:
-        return  # not configured — skip silently
+        logger.error(
+            "SMTP NOT CONFIGURED — reset email NOT sent to %s. "
+            "Set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/EMAIL_FROM in Railway env vars.",
+            to_email,
+        )
+        return
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Surge — Password Reset</h2>
@@ -289,6 +294,7 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
 
 async def _send_welcome_email(to_email: str, username: str) -> None:
     if not _SMTP_USER or not _SMTP_PASS:
+        logger.warning("SMTP NOT CONFIGURED — welcome email NOT sent to %s.", to_email)
         return
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">

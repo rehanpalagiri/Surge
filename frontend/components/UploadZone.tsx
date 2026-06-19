@@ -14,6 +14,7 @@ const NICHE_SUGGESTIONS = [
   "Beauty", "Finance", "Music", "Lifestyle", "Tech",
 ];
 
+
 const TIPS = [
   "Analyzing your hook strength...",
   "Checking trend alignment...",
@@ -490,42 +491,43 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           </div>
         )}
 
-        {/* ── Niche chips ── */}
-        <div>
-          <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-            Content Niche
-          </label>
+        {/* ── Niche ── */}
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-white">Content niche</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Pick one or describe your own below</p>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             {NICHE_SUGGESTIONS.map((n) => (
               <button
                 key={n}
                 type="button"
                 onClick={() => setNiche(isChipSelected(n) ? "" : n)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
                   isChipSelected(n)
-                    ? "bg-purple-600 text-white"
-                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                    ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_14px_rgba(168,85,247,0.45)]"
+                    : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-purple-500/50 hover:text-white hover:bg-zinc-700/80"
                 }`}
               >
                 {n}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* ── Custom Niche ── */}
-        <div>
-          <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-            Custom Niche{" "}
-            <span className="text-zinc-600 font-normal normal-case tracking-normal">— overrides chip above</span>
-          </label>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-zinc-800" />
+            <span className="text-xs text-zinc-600">or type your own</span>
+            <div className="flex-1 h-px bg-zinc-800" />
+          </div>
+
           <input
             type="text"
             value={customNicheValue}
             onChange={(e) => setNiche(e.target.value)}
             maxLength={80}
             placeholder='e.g. "Dark humor skits", "Calisthenics", "Day trading"…'
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors text-sm"
+            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition-colors text-sm"
           />
         </div>
 
