@@ -53,7 +53,13 @@ def _build_engine(raw_url: str):
     if "-pooler" in raw_url:
         connect_args["statement_cache_size"] = 0
 
-    return create_async_engine(clean, echo=False, connect_args=connect_args)
+    return create_async_engine(
+        clean,
+        echo=False,
+        connect_args=connect_args,
+        pool_pre_ping=True,   # re-validate connections before use; drops dead ones
+        pool_recycle=300,     # recycle after 5 min — before Neon's idle timeout closes them
+    )
 
 
 engine = _build_engine(_RAW_URL)
