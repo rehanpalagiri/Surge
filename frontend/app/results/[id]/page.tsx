@@ -10,6 +10,41 @@ import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
 import { getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus, AnalysisOut } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { track } from "@vercel/analytics";
+
+function ShareButton({ analysisId, score, locked }: { analysisId: number | string; score: number; locked: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare() {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    track("result_shared", { analysis_id: analysisId, score: Math.round(score * 10), is_locked: locked });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      onClick={handleShare}
+      className="inline-flex items-center gap-2 border border-border text-text-muted hover:text-text-primary hover:border-purple-to px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+    >
+      {copied ? (
+        <><span>✓</span> Link copied!</>
+      ) : (
+        <><span>↗</span> Share my score</>
+      )}
+    </button>
+  );
+}
 
 function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
   const [dismissed, setDismissed] = useState(false);
@@ -290,6 +325,7 @@ export default function ResultsPage() {
                 </p>
                 <Link
                   href={`/signup?next=/results/${analysis.id}`}
+                  onClick={() => track("signup_cta_clicked", { analysis_id: analysis.id, score: Math.round((s.overall_score ?? 0) * 10) })}
                   className="gradient-btn text-white font-bold px-8 py-3.5 rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform text-base"
                 >
                   Create free account
@@ -304,13 +340,14 @@ export default function ResultsPage() {
               </div>
             </div>
 
-            <div className="text-center pb-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-4">
               <Link
                 href="/"
                 className="inline-block bg-card border border-border text-text-primary font-semibold px-8 py-3 rounded-xl hover:border-purple-to transition-colors"
               >
                 Analyze another video →
               </Link>
+              <ShareButton analysisId={analysis.id} score={s.overall_score ?? 0} locked={true} />
             </div>
           </>
         ) : (
@@ -427,13 +464,14 @@ export default function ResultsPage() {
             <FeedbackModal analysisId={analysis.id} platform={analysis.platform} />
 
             {/* CTA */}
-            <div className="text-center pb-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-4">
               <Link
                 href="/"
                 className="inline-block gradient-btn text-white font-semibold px-8 py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
               >
                 Analyze another video →
               </Link>
+              <ShareButton analysisId={analysis.id} score={s.overall_score ?? 0} locked={false} />
             </div>
           </>
         )}

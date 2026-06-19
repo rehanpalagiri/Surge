@@ -264,11 +264,8 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               </div>
 
               {/* Niche chips (optional) */}
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">Content niche</p>
-                  <p className="text-xs text-zinc-500 mt-0.5">Optional — helps us benchmark your video</p>
-                </div>
+              <div className="space-y-2.5">
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Content Niche</p>
                 <div className="flex flex-wrap gap-2">
                   {NICHE_CHIPS.map((n) => (
                     <button
@@ -277,7 +274,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                       onClick={() => setNiche(niche === n ? "" : n)}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
                         niche === n
-                          ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_14px_rgba(168,85,247,0.45)]"
+                          ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
                           : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-purple-500/50 hover:text-white hover:bg-zinc-700/80"
                       }`}
                     >

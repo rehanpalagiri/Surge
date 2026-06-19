@@ -158,4 +158,10 @@ Target 500 words per section for the pattern sections (~4,000 words total). Dens
             f"Gemini returned an empty response for {platform}/{niche} insight generation "
             "(likely a safety filter or empty response). Try again or check the prompt."
         )
+    if "DIMENSION WEIGHTS:" not in text:
+        raise ValueError(
+            f"Gemini insight for {platform}/{niche} is missing the DIMENSION WEIGHTS section. "
+            "The response may have been truncated or the model skipped the section. "
+            "Try regenerating."
+        )
     return text

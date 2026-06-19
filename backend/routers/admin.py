@@ -343,6 +343,7 @@ async def ack_fetch_status(
 class HarvestRequest(BaseModel):
     niches: Optional[list[str]] = None       # None = all 50
     min_views: int = 500_000
+    max_views: Optional[int] = None          # None = no cap (use for low-quality seed harvests)
     max_per_niche: int = 3
     platform: str = "tiktok"                 # "tiktok" | "instagram"
     min_likes: int = 1_000                   # Instagram only
@@ -367,7 +368,7 @@ async def trigger_harvest(
     if platform == "instagram":
         background_tasks.add_task(harvest_instagram_all, target, req.min_likes, req.max_per_niche)
     else:
-        background_tasks.add_task(harvest_all, target, req.min_views, req.max_per_niche)
+        background_tasks.add_task(harvest_all, target, req.min_views, req.max_per_niche, req.max_views)
     return {"status": "harvest started", "niches": len(target), "platform": platform}
 
 

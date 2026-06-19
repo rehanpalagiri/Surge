@@ -94,7 +94,7 @@ export default function ImprovePage() {
   }
 
   const plan: ImprovementItem[] = Array.isArray(s.improvement_plan)
-    ? [...s.improvement_plan].sort((a, b) => a.priority - b.priority)
+    ? [...s.improvement_plan].sort((a, b) => a.priority - b.priority).slice(0, 3)
     : [];
   const hasPlan = plan.length > 0;
   const hasProjection = !!s.projected_verdict;
@@ -171,7 +171,17 @@ export default function ImprovePage() {
                       </p>
                       <p className="text-text-primary text-sm">{item.fix}</p>
                     </div>
-                    {item.example && (
+                    {item.pattern && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-text-muted text-xs uppercase tracking-wide">
+                          Technique
+                        </span>
+                        <span className="text-xs font-medium bg-surface border border-border rounded-lg px-2 py-0.5 text-text-primary">
+                          {item.pattern}
+                        </span>
+                      </div>
+                    )}
+                    {!item.pattern && item.example && (
                       <div className="bg-surface border border-border rounded-xl px-4 py-3">
                         <p className="text-text-muted text-xs uppercase tracking-wide mb-0.5">
                           Example

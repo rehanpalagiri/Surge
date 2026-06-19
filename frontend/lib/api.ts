@@ -107,7 +107,8 @@ export interface ImprovementItem {
   current_score: number;
   problem: string;
   fix: string;
-  example: string;
+  pattern?: string;  // technique name, e.g. "cold open", "text-first frame"
+  example?: string;  // legacy field — present on older analyses only
 }
 
 export interface SeedVideoOut {
@@ -567,7 +568,7 @@ export interface HarvestStatus {
 
 export async function triggerHarvest(
   password: string,
-  options?: { niches?: string[]; min_views?: number; max_per_niche?: number; platform?: string; min_likes?: number }
+  options?: { niches?: string[]; min_views?: number; max_views?: number; max_per_niche?: number; platform?: string; min_likes?: number }
 ): Promise<{ status: string; niches: number; platform: string }> {
   const res = await fetch(`${BASE}/api/admin/harvest`, {
     method: "POST",

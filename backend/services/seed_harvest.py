@@ -133,11 +133,12 @@ async def harvest_niche(
     niche: str,
     min_views: int = DEFAULT_MIN_VIEWS,
     max_videos: int = DEFAULT_MAX_PER_NICHE,
+    max_views: Optional[int] = None,
 ) -> dict:
     keywords = NICHE_KEYWORDS.get(niche, [niche])
     added = skipped = errors = search_failures = gemini_calls = 0
     # Granular skip counters — tell us exactly why candidates were filtered out.
-    skip_missing_id = skip_missing_play_url = skip_below_min_views = skip_duplicate = 0
+    skip_missing_id = skip_missing_play_url = skip_below_min_views = skip_above_max_views = skip_duplicate = 0
     # Split error counters — separate download vs. Gemini vs. DB failures.
     download_errors = analysis_errors = db_errors = 0
     last_download_error = last_analysis_error = last_db_error = ""
@@ -187,6 +188,10 @@ async def harvest_niche(
                 continue
             if play_count < min_views:
                 skip_below_min_views += 1
+                skipped += 1
+                continue
+            if max_views is not None and play_count > max_views:
+                skip_above_max_views += 1
                 skipped += 1
                 continue
 
@@ -268,9 +273,9 @@ async def harvest_niche(
                     os.remove(tmp)
 
     logger.info(
-        "harvest_niche done niche=%s added=%d skipped=%d(below_views=%d dup=%d) "
+        "harvest_niche done niche=%s added=%d skipped=%d(below_views=%d above_views=%d dup=%d) "
         "search_fail=%d gemini=%d dl_err=%d analysis_err=%d db_err=%d",
-        niche, added, skipped, skip_below_min_views, skip_duplicate,
+        niche, added, skipped, skip_below_min_views, skip_above_max_views, skip_duplicate,
         search_failures, gemini_calls, download_errors, analysis_errors, db_errors,
     )
     return {
@@ -283,6 +288,7 @@ async def harvest_niche(
         "skip_missing_id": skip_missing_id,
         "skip_missing_play_url": skip_missing_play_url,
         "skip_below_min_views": skip_below_min_views,
+        "skip_above_max_views": skip_above_max_views,
         "skip_duplicate": skip_duplicate,
         "download_errors": download_errors,
         "analysis_errors": analysis_errors,
@@ -297,11 +303,12 @@ async def harvest_all(
     niches: Optional[list[str]] = None,
     min_views: int = DEFAULT_MIN_VIEWS,
     max_per_niche: int = DEFAULT_MAX_PER_NICHE,
+    max_views: Optional[int] = None,
 ) -> None:
     global _last_harvest
     target = niches or list(NICHE_KEYWORDS.keys())
     _last_harvest = {"status": "running", "started_at": datetime.utcnow().isoformat()}
-    logger.info("Harvest started: %d niches min_views=%d max_per_niche=%d", len(target), min_views, max_per_niche)
+    logger.info("Harvest started: %d niches min_views=%d max_views=%s max_per_niche=%d", len(target), min_views, max_views, max_per_niche)
 
     try:
         sem = asyncio.Semaphore(_TIKTOK_CONCURRENCY)
@@ -309,14 +316,14 @@ async def harvest_all(
             "added": 0, "skipped": 0, "errors": 0, "gemini_calls": 0,
             "search_failures": 0, "niches_done": 0,
             "skip_missing_id": 0, "skip_missing_play_url": 0,
-            "skip_below_min_views": 0, "skip_duplicate": 0,
+            "skip_below_min_views": 0, "skip_above_max_views": 0, "skip_duplicate": 0,
             "download_errors": 0, "analysis_errors": 0, "db_errors": 0,
             "last_download_error": "", "last_analysis_error": "", "last_db_error": "",
         }
 
         async def _run(niche: str) -> dict:
             async with sem:
-                result = await harvest_niche(niche, min_views, max_per_niche)
+                result = await harvest_niche(niche, min_views, max_per_niche, max_views)
             _running["added"] += result["added"]
             _running["skipped"] += result["skipped"]
             _running["errors"] += result["errors"]
@@ -325,6 +332,7 @@ async def harvest_all(
             _running["skip_missing_id"] += result.get("skip_missing_id", 0)
             _running["skip_missing_play_url"] += result.get("skip_missing_play_url", 0)
             _running["skip_below_min_views"] += result.get("skip_below_min_views", 0)
+            _running["skip_above_max_views"] += result.get("skip_above_max_views", 0)
             _running["skip_duplicate"] += result.get("skip_duplicate", 0)
             _running["download_errors"] += result.get("download_errors", 0)
             _running["analysis_errors"] += result.get("analysis_errors", 0)
@@ -347,6 +355,7 @@ async def harvest_all(
                 "total_skip_missing_id": _running["skip_missing_id"],
                 "total_skip_missing_play_url": _running["skip_missing_play_url"],
                 "total_skip_below_min_views": _running["skip_below_min_views"],
+                "total_skip_above_max_views": _running["skip_above_max_views"],
                 "total_skip_duplicate": _running["skip_duplicate"],
                 "total_download_errors": _running["download_errors"],
                 "total_analysis_errors": _running["analysis_errors"],
@@ -389,6 +398,7 @@ async def harvest_all(
             "total_skip_missing_id": _running["skip_missing_id"],
             "total_skip_missing_play_url": _running["skip_missing_play_url"],
             "total_skip_below_min_views": _running["skip_below_min_views"],
+            "total_skip_above_max_views": _running["skip_above_max_views"],
             "total_skip_duplicate": _running["skip_duplicate"],
             "total_download_errors": _running["download_errors"],
             "total_analysis_errors": _running["analysis_errors"],

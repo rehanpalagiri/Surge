@@ -147,6 +147,7 @@ export default function AdminPage() {
   const [harvesting, setHarvesting] = useState(false);
   const [harvestError, setHarvestError] = useState("");
   const [harvestMinViews, setHarvestMinViews] = useState("500000");
+  const [harvestMaxViews, setHarvestMaxViews] = useState("");
   const [harvestMinLikes, setHarvestMinLikes] = useState("1000");
   const [harvestMaxPer, setHarvestMaxPer] = useState("3");
   const [harvestPlatform, setHarvestPlatform] = useState<"tiktok" | "instagram">("tiktok");
@@ -326,6 +327,7 @@ export default function AdminPage() {
       await triggerHarvest(password, {
         platform: harvestPlatform,
         min_views: parseInt(harvestMinViews) || 500_000,
+        ...(harvestMaxViews.trim() ? { max_views: parseInt(harvestMaxViews) } : {}),
         min_likes: parseInt(harvestMinLikes) || 1_000,
         max_per_niche: parseInt(harvestMaxPer) || 3,
         ...(harvestDebugNiche ? { niches: [harvestDebugNiche] } : {}),
@@ -712,12 +714,24 @@ export default function AdminPage() {
 
           <div className="flex flex-wrap gap-4 items-end">
             {harvestPlatform === "tiktok" ? (
-              <div>
-                <label className="block text-xs text-text-muted mb-1">Min views</label>
-                <input type="number" value={harvestMinViews}
-                  onChange={(e) => setHarvestMinViews(e.target.value)}
-                  className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
-              </div>
+              <>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Min views</label>
+                  <input type="number" value={harvestMinViews}
+                    onChange={(e) => setHarvestMinViews(e.target.value)}
+                    className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">
+                    Max views
+                    <span className="ml-1 text-text-muted/50 font-normal">(blank = no cap)</span>
+                  </label>
+                  <input type="number" value={harvestMaxViews}
+                    placeholder="e.g. 50000"
+                    onChange={(e) => setHarvestMaxViews(e.target.value)}
+                    className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm placeholder-text-muted/40 focus:outline-none focus:border-purple-to" />
+                </div>
+              </>
             ) : (
               <div>
                 <label className="block text-xs text-text-muted mb-1">Min likes</label>
@@ -726,6 +740,7 @@ export default function AdminPage() {
                   className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
               </div>
             )}
+
             <div>
               <label className="block text-xs text-text-muted mb-1">Max per niche</label>
               <input type="number" min="1" max="10" value={harvestMaxPer}
