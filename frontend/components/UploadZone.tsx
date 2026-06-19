@@ -6,6 +6,8 @@ import Link from "next/link";
 import { UploadCloud, CheckCircle2, Loader2 } from "lucide-react";
 import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUploadUrl, uploadFileToR2, analyzeFromR2, getAnalysisStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
+import { track } from "@vercel/analytics";
 
 const NICHE_SUGGESTIONS = [
   "Fitness", "Comedy", "Gaming", "Food", "Fashion",
@@ -201,6 +203,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   async function processFile(f: File) {
     setError("");
 
+    if (!isAllowedVideoFile(f)) {
+      setError("Please upload a video file (.mp4 or .mov).");
+      return;
+    }
+
     // 1. Duration check
     let duration = 0;
     try { duration = await getVideoDuration(f); } catch { /* fall through */ }
@@ -277,6 +284,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       return;
     }
     setError("");
+    track("upload_started", { platform, niche_set: !!niche.trim(), logged_in: loggedIn });
     setLoading(true);
     setUploadPhase("idle");
     setUploadProgress(0);
@@ -291,14 +299,12 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       if (!awake) throw new Error("load failed");
 
       // Phase 1: get presigned upload URL
-      const { upload_url, key } = await getPresignedUploadUrl(
-        file.name,
-        file.type || "video/mp4"
-      );
+      const uploadContentType = uploadContentTypeFor(file);
+      const { upload_url, key } = await getPresignedUploadUrl(file.name, uploadContentType);
 
       // Phase 2: upload directly to R2
       setUploadPhase("uploading");
-      await uploadFileToR2(upload_url, file, setUploadProgress);
+      await uploadFileToR2(upload_url, file, setUploadProgress, uploadContentType);
 
       // Phase 3: trigger async analysis
       setUploadPhase("analyzing");
@@ -321,6 +327,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
         await new Promise((r) => setTimeout(r, 3000));
         const { status } = await getAnalysisStatus(id);
         if (status === "complete") {
+          track("analysis_complete", { platform, mode: "r2_async" });
           router.push(`/results/${id}`);
           return;
         }
@@ -341,6 +348,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             : msg || "Analysis failed. Please try again."
         );
       }
+      track("upload_error", { error_type: msg.includes("429") ? "rate_limit" : "other" });
       setLoading(false);
       setWaking(false);
       setUploadPhase("idle");

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login, claimAnalysis } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import PasswordInput from "@/components/PasswordInput";
 
 function extractAnalysisId(next: string | null): string | null {
   if (!next) return null;
@@ -66,14 +67,12 @@ function LoginForm() {
             autoComplete="username"
             className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
           />
-          <input
-            type="password"
+          <PasswordInput
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
           />
           {error && <p className="text-danger text-sm">{error}</p>}
           <button

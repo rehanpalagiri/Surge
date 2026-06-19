@@ -354,12 +354,21 @@ async def trigger_harvest(
     req: HarvestRequest = HarvestRequest(),
     _: None = Depends(check_admin),
 ):
+    platform = req.platform.lower() if req.platform.lower() in ("tiktok", "instagram") else "tiktok"
+    if platform == "instagram" and not os.getenv("HIKERAPI_KEY"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "HIKERAPI_KEY is not set. Add it to your Railway environment variables "
+                "to run Instagram harvest. TikTok harvest does not require this key."
+            ),
+        )
     target = req.niches or list(NICHE_KEYWORDS.keys())
-    if req.platform == "instagram":
+    if platform == "instagram":
         background_tasks.add_task(harvest_instagram_all, target, req.min_likes, req.max_per_niche)
     else:
         background_tasks.add_task(harvest_all, target, req.min_views, req.max_per_niche)
-    return {"status": "harvest started", "niches": len(target), "platform": req.platform}
+    return {"status": "harvest started", "niches": len(target), "platform": platform}
 
 
 @router.get("/harvest/status")

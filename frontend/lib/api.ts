@@ -509,7 +509,7 @@ export async function ackFetchStatus(password: string): Promise<void> {
 }
 
 export interface SingleHarvestStatus {
-  status: "never_run" | "running" | "done" | "failed";
+  status: "never_run" | "running" | "done" | "failed" | "degraded";
   platform?: string;
   started_at?: string;
   finished_at?: string;
@@ -517,11 +517,47 @@ export interface SingleHarvestStatus {
   total_added?: number;
   total_skipped?: number;
   total_errors?: number;
-  total_gemini_calls?: number;      // Gemini video upload+analysis calls made this run
-  total_search_failures?: number;   // keyword/hashtag searches that failed (likely API rate limit)
-  failed_niches?: number;           // niche tasks that crashed outright
+  total_gemini_calls?: number;
+  total_search_failures?: number;
+  failed_niches?: number;
+  // Granular skip breakdown
+  total_skip_not_reel?: number;          // Instagram: search result was not a Reel
+  total_skip_missing_id?: number;
+  total_skip_missing_play_url?: number;  // TikTok: candidate had no playable URL
+  total_skip_missing_url?: number;       // Instagram: candidate had no video URL
+  total_skip_below_min_views?: number;   // TikTok: below min_views threshold
+  total_skip_below_min_likes?: number;   // Instagram: below min_likes threshold
+  total_skip_duplicate?: number;
+  // Split error counters — separate stages for diagnosing zero results
+  total_download_errors?: number;
+  total_analysis_errors?: number;
+  total_db_errors?: number;
+  // Last error strings for each stage
+  last_download_error?: string;
+  last_analysis_error?: string;
+  last_db_error?: string;
   error?: string;
-  detail?: { niche: string; added: number; skipped: number; errors: number; search_failures?: number; gemini_calls?: number }[];
+  detail?: {
+    niche: string;
+    added: number;
+    skipped: number;
+    errors: number;
+    search_failures?: number;
+    gemini_calls?: number;
+    skip_not_reel?: number;
+    skip_missing_id?: number;
+    skip_missing_play_url?: number;
+    skip_missing_url?: number;
+    skip_below_min_views?: number;
+    skip_below_min_likes?: number;
+    skip_duplicate?: number;
+    download_errors?: number;
+    analysis_errors?: number;
+    db_errors?: number;
+    last_download_error?: string;
+    last_analysis_error?: string;
+    last_db_error?: string;
+  }[];
 }
 
 export interface HarvestStatus {
@@ -577,7 +613,8 @@ export async function getPresignedUploadUrl(
 export function uploadFileToR2(
   url: string,
   file: File,
-  onProgress: (pct: number) => void
+  onProgress: (pct: number) => void,
+  contentType: string = file.type || "video/mp4"
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -587,7 +624,7 @@ export function uploadFileToR2(
     xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)));
     xhr.onerror = () => reject(new Error("Upload failed — check your connection and try again."));
     xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+    xhr.setRequestHeader("Content-Type", contentType);
     xhr.send(file);
   });
 }

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signup, claimAnalysis, apiErrorDetail } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import PasswordInput from "@/components/PasswordInput";
+import { track } from "@vercel/analytics";
 
 function extractAnalysisId(next: string | null): string | null {
   if (!next) return null;
@@ -89,6 +91,7 @@ function SignupForm() {
           // Non-fatal.
         }
       }
+      track("signup_complete", { from_results: !!extractAnalysisId(next) });
       // If coming from a results page, go back there; otherwise go to onboarding.
       if (next && next !== "/projects") {
         router.push(next);
@@ -134,14 +137,12 @@ function SignupForm() {
             autoComplete="username"
             className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
           />
-          <input
-            type="password"
+          <PasswordInput
             placeholder="Password (8+ chars)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="new-password"
-            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
           />
           <div>
             <input

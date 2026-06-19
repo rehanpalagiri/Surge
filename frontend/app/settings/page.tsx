@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import PasswordInput from "@/components/PasswordInput";
 import { getToken, clearToken } from "@/lib/auth";
 import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
 
@@ -154,14 +155,12 @@ function ChangeUsernameCard() {
           autoComplete="username"
           className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
-        <input
-          type="password"
+        <PasswordInput
           placeholder="Current password (to confirm)"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required
           autoComplete="current-password"
-          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
         <Link href="/forgot-password" className="block text-purple-to text-sm hover:underline">
           Forgot your password?
@@ -226,8 +225,7 @@ function DeleteAccountCard() {
           <p className="text-text-muted text-sm">
             Enter your password to confirm. All your data will be deleted immediately.
           </p>
-          <input
-            type="password"
+          <PasswordInput
             placeholder="Your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -292,23 +290,19 @@ function ChangePasswordCard() {
         <p className="text-text-muted text-sm mt-0.5">Choose a strong password.</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="password"
+        <PasswordInput
           placeholder="Current password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required
           autoComplete="current-password"
-          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
-        <input
-          type="password"
+        <PasswordInput
           placeholder="New password (8+ chars)"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
           autoComplete="new-password"
-          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
         />
         <Link href="/forgot-password" className="block text-purple-to text-sm hover:underline">
           Forgot your current password?

@@ -8,6 +8,8 @@ import UploadZone from "@/components/UploadZone";
 import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
+import { isAllowedVideoFile } from "@/lib/videoValidation";
+import { track } from "@vercel/analytics";
 
 type Platform = "tiktok" | "instagram";
 
@@ -41,7 +43,7 @@ function ProcessingOverlay({ step }: { step: number }) {
         <p className="text-white text-xl font-bold animate-pulse">
           {PROCESSING_STEPS[step] ?? PROCESSING_STEPS[PROCESSING_STEPS.length - 1]}
         </p>
-        <p className="text-zinc-500 text-sm">Hang tight — this takes about 15 seconds</p>
+        <p className="text-zinc-500 text-sm">Hang tight — this usually takes 15–60 seconds</p>
       </div>
 
       {/* Step indicator dots */}
@@ -63,7 +65,18 @@ function ProcessingOverlay({ step }: { step: number }) {
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
-function LandingHero({ deleted }: { deleted: boolean }) {
+function formatBadRequestMessage(msg: string) {
+  const detail = msg.replace(/^API error 400:\s*/, "");
+  try {
+    const parsed = JSON.parse(detail);
+    if (typeof parsed?.detail === "string") return parsed.detail;
+  } catch {
+    // Plain-text API errors are already suitable for display.
+  }
+  return detail || "Analysis failed. Please try again.";
+}
+
+function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,7 +100,7 @@ function LandingHero({ deleted }: { deleted: boolean }) {
   const handleFile = async (f: File) => {
     setError("");
 
-    if (!f.type.startsWith("video/")) {
+    if (!isAllowedVideoFile(f)) {
       setError("Please upload a video file (.mp4 or .mov).");
       return;
     }
@@ -128,19 +141,22 @@ function LandingHero({ deleted }: { deleted: boolean }) {
       return;
     }
     setError("");
+    track("upload_started", { platform: "tiktok", niche_set: !!niche.trim(), logged_in: false });
     setProcessing(true);
 
     try {
       await wakeBackend();
       const { id } = await analyzeVideo(file, niche || "Lifestyle & Vlogs");
+      track("analysis_complete", { platform: "tiktok", mode: "direct" });
       router.push(`/results/${id}`);
     } catch (err: unknown) {
-      setProcessing(false);
       const msg = err instanceof Error ? err.message : "";
+      track("upload_error", { error_type: msg.includes("429") ? "rate_limit" : msg.includes("400") ? "validation" : "other" });
+      setProcessing(false);
       if (msg.includes("429")) {
         setError("You've used your free analyses for today. Sign up free to get more.");
       } else if (msg.includes("400")) {
-        setError(msg.replace("API error 400: ", "") || "Analysis failed. Please try again.");
+        setError(formatBadRequestMessage(msg));
       } else {
         setError(msg || "Analysis failed. Please try again.");
       }
@@ -169,8 +185,15 @@ function LandingHero({ deleted }: { deleted: boolean }) {
         </header>
 
         {deleted && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm px-5 py-3 rounded-xl shadow-lg">
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm px-5 py-3 rounded-xl shadow-lg flex items-center gap-3">
             Your account has been deleted.
+            <button
+              onClick={onDismissDeleted}
+              className="text-emerald-400/60 hover:text-emerald-400 transition-colors leading-none"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -181,7 +204,7 @@ function LandingHero({ deleted }: { deleted: boolean }) {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold px-4 py-1.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-              AI-powered · Free · Results in 15 seconds
+              AI-powered · Free · Results in under 60 seconds
             </div>
 
             {/* Headline */}
@@ -192,7 +215,7 @@ function LandingHero({ deleted }: { deleted: boolean }) {
               </h1>
               <p className="text-zinc-400 text-lg max-w-xl mx-auto leading-relaxed">
                 Upload your video before you post it. Our AI engine analyzes your pacing, hook
-                velocity, and UI collisions in 15 seconds to predict your viral potential.
+                velocity, and UI collisions to predict your viral potential.
               </p>
             </div>
 
@@ -326,13 +349,15 @@ export default function Home() {
     if (params.get("deleted") === "1") {
       setDeleted(true);
       window.history.replaceState({}, "", "/");
+      const timer = setTimeout(() => setDeleted(false), 5000);
+      return () => clearTimeout(timer);
     }
   }, []);
 
   if (showSplash === null) return null;
 
   if (showSplash) {
-    return <LandingHero deleted={deleted} />;
+    return <LandingHero deleted={deleted} onDismissDeleted={() => setDeleted(false)} />;
   }
 
   return (

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { forgotPassword, verifyResetCode, resetPassword, apiErrorDetail } from "@/lib/api";
+import PasswordInput from "@/components/PasswordInput";
 
 type Step = "email" | "code" | "password" | "done";
 
@@ -216,23 +217,19 @@ export default function ForgotPasswordPage() {
 
         {step === "password" && (
           <form onSubmit={handleReset} className="space-y-4">
-            <input
-              type="password"
+            <PasswordInput
               placeholder="New password (min 8 chars)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="new-password"
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
             />
-            <input
-              type="password"
+            <PasswordInput
               placeholder="Confirm new password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
               autoComplete="new-password"
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
             />
             {error && <p className="text-danger text-sm">{error}</p>}
             <button type="submit" disabled={loading}

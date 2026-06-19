@@ -150,6 +150,8 @@ export default function AdminPage() {
   const [harvestMinLikes, setHarvestMinLikes] = useState("1000");
   const [harvestMaxPer, setHarvestMaxPer] = useState("3");
   const [harvestPlatform, setHarvestPlatform] = useState<"tiktok" | "instagram">("tiktok");
+  const [harvestDebugNiche, setHarvestDebugNiche] = useState("");
+  const [harvestDetailExpanded, setHarvestDetailExpanded] = useState<Record<string, boolean>>({});
 
   // Niche Intelligence state
   const [insights, setInsights] = useState<NicheInsightRow[]>([]);
@@ -326,6 +328,7 @@ export default function AdminPage() {
         min_views: parseInt(harvestMinViews) || 500_000,
         min_likes: parseInt(harvestMinLikes) || 1_000,
         max_per_niche: parseInt(harvestMaxPer) || 3,
+        ...(harvestDebugNiche ? { niches: [harvestDebugNiche] } : {}),
       });
       const poll = async () => {
         try {
@@ -729,11 +732,35 @@ export default function AdminPage() {
                 onChange={(e) => setHarvestMaxPer(e.target.value)}
                 className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
             </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">
+                Debug: single niche
+                <span className="ml-1 text-text-muted/50 font-normal">(blank = all)</span>
+              </label>
+              <select
+                value={harvestDebugNiche}
+                onChange={(e) => setHarvestDebugNiche(e.target.value)}
+                className="w-44 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
+              >
+                <option value="">All {harvestPlatform === "tiktok" ? "50" : "50"} niches</option>
+                {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
+              </select>
+            </div>
             <button onClick={handleHarvest} disabled={harvesting}
               className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
-              {harvesting ? "Harvesting…" : `Run ${harvestPlatform === "instagram" ? "Instagram" : "TikTok"} Harvest`}
+              {harvesting
+                ? "Harvesting…"
+                : harvestDebugNiche
+                  ? `Test: ${harvestDebugNiche.split(" ")[0]}…`
+                  : `Run ${harvestPlatform === "instagram" ? "Instagram" : "TikTok"} Harvest`}
             </button>
           </div>
+          {harvestDebugNiche && (
+            <p className="text-yellow-400/80 text-xs">
+              🔬 Debug mode — harvesting only <strong>{harvestDebugNiche}</strong>.
+              Lower min {harvestPlatform === "tiktok" ? "views (e.g. 10000)" : "likes (e.g. 100)"} and set max=1 for a fast smoke test.
+            </p>
+          )}
 
           {harvestError && <p className="text-danger text-sm">{harvestError}</p>}
 
@@ -741,15 +768,27 @@ export default function AdminPage() {
           {(["tiktok", "instagram"] as const).map((p) => {
             const s = harvestStatus?.[p];
             if (!s || s.status === "never_run") return null;
+            const isZeroAdded = (s.total_added ?? 0) === 0;
+            const isDoneOrDegraded = s.status === "done" || s.status === "degraded";
+            const detailOpen = harvestDetailExpanded[p] ?? false;
+            const belowThreshold = (s.total_skip_below_min_views ?? 0) + (s.total_skip_below_min_likes ?? 0);
+
             return (
               <div key={p} className={`rounded-xl px-4 py-3 text-sm border ${
-                s.status === "running" ? "bg-yellow-400/5 border-yellow-400/20 text-yellow-400"
-                : s.status === "failed" ? "bg-danger/5 border-danger/20 text-danger"
-                : "bg-success/5 border-success/20 text-text-primary"
-              }`}>
-                <p className="text-xs text-text-muted/60 uppercase tracking-widest mb-1">{p === "tiktok" ? "TikTok" : "Instagram"}</p>
+                s.status === "running"
+                  ? "bg-yellow-400/5 border-yellow-400/20"
+                  : s.status === "failed"
+                    ? "bg-danger/5 border-danger/20"
+                    : isZeroAdded
+                      ? "bg-yellow-400/5 border-yellow-400/20"
+                      : "bg-success/5 border-success/20"
+              } text-text-primary`}>
+                <p className="text-xs text-text-muted/60 uppercase tracking-widest mb-1">
+                  {p === "tiktok" ? "TikTok" : "Instagram"}
+                </p>
+
                 {s.status === "running" ? (
-                  <div className="space-y-0.5">
+                  <div className="space-y-0.5 text-yellow-400">
                     <p>Harvest in progress — checking every 8s…</p>
                     {(s.niches_processed ?? 0) > 0 && (
                       <p className="text-xs opacity-70">
@@ -759,40 +798,180 @@ export default function AdminPage() {
                     )}
                   </div>
                 ) : s.status === "failed" ? (
-                  <div className="space-y-1">
+                  <div className="space-y-1 text-danger">
                     <p className="font-medium">Error — harvest failed</p>
                     {s.error && <p className="text-xs opacity-80 font-mono">{s.error}</p>}
                     {s.finished_at && <p className="text-xs opacity-60">{new Date(s.finished_at).toLocaleString()}</p>}
                   </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="font-medium text-success">Complete · +{s.total_added} seeds added</p>
+                ) : isDoneOrDegraded ? (
+                  <div className="space-y-1.5">
+                    {/* Headline — amber when 0 seeds, green when seeds added */}
+                    {isZeroAdded ? (
+                      <p className="font-medium text-yellow-400">
+                        Finished · +0 seeds added
+                        {s.status === "degraded" ? " — errors prevented harvest" : " — all candidates filtered out"}
+                      </p>
+                    ) : (
+                      <p className="font-medium text-success">Complete · +{s.total_added} seeds added</p>
+                    )}
+
                     <p className="text-text-muted text-xs">
-                      {s.niches_processed} niches · {s.total_skipped} skipped
+                      {s.niches_processed} niches · {s.total_skipped ?? 0} skipped
                       {s.finished_at && ` · ${new Date(s.finished_at).toLocaleString()}`}
                     </p>
+
                     {(s.total_gemini_calls ?? 0) > 0 && (
                       <p className="text-text-muted text-xs">
-                        🤖 {s.total_gemini_calls} Gemini video upload{s.total_gemini_calls !== 1 ? "s" : ""} used this run
+                        🤖 {s.total_gemini_calls} Gemini upload{(s.total_gemini_calls ?? 0) !== 1 ? "s" : ""} this run
                       </p>
                     )}
-                    {(s.total_errors ?? 0) > 0 && (
-                      <p className="text-yellow-400 text-xs mt-1">
-                        ⚠ {s.total_errors} video{s.total_errors !== 1 ? "s" : ""} failed — check Railway logs
+
+                    {/* Zero-seed diagnostic panel */}
+                    {isZeroAdded && (() => {
+                      const dupCount = s.total_skip_duplicate ?? 0;
+                      const missingFieldCount =
+                        (s.total_skip_missing_id ?? 0) +
+                        (s.total_skip_missing_play_url ?? 0) +
+                        (s.total_skip_missing_url ?? 0);
+                      const noCandidates =
+                        (s.total_search_failures ?? 0) === 0 &&
+                        belowThreshold === 0 &&
+                        dupCount === 0 &&
+                        missingFieldCount === 0 &&
+                        (s.total_download_errors ?? 0) === 0 &&
+                        (s.total_analysis_errors ?? 0) === 0;
+                      return (
+                        <div className="mt-1 bg-yellow-400/5 border border-yellow-400/20 rounded-lg px-3 py-2 space-y-1">
+                          <p className="text-yellow-400 text-xs font-semibold">Why 0 seeds?</p>
+                          {(s.total_search_failures ?? 0) > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {s.total_search_failures} keyword search{(s.total_search_failures ?? 0) !== 1 ? "es" : ""} failed
+                              {" "}(API rate limit or unreachable)
+                            </p>
+                          )}
+                          {belowThreshold > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {belowThreshold} candidate{belowThreshold !== 1 ? "s" : ""} below
+                              {" "}{p === "tiktok" ? "min views" : "min likes"}
+                              {" "}— lower the threshold or use Debug mode with a smaller min value
+                            </p>
+                          )}
+                          {dupCount > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {dupCount} duplicate{dupCount !== 1 ? "s" : ""} skipped — already in the seed library from a prior run
+                            </p>
+                          )}
+                          {missingFieldCount > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {missingFieldCount} candidate{missingFieldCount !== 1 ? "s" : ""} skipped — missing required fields (possible API schema change)
+                            </p>
+                          )}
+                          {(s.total_download_errors ?? 0) > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {s.total_download_errors} download{(s.total_download_errors ?? 0) !== 1 ? "s" : ""} failed
+                              {s.last_download_error && (
+                                <span className="block mt-0.5 font-mono text-[11px] text-text-muted/60 break-all">
+                                  {s.last_download_error}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {(s.total_analysis_errors ?? 0) > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {s.total_analysis_errors} Gemini analysis failure{(s.total_analysis_errors ?? 0) !== 1 ? "s" : ""}
+                              {s.last_analysis_error && (
+                                <span className="block mt-0.5 font-mono text-[11px] text-text-muted/60 break-all">
+                                  {s.last_analysis_error}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {(s.total_db_errors ?? 0) > 0 && (
+                            <p className="text-xs text-text-muted">
+                              • {s.total_db_errors} database error{(s.total_db_errors ?? 0) !== 1 ? "s" : ""}
+                              {s.last_db_error && (
+                                <span className="block mt-0.5 font-mono text-[11px] text-text-muted/60 break-all">
+                                  {s.last_db_error}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {noCandidates && (
+                            <p className="text-xs text-text-muted">
+                              • No candidates returned from search — {p === "tiktok" ? "tikwm" : "HikerAPI"} returned an empty result set for these keywords
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Non-zero warnings */}
+                    {!isZeroAdded && (s.total_errors ?? 0) > 0 && (
+                      <p className="text-yellow-400 text-xs">
+                        ⚠ {s.total_errors} video{(s.total_errors ?? 0) !== 1 ? "s" : ""} failed
                       </p>
                     )}
-                    {(s.total_search_failures ?? 0) > 0 && (
-                      <p className="text-yellow-400 text-xs mt-1">
-                        ⚠ {s.total_search_failures} search{s.total_search_failures !== 1 ? "es" : ""} failed (likely API rate limit) — fewer seeds than expected
+                    {!isZeroAdded && (s.total_search_failures ?? 0) > 0 && (
+                      <p className="text-yellow-400 text-xs">
+                        ⚠ {s.total_search_failures} search{(s.total_search_failures ?? 0) !== 1 ? "es" : ""} failed — fewer seeds than expected
                       </p>
                     )}
                     {(s.failed_niches ?? 0) > 0 && (
-                      <p className="text-yellow-400 text-xs mt-1">
-                        ⚠ {s.failed_niches} niche{s.failed_niches !== 1 ? "s" : ""} crashed — check Railway logs
+                      <p className="text-yellow-400 text-xs">
+                        ⚠ {s.failed_niches} niche{(s.failed_niches ?? 0) !== 1 ? "s" : ""} crashed — check Railway logs
                       </p>
                     )}
+
+                    {/* Per-niche detail table */}
+                    {s.detail && s.detail.length > 0 && (
+                      <div className="mt-1">
+                        <button
+                          onClick={() => setHarvestDetailExpanded(prev => ({ ...prev, [p]: !detailOpen }))}
+                          className="text-xs text-purple-to hover:underline"
+                        >
+                          {detailOpen ? "Hide" : "Show"} per-niche detail ({s.detail.length})
+                        </button>
+                        {detailOpen && (
+                          <div className="mt-2 overflow-x-auto">
+                            <table className="w-full text-xs border-collapse">
+                              <thead>
+                                <tr className="text-text-muted/60 border-b border-border/30">
+                                  <th className="text-left py-1 pr-3 font-medium">Niche</th>
+                                  <th className="text-right py-1 pr-2 font-medium">+Added</th>
+                                  <th className="text-right py-1 pr-2 font-medium">Skip</th>
+                                  <th className="text-right py-1 pr-2 font-medium">↓Filter</th>
+                                  <th className="text-right py-1 pr-2 font-medium">Gemini</th>
+                                  <th className="text-right py-1 pr-2 font-medium">Err</th>
+                                  <th className="text-right py-1 font-medium">↯Srch</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {s.detail.map((d) => (
+                                  <tr
+                                    key={d.niche}
+                                    className={`border-t border-border/20 ${
+                                      d.added > 0 ? "text-success" :
+                                      d.errors > 0 || (d.search_failures ?? 0) > 0 ? "text-yellow-400/80" :
+                                      "text-text-muted"
+                                    }`}
+                                  >
+                                    <td className="py-1 pr-3 text-text-primary/80" style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.niche}</td>
+                                    <td className="py-1 pr-2 text-right font-medium">{d.added}</td>
+                                    <td className="py-1 pr-2 text-right">{d.skipped}</td>
+                                    <td className="py-1 pr-2 text-right">{(d.skip_below_min_views ?? 0) + (d.skip_below_min_likes ?? 0)}</td>
+                                    <td className="py-1 pr-2 text-right">{d.gemini_calls ?? 0}</td>
+                                    <td className="py-1 pr-2 text-right">{d.errors}</td>
+                                    <td className="py-1 text-right">{d.search_failures ?? 0}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
+                ) : null}
               </div>
             );
           })}

@@ -185,6 +185,13 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'complete'",
+        # Dedup: if any email appears more than once (case-insensitive), null out all
+        # but the newest account (highest id). Idempotent — no-op when no duplicates.
+        "UPDATE users SET email = NULL WHERE email IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM users WHERE email IS NOT NULL GROUP BY lower(email))",
+        # Enforce case-insensitive uniqueness on email. Partial index (WHERE email IS
+        # NOT NULL) lets legacy accounts keep NULL without conflicting. Idempotent via
+        # IF NOT EXISTS. Works even if ADD COLUMN UNIQUE above was already applied.
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_ci ON users (lower(email)) WHERE email IS NOT NULL",
     ]
     for stmt in statements:
         await conn.exec_driver_sql(stmt)

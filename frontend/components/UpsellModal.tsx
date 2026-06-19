@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { track } from "@vercel/analytics";
 
 interface UpsellModalProps {
   analysisId: number | string;
@@ -8,6 +10,10 @@ interface UpsellModalProps {
 }
 
 export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
+  useEffect(() => {
+    track("upsell_shown", { analysis_id: analysisId });
+  }, [analysisId]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm"
@@ -41,6 +47,7 @@ export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
           <div className="flex flex-col gap-3">
             <Link
               href={`/signup?next=/results/${analysisId}`}
+              onClick={() => track("upsell_cta_clicked", { analysis_id: analysisId })}
               className="gradient-btn text-white font-bold py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
               Get my improvement plan

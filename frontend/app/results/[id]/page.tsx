@@ -194,7 +194,7 @@ export default function ResultsPage() {
 
   if (s.error) {
     return (
-      <ErrorScreen title="Analysis failed" message={s.analysis_summary} />
+      <ErrorScreen title="Analysis failed" message={s.error} />
     );
   }
 

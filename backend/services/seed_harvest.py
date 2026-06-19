@@ -107,7 +107,9 @@ async def _search_tiktok(keyword: str, count: int = 20) -> list[dict]:
         body = r.json()
     if body.get("code") != 0:
         raise ValueError(f"tikwm search '{keyword}': {body.get('msg')}")
-    return body.get("data", {}).get("videos", [])
+    videos = body.get("data", {}).get("videos", [])
+    logger.info("tikwm search '%s' → %d candidates", keyword, len(videos))
+    return videos
 
 
 async def _already_harvested(video_id: str) -> bool:
@@ -134,6 +136,11 @@ async def harvest_niche(
 ) -> dict:
     keywords = NICHE_KEYWORDS.get(niche, [niche])
     added = skipped = errors = search_failures = gemini_calls = 0
+    # Granular skip counters — tell us exactly why candidates were filtered out.
+    skip_missing_id = skip_missing_play_url = skip_below_min_views = skip_duplicate = 0
+    # Split error counters — separate download vs. Gemini vs. DB failures.
+    download_errors = analysis_errors = db_errors = 0
+    last_download_error = last_analysis_error = last_db_error = ""
     consecutive_errors = 0  # circuit breaker counter — resets on any success
 
     for keyword in keywords:
@@ -157,11 +164,9 @@ async def harvest_niche(
             if added >= max_videos:
                 break
 
-            # Circuit breaker: stop this niche if Gemini is consistently failing.
-            # Prevents draining daily quota when rate-limited or key is exhausted.
             if consecutive_errors >= _CIRCUIT_BREAKER_THRESHOLD:
                 logger.warning(
-                    "Circuit breaker: stopping niche=%s after %d consecutive Gemini errors",
+                    "Circuit breaker: stopping niche=%s after %d consecutive errors",
                     niche, consecutive_errors,
                 )
                 break
@@ -171,25 +176,51 @@ async def harvest_niche(
             like_count = int(v.get("digg_count") or 0)
             play_url = v.get("play", "")
 
-            if not video_id or not play_url or play_count < min_views:
+            # Granular filter — log each skip reason separately.
+            if not video_id:
+                skip_missing_id += 1
+                skipped += 1
+                continue
+            if not play_url:
+                skip_missing_play_url += 1
+                skipped += 1
+                continue
+            if play_count < min_views:
+                skip_below_min_views += 1
                 skipped += 1
                 continue
 
             if await _already_harvested(video_id):
+                skip_duplicate += 1
                 skipped += 1
                 continue
 
             fd, tmp = tempfile.mkstemp(suffix=".mp4")
-            os.close(fd)  # _download reopens by path; we don't need the fd
+            os.close(fd)
             try:
-                await _download(play_url, tmp)
+                # Step 1: Download — tracked separately from analysis failures.
+                try:
+                    await _download(play_url, tmp)
+                except Exception as e:
+                    msg = str(e)[:200]
+                    logger.error("Download error niche=%s vid=%s: %s", niche, video_id, e)
+                    download_errors += 1
+                    errors += 1
+                    consecutive_errors += 1
+                    last_download_error = msg
+                    continue
+
+                # Step 2: Gemini analysis — tracked separately from download failures.
                 gemini_calls += 1
                 result = await analyze_seed_video(tmp, "tiktok", niche, play_count, like_count)
 
                 if "error" in result or "virality_rating" not in result:
-                    logger.warning("Analysis failed vid:%s — %s", video_id, result.get("error"))
+                    err_msg = str(result.get("error", "missing virality_rating"))[:200]
+                    logger.warning("Analysis failed vid:%s — %s", video_id, err_msg)
+                    analysis_errors += 1
                     errors += 1
                     consecutive_errors += 1
+                    last_analysis_error = err_msg
                     continue
 
                 consecutive_errors = 0  # success — reset the circuit breaker
@@ -199,25 +230,36 @@ async def harvest_niche(
                 if caption:
                     note_parts.append(caption)
 
-                async with AsyncSessionLocal() as db:
-                    seed = SeedVideo(
-                        filename=f"harvest-{video_id}.mp4",
-                        platform="tiktok",
-                        niche=niche,
-                        view_count=play_count,
-                        like_count=like_count,
-                        rating=rating,
-                        gemini_analysis=json.dumps(result),
-                        notes=" · ".join(note_parts),
-                        source="harvest",
-                    )
-                    db.add(seed)
-                    await db.commit()
+                # Step 3: DB insert — tracked separately so a schema error is diagnosable.
+                try:
+                    async with AsyncSessionLocal() as db:
+                        seed = SeedVideo(
+                            filename=f"harvest-{video_id}.mp4",
+                            platform="tiktok",
+                            niche=niche,
+                            view_count=play_count,
+                            like_count=like_count,
+                            rating=rating,
+                            gemini_analysis=json.dumps(result),
+                            notes=" · ".join(note_parts),
+                            source="harvest",
+                        )
+                        db.add(seed)
+                        await db.commit()
+                except Exception as e:
+                    msg = str(e)[:200]
+                    logger.error("DB error niche=%s vid=%s: %s", niche, video_id, e)
+                    db_errors += 1
+                    errors += 1
+                    consecutive_errors += 1
+                    last_db_error = msg
+                    continue
 
                 added += 1
                 logger.info("Harvested niche=%s vid=%s rating=%d views=%d", niche, video_id, rating, play_count)
 
             except Exception as e:
+                # Catch-all for anything not handled above (e.g. rating type error).
                 logger.error("Harvest error niche=%s vid=%s: %s", niche, video_id, e)
                 errors += 1
                 consecutive_errors += 1
@@ -225,6 +267,12 @@ async def harvest_niche(
                 if os.path.exists(tmp):
                     os.remove(tmp)
 
+    logger.info(
+        "harvest_niche done niche=%s added=%d skipped=%d(below_views=%d dup=%d) "
+        "search_fail=%d gemini=%d dl_err=%d analysis_err=%d db_err=%d",
+        niche, added, skipped, skip_below_min_views, skip_duplicate,
+        search_failures, gemini_calls, download_errors, analysis_errors, db_errors,
+    )
     return {
         "niche": niche,
         "added": added,
@@ -232,6 +280,16 @@ async def harvest_niche(
         "errors": errors,
         "search_failures": search_failures,
         "gemini_calls": gemini_calls,
+        "skip_missing_id": skip_missing_id,
+        "skip_missing_play_url": skip_missing_play_url,
+        "skip_below_min_views": skip_below_min_views,
+        "skip_duplicate": skip_duplicate,
+        "download_errors": download_errors,
+        "analysis_errors": analysis_errors,
+        "db_errors": db_errors,
+        "last_download_error": last_download_error,
+        "last_analysis_error": last_analysis_error,
+        "last_db_error": last_db_error,
     }
 
 
@@ -247,20 +305,38 @@ async def harvest_all(
 
     try:
         sem = asyncio.Semaphore(_TIKTOK_CONCURRENCY)
-        # Live running totals — updated after each niche so polling shows progress.
-        _running: dict = {"added": 0, "skipped": 0, "errors": 0, "gemini_calls": 0,
-                          "search_failures": 0, "niches_done": 0, "failed_niches": 0}
+        _running: dict = {
+            "added": 0, "skipped": 0, "errors": 0, "gemini_calls": 0,
+            "search_failures": 0, "niches_done": 0,
+            "skip_missing_id": 0, "skip_missing_play_url": 0,
+            "skip_below_min_views": 0, "skip_duplicate": 0,
+            "download_errors": 0, "analysis_errors": 0, "db_errors": 0,
+            "last_download_error": "", "last_analysis_error": "", "last_db_error": "",
+        }
 
         async def _run(niche: str) -> dict:
             async with sem:
                 result = await harvest_niche(niche, min_views, max_per_niche)
-            # Update live totals immediately after each niche finishes.
             _running["added"] += result["added"]
             _running["skipped"] += result["skipped"]
             _running["errors"] += result["errors"]
             _running["gemini_calls"] += result.get("gemini_calls", 0)
             _running["search_failures"] += result.get("search_failures", 0)
+            _running["skip_missing_id"] += result.get("skip_missing_id", 0)
+            _running["skip_missing_play_url"] += result.get("skip_missing_play_url", 0)
+            _running["skip_below_min_views"] += result.get("skip_below_min_views", 0)
+            _running["skip_duplicate"] += result.get("skip_duplicate", 0)
+            _running["download_errors"] += result.get("download_errors", 0)
+            _running["analysis_errors"] += result.get("analysis_errors", 0)
+            _running["db_errors"] += result.get("db_errors", 0)
+            if result.get("last_download_error"):
+                _running["last_download_error"] = result["last_download_error"]
+            if result.get("last_analysis_error"):
+                _running["last_analysis_error"] = result["last_analysis_error"]
+            if result.get("last_db_error"):
+                _running["last_db_error"] = result["last_db_error"]
             _running["niches_done"] += 1
+            # Update in-memory status live so polling shows progress.
             _last_harvest.update({
                 "niches_processed": _running["niches_done"],
                 "total_added": _running["added"],
@@ -268,11 +344,19 @@ async def harvest_all(
                 "total_errors": _running["errors"],
                 "total_gemini_calls": _running["gemini_calls"],
                 "total_search_failures": _running["search_failures"],
+                "total_skip_missing_id": _running["skip_missing_id"],
+                "total_skip_missing_play_url": _running["skip_missing_play_url"],
+                "total_skip_below_min_views": _running["skip_below_min_views"],
+                "total_skip_duplicate": _running["skip_duplicate"],
+                "total_download_errors": _running["download_errors"],
+                "total_analysis_errors": _running["analysis_errors"],
+                "total_db_errors": _running["db_errors"],
+                "last_download_error": _running["last_download_error"],
+                "last_analysis_error": _running["last_analysis_error"],
+                "last_db_error": _running["last_db_error"],
             })
             return result
 
-        # return_exceptions=True: one niche crashing must not discard every other
-        # niche's completed work.
         raw = await asyncio.gather(*[_run(n) for n in target], return_exceptions=True)
         results = [r for r in raw if isinstance(r, dict)]
         failed_niches = 0
@@ -282,26 +366,45 @@ async def harvest_all(
                 logger.error("TikTok niche task crashed: %s", r)
 
         total_added = _running["added"]
-        total_skipped = _running["skipped"]
         total_errors = _running["errors"]
-        total_gemini_calls = _running["gemini_calls"]
         total_search_failures = _running["search_failures"]
+        total_gemini_calls = _running["gemini_calls"]
+
+        # Honest status: "degraded" when errors or search failures caused zero results.
+        # "done" when seeds were added, or when filters (not errors) caused zero results.
+        if total_added == 0 and (total_errors > 0 or total_search_failures > 0):
+            final_status = "degraded"
+        else:
+            final_status = "done"
 
         _last_harvest = {
-            "status": "done",
+            "status": final_status,
             "finished_at": datetime.utcnow().isoformat(),
             "niches_processed": len(results),
             "total_added": total_added,
-            "total_skipped": total_skipped,
+            "total_skipped": _running["skipped"],
             "total_errors": total_errors,
             "total_gemini_calls": total_gemini_calls,
             "total_search_failures": total_search_failures,
+            "total_skip_missing_id": _running["skip_missing_id"],
+            "total_skip_missing_play_url": _running["skip_missing_play_url"],
+            "total_skip_below_min_views": _running["skip_below_min_views"],
+            "total_skip_duplicate": _running["skip_duplicate"],
+            "total_download_errors": _running["download_errors"],
+            "total_analysis_errors": _running["analysis_errors"],
+            "total_db_errors": _running["db_errors"],
+            "last_download_error": _running["last_download_error"],
+            "last_analysis_error": _running["last_analysis_error"],
+            "last_db_error": _running["last_db_error"],
             "failed_niches": failed_niches,
             "detail": results,
         }
         logger.info(
-            "Harvest done: added=%d skipped=%d errors=%d gemini_calls=%d search_failures=%d failed_niches=%d",
-            total_added, total_skipped, total_errors, total_gemini_calls, total_search_failures, failed_niches,
+            "Harvest done: status=%s added=%d skipped=%d(below_views=%d) "
+            "errors=%d(dl=%d analysis=%d db=%d) gemini=%d search_fail=%d failed_niches=%d",
+            final_status, total_added, _running["skipped"], _running["skip_below_min_views"],
+            total_errors, _running["download_errors"], _running["analysis_errors"], _running["db_errors"],
+            total_gemini_calls, total_search_failures, failed_niches,
         )
     except Exception as e:
         logger.error("Harvest failed: %s", e)
