@@ -162,13 +162,16 @@ The results badge reads `analysis.mode` (effective), never the requested mode.
 
 ## Deploy discipline — IMPORTANT
 
-Railway runs on a usage credit model. Every backend deploy rebuilds the Docker image and costs bandwidth. **30 deploys burned through Render's free tier** — don't repeat this pattern.
+**Railway is on the FREE plan.** Deploys are limited to 1–2 per day max. Every backend deploy rebuilds the Docker image and costs credits. **30 deploys burned through Render's free tier** — don't repeat this pattern.
+
+**NEVER deploy unless the user explicitly says "deploy" or "push to Railway".** Do not push to trigger a deploy as a convenience, to verify a fix, or as part of a task unless directly instructed.
 
 **Rules:**
-1. **Batch backend changes.** Never push a single-line backend fix. Accumulate multiple changes and push once.
-2. **Test locally before every backend push.** Run `uvicorn main:app --reload` and manually verify the change works. A push that requires a follow-up fix = 2 deploys for 1 fix.
-3. **Frontend deploys are free** (Vercel bandwidth is generous). The discipline applies to backend (`main` branch pushes that touch `backend/`).
-4. **Schema changes + code changes = one push.** Don't push the schema change, verify, then push the code. Do both together.
-5. **Never push to fix a typo or log statement.** Fix locally, bundle it into the next real change.
+1. **Do not deploy without explicit instruction.** Always wait for the user to say so.
+2. **Batch backend changes.** Never push a single-line backend fix. Accumulate multiple changes and push once.
+3. **Test locally before every backend push.** Run `uvicorn main:app --reload` and manually verify the change works. A push that requires a follow-up fix = 2 deploys for 1 fix.
+4. **Frontend deploys are free** (Vercel bandwidth is generous). The discipline applies to backend (`main` branch pushes that touch `backend/`).
+5. **Schema changes + code changes = one push.** Don't push the schema change, verify, then push the code. Do both together.
+6. **Never push to fix a typo or log statement.** Fix locally, bundle it into the next real change.
 
 **Before any backend push, ask:** "Can I combine this with anything else that's pending?" If yes, wait.

@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 import aiosmtplib
 import certifi
+import httpx
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -28,6 +29,10 @@ _SMTP_USER = os.getenv("SMTP_USER", "")
 _SMTP_PASS = os.getenv("SMTP_PASS", "")
 _EMAIL_FROM = os.getenv("EMAIL_FROM", f"Surge <{_SMTP_USER}>" if _SMTP_USER else "")
 _FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
+# Brevo HTTP API key (xkeysib-...). Preferred transport: HTTPS/443 works on hosts
+# like Railway that block all outbound SMTP ports (587/2525/465/25). SMTP is the
+# local-dev fallback only.
+_BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -232,14 +237,101 @@ async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSe
     return {"ok": True}
 
 
+def _parse_sender(raw: str) -> tuple[str, str]:
+    """Split 'Surge <foo@bar.com>' into ('Surge', 'foo@bar.com'). Falls back to the
+    raw value as the address with a default display name."""
+    m = re.match(r"^\s*(.*?)\s*<\s*([^>]+?)\s*>\s*$", raw)
+    if m:
+        return (m.group(1) or "Surge"), m.group(2)
+    return "Surge", raw.strip()
+
+
+async def _send_via_brevo_api(to_email: str, subject: str, html: str, plain: str) -> bool:
+    """Send through Brevo's transactional HTTP API (HTTPS/443). Returns True on success."""
+    name, addr = _parse_sender(_EMAIL_FROM)
+    payload = {
+        "sender": {"name": name, "email": addr},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html,
+        "textContent": plain,
+    }
+    headers = {
+        "api-key": _BREVO_API_KEY,
+        "content-type": "application/json",
+        "accept": "application/json",
+    }
+    last_err: str | None = None
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.post(
+                    "https://api.brevo.com/v3/smtp/email", json=payload, headers=headers
+                )
+            if r.status_code in (200, 201):
+                msg_id = r.json().get("messageId") if r.content else None
+                logger.info("Email sent to %s via Brevo API (attempt %d, msgId=%s)", to_email, attempt + 1, msg_id)
+                return True
+            last_err = f"HTTP {r.status_code}: {r.text[:200]}"
+            logger.warning("Brevo API attempt %d for %s: %s", attempt + 1, to_email, last_err)
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+            logger.warning("Brevo API attempt %d failed for %s: %s", attempt + 1, to_email, last_err)
+        if attempt < 2:
+            await asyncio.sleep(2 ** attempt)  # 1s, 2s
+    logger.error("All Brevo API attempts failed for %s: %s", to_email, last_err)
+    return False
+
+
+async def _send_via_smtp(to_email: str, subject: str, html: str, plain: str) -> bool:
+    """Send through Brevo SMTP. Works locally; BLOCKED on Railway (all SMTP ports)."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = _EMAIL_FROM
+    msg["To"] = to_email
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html, "html"))
+
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            await aiosmtplib.send(
+                msg,
+                hostname=_SMTP_HOST,
+                port=_SMTP_PORT,
+                username=_SMTP_USER,
+                password=_SMTP_PASS,
+                start_tls=True,
+                timeout=30,
+                cert_bundle=certifi.where(),
+            )
+            logger.info("Email sent to %s via SMTP (attempt %d)", to_email, attempt + 1)
+            return True
+        except Exception as e:
+            last_err = e
+            logger.warning("SMTP attempt %d failed for %s: %s: %s", attempt + 1, to_email, type(e).__name__, e)
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)  # 1s, 2s
+    logger.error("All SMTP attempts failed for %s: %s", to_email, last_err)
+    return False
+
+
+async def _send_email(to_email: str, subject: str, html: str, plain: str) -> bool:
+    """Dispatch an email. Prefers the Brevo HTTP API (Railway blocks SMTP); falls
+    back to SMTP only when no API key is set (local dev)."""
+    if _BREVO_API_KEY:
+        return await _send_via_brevo_api(to_email, subject, html, plain)
+    if _SMTP_USER and _SMTP_PASS:
+        return await _send_via_smtp(to_email, subject, html, plain)
+    logger.error(
+        "EMAIL NOT CONFIGURED — message to %s NOT sent. Set BREVO_API_KEY (preferred) "
+        "or SMTP_* env vars.",
+        to_email,
+    )
+    return False
+
+
 async def _send_reset_email(to_email: str, username: str, code: str) -> None:
-    if not _SMTP_USER or not _SMTP_PASS:
-        logger.error(
-            "SMTP NOT CONFIGURED — reset email NOT sent to %s. "
-            "Set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/EMAIL_FROM in Railway env vars.",
-            to_email,
-        )
-        return
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Surge — Password Reset</h2>
@@ -261,41 +353,10 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
         f"It expires in 1 hour. If you didn't request this, ignore this email.\n\n"
         f"— The Surge team"
     )
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Reset your Surge password"
-    msg["From"] = _EMAIL_FROM
-    msg["To"] = to_email
-    msg.attach(MIMEText(plain, "plain"))
-    msg.attach(MIMEText(html, "html"))
-
-    last_err: Exception | None = None
-    for attempt in range(3):
-        try:
-            await aiosmtplib.send(
-                msg,
-                hostname=_SMTP_HOST,
-                port=_SMTP_PORT,
-                username=_SMTP_USER,
-                password=_SMTP_PASS,
-                start_tls=True,
-                timeout=30,
-                cert_bundle=certifi.where(),
-            )
-            logger.info("Reset email sent to %s (attempt %d)", to_email, attempt + 1)
-            return
-        except Exception as e:
-            last_err = e
-            logger.warning("Reset email attempt %d failed for %s: %s: %s", attempt + 1, to_email, type(e).__name__, e)
-            if attempt < 2:
-                await asyncio.sleep(2 ** attempt)  # 1s, 2s
-
-    logger.error("All reset email attempts failed for %s: %s", to_email, last_err)
+    await _send_email(to_email, "Reset your Surge password", html, plain)
 
 
 async def _send_welcome_email(to_email: str, username: str) -> None:
-    if not _SMTP_USER or not _SMTP_PASS:
-        logger.warning("SMTP NOT CONFIGURED — welcome email NOT sent to %s.", to_email)
-        return
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Welcome to Surge, {username}!</h2>
@@ -319,32 +380,4 @@ async def _send_welcome_email(to_email: str, username: str) -> None:
         f"and get an AI-powered virality score in seconds.\n\n"
         f"— The Surge team"
     )
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Welcome to Surge 🎬"
-    msg["From"] = _EMAIL_FROM
-    msg["To"] = to_email
-    msg.attach(MIMEText(plain, "plain"))
-    msg.attach(MIMEText(html, "html"))
-
-    last_err: Exception | None = None
-    for attempt in range(3):
-        try:
-            await aiosmtplib.send(
-                msg,
-                hostname=_SMTP_HOST,
-                port=_SMTP_PORT,
-                username=_SMTP_USER,
-                password=_SMTP_PASS,
-                start_tls=True,
-                timeout=30,
-                cert_bundle=certifi.where(),
-            )
-            logger.info("Welcome email sent to %s (attempt %d)", to_email, attempt + 1)
-            return
-        except Exception as e:
-            last_err = e
-            logger.warning("Welcome email attempt %d failed for %s: %s: %s", attempt + 1, to_email, type(e).__name__, e)
-            if attempt < 2:
-                await asyncio.sleep(2 ** attempt)  # 1s, 2s
-
-    logger.error("All welcome email attempts failed for %s: %s", to_email, last_err)
+    await _send_email(to_email, "Welcome to Surge 🎬", html, plain)
