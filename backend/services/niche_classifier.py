@@ -1,7 +1,13 @@
 """Maps a creator's free-text niche description to one of the canonical
 niches used for seed matching. The canonical label keeps seed bucketing
 deterministic; the raw text still goes to the analysis prompt for specificity.
+
+Honesty layer (#4, on top of #6): a niche Surge isn't sure about routes to the
+``Uncategorized`` sentinel — which matches no NicheInsight / seed / TrendSummary,
+so grading falls back to the generic dimension hierarchy (neutral weights) — and
+flags ``needs_confirmation`` instead of silently scoring as the wrong niche.
 """
+import re
 import asyncio
 import json
 
@@ -64,34 +70,62 @@ CANONICAL_NICHES = [
     "News & Commentary",
 ]
 
-FALLBACK_NICHE = "Lifestyle & Vlogs"
+# Sentinel — deliberately NOT in CANONICAL_NICHES. An "Uncategorized" niche
+# matches no NicheInsight / seed / TrendSummary lookup, so grading falls back to
+# the generic dimension hierarchy: unknown niche → neutral weights, never the
+# wrong niche's weights. Analysis still completes.
+UNCATEGORIZED = "Uncategorized"
 
 _CLASSIFY_TIMEOUT_S = 10
 
 
-async def classify_niche(raw: str) -> str:
-    """Return the canonical niche that best matches the creator's own wording.
+def _match_canonical(value: str) -> str | None:
+    """Resolve free text to a canonical niche, or None if nothing fits (#6).
 
-    Never raises and never blocks an analysis: any failure (bad response,
-    rate limit, timeout) falls back to FALLBACK_NICHE.
+    Exact (case-insensitive) match first, then a near-miss: the text equals one
+    side of an ``&``/``/``-joined canonical label — so "Finance" → "Finance &
+    Investing" and "Makeup" → "Beauty & Makeup". ``""``/``"NONE"`` → None.
+    """
+    v = (value or "").strip().lower()
+    if not v or v == "none":
+        return None
+    # Exact (case-insensitive).
+    for c in CANONICAL_NICHES:
+        if v == c.lower():
+            return c
+    # Near-miss: the text equals a segment of a compound canonical label.
+    for c in CANONICAL_NICHES:
+        for seg in re.split(r"[&/,]", c.lower()):
+            if v == seg.strip():
+                return c
+    return None
+
+
+async def classify_niche(raw: str) -> dict:
+    """Map free text → {canonical (primary), secondary, confidence, needs_confirmation}.
+
+    Never raises, never blocks. Unknown/off-list/failure → UNCATEGORIZED +
+    needs_confirmation, NEVER a silent real niche. Secondary is advisory only (#6).
     """
     raw = (raw or "").strip()
     if not raw:
-        return FALLBACK_NICHE
+        return {"canonical": UNCATEGORIZED, "secondary": None,
+                "confidence": "low", "needs_confirmation": True}
 
-    # Exact match (e.g. a suggestion chip or canonical label) needs no API call.
-    lowered = raw.lower()
-    for canonical in CANONICAL_NICHES:
-        if lowered == canonical.lower():
-            return canonical
+    exact = _match_canonical(raw)
+    if exact and exact.lower() == raw.lower():            # explicit chip pick
+        return {"canonical": exact, "secondary": None,
+                "confidence": "high", "needs_confirmation": False}
 
     prompt = (
-        "You are a content category classifier.\n"
-        "Given a creator's self-described niche, return ONLY the single "
-        "best-matching category from this list (return the exact string as a "
-        "JSON string, nothing else):\n"
-        f"{json.dumps(CANONICAL_NICHES)}\n\n"
-        f'Creator\'s niche: "{raw}"'
+        "You are a content category classifier. From the list, choose the PRIMARY category that "
+        "best fits, and a SECONDARY only if the video genuinely blends two niches. "
+        'If NO category genuinely fits the primary, return "NONE" for primary — do not force a weak match. '
+        "Also rate your confidence in the primary.\n\n"
+        f"Categories: {json.dumps(CANONICAL_NICHES)}\n\n"
+        f'Creator\'s niche: "{raw}"\n\n'
+        'Return ONLY: {"primary": "<exact category or NONE>", '
+        '"secondary": "<exact category or NONE>", "confidence": "high" | "low"}'
     )
 
     try:
@@ -105,12 +139,20 @@ async def classify_niche(raw: str) -> str:
             ),
             timeout=_CLASSIFY_TIMEOUT_S,
         )
-        value = json.loads(response.text)
-        if isinstance(value, str):
-            value = value.strip()
-            for canonical in CANONICAL_NICHES:
-                if value.lower() == canonical.lower():
-                    return canonical
+        data = json.loads(response.text)
+        if isinstance(data, dict):
+            primary = _match_canonical(str(data.get("primary", "")))
+            secondary = _match_canonical(str(data.get("secondary", "")))
+            conf = "low" if str(data.get("confidence", "")).lower() == "low" else "high"
+            if primary:                                   # confident enough to route
+                if secondary == primary:
+                    secondary = None
+                return {"canonical": primary, "secondary": secondary,
+                        "confidence": conf, "needs_confirmation": conf == "low"}
     except Exception:
         pass
-    return FALLBACK_NICHE
+
+    # No confident primary (NONE / no-match / failure) → Uncategorized + confirm.
+    # NOT a silent real niche — that would poison the wrong rubric.
+    return {"canonical": UNCATEGORIZED, "secondary": None,
+            "confidence": "low", "needs_confirmation": True}

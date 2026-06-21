@@ -10,6 +10,25 @@ from services.niche_weights import get_dimension_hierarchy_block
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+# Build #3: a calibration note is only allowed to nudge grading when it is BOTH
+# high-confidence AND built from a real sample. Mirrors services.calibration.MIN_CORRECTIONS
+# (duplicated here as a plain int to avoid a circular import — calibration imports `client`
+# from this module). If you change MIN_CORRECTIONS there, change this too.
+_CALIBRATION_MIN_SAMPLE = 12
+
+
+def _calibration_applies(note: dict | None) -> bool:
+    """A calibration note is applied to grading ONLY when it is high-confidence and
+    backed by a real sample. Otherwise the grader runs un-nudged (the safe default)."""
+    if not isinstance(note, dict):
+        return False
+    if note.get("confidence") != "high":
+        return False
+    if (note.get("sample_count") or 0) < _CALIBRATION_MIN_SAMPLE:
+        return False
+    directive = (note.get("directive") or "").strip()
+    return bool(directive) and directive.lower() != "no adjustment"
+
 
 def _recency_multiplier(seed) -> float:
     """Exponential decay based on how old the seed video is.
@@ -105,6 +124,8 @@ def _build_system_prompt(
     creator_like_baseline: dict | None = None,
     niche_insight: str | None = None,
     trend_context: str | None = None,
+    calibration_note: dict | None = None,
+    secondary_niche: str = "",
 ) -> str:
     ctx = _PLATFORM_CONTEXT.get(platform, _PLATFORM_CONTEXT["tiktok"])
     pname = ctx["name"]
@@ -230,6 +251,18 @@ def _build_system_prompt(
             f'(creator describes their content as: "{raw}").'
         )
 
+    # Advisory secondary niche (#6 Light blend). Primary still drives the rubric,
+    # seeds, and weights — this only tells the model to judge a blended video as a
+    # blend. None/empty/equal-to-primary → no note (identical to single-niche scoring).
+    blend_block = ""
+    if secondary_niche and secondary_niche.strip() and secondary_niche != niche:
+        blend_block = (
+            f"\nBLEND: This video is primarily **{niche}** with strong **{secondary_niche}** "
+            f"elements. Apply {niche} scoring standards as the base, but recognize "
+            f"{secondary_niche} conventions where they appear — do not penalize the video for "
+            f"not being a pure {niche} post. Score the 6 dimensions on what you actually observe."
+        )
+
     if creator_like_baseline and creator_like_baseline.get("sample_count", 0) >= 2:
         ml = creator_like_baseline["median_likes"]
         n = creator_like_baseline["sample_count"]
@@ -284,6 +317,31 @@ def _build_system_prompt(
     else:
         hierarchy_block = get_dimension_hierarchy_block(niche, platform)
 
+    # --- Calibration nudge (Build #3) — soft guidance from REAL past outcomes ---
+    # Only applied when high-confidence + real sample (see _calibration_applies). The
+    # per-dimension numbers were already clamped server-side at generation time; we
+    # additionally tell the model to treat them as soft and never move a score > 1 point.
+    cal_block = ""
+    if show_seeds and _calibration_applies(calibration_note):
+        directive = (calibration_note.get("directive") or "").strip()
+        adjustments = calibration_note.get("dimension_adjustments") or {}
+        adj_line = ""
+        if isinstance(adjustments, dict) and adjustments:
+            parts = [
+                f"{d} {'+' if float(v) >= 0 else ''}{float(v):g}"
+                for d, v in adjustments.items()
+            ]
+            adj_line = (
+                " Per-dimension nudges (already capped, apply gently): "
+                + ", ".join(parts) + "."
+            )
+        cal_block = (
+            "\nCALIBRATION (learned from REAL outcomes in this niche — soft guidance, NOT hard math):\n"
+            f"{directive}{adj_line}\n"
+            "This is derived from a small sample and may reflect selection bias. Apply it gently; "
+            "never let calibration move any single score by more than 1 point."
+        )
+
     return f"""You are an {ctx["analyst_title"]}. Score this video accurately. If something is broken, name it plainly. If something works, say so.
 {benchmark_block}
 {trend_block}
@@ -300,7 +358,7 @@ SCORING (0–10):
 {calibration_block}
 {profile_perf_block}{seed_block}
 
-{niche_line}
+{niche_line}{blend_block}
 {caption_block}{bio_block}{profile_block}
 
 PLATFORM ({pname}):
@@ -322,6 +380,7 @@ SIX DIMENSIONS — score each independently on what you observe in this video:
 6. loop_seamlessness — Does the ending pull viewers back to the start or signal they're done? "Thanks for watching" / fade to black = 1–3. Ending that naturally re-enters the opening = 8–9.
 
 {hierarchy_block}
+{cal_block}
 
 VERDICT (apply exactly, no exceptions):
 - "High potential": overall_score ≥ 7 AND hook_velocity or curiosity_gap ≥ 5.
@@ -389,8 +448,14 @@ async def analyze_video(
     creator_like_baseline: dict | None = None,
     niche_insight: str | None = None,
     trend_context: str | None = None,
+    calibration_note: dict | None = None,
+    secondary_niche: str = "",
 ) -> dict:
     try:
+        # Build #3: only nudge grading in Thinking/Deep — quick mode stays a pure,
+        # un-nudged video assessment (and the corrections feeding calibration are
+        # themselves filtered to thinking/deep predictions only).
+        apply_calibration = mode in ("thinking", "deep_thinking") and _calibration_applies(calibration_note)
         prompt = _build_system_prompt(
             niche,
             high_seeds,
@@ -405,6 +470,8 @@ async def analyze_video(
             creator_like_baseline=creator_like_baseline,
             niche_insight=niche_insight,
             trend_context=trend_context,
+            calibration_note=calibration_note if apply_calibration else None,
+            secondary_niche=secondary_niche,
         )
 
         uploaded = await client.aio.files.upload(file=video_path)
@@ -436,7 +503,12 @@ async def analyze_video(
         except Exception:
             pass  # Non-fatal; Gemini will expire it automatically
 
-        return json.loads(response.text)
+        result = json.loads(response.text)
+        # Build #3: stamp the calibration version that nudged this prediction so
+        # audit_prediction can later record it (hole #2 guard). 0 / absent = un-nudged.
+        if apply_calibration and isinstance(result, dict):
+            result["calibration_version"] = int(calibration_note.get("version") or 0)
+        return result
 
     except _GeminiClientError as e:
         if e.code in (429, 403):

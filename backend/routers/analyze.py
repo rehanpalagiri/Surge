@@ -9,14 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from database import get_db, AsyncSessionLocal
-from models import SeedVideo, UserAnalysis, UserProfile, User, NicheInsight, TrendSummary
+from models import SeedVideo, UserAnalysis, UserProfile, User, NicheInsight, TrendSummary, CalibrationNote
 from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn, SeedConsentDecisionIn
 from services.gemini import analyze_video, select_seed_examples
+from services.calibration import load_calibration_note
 from google.genai.errors import ClientError as _GeminiClientError
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
 from services.seed_promote import promote_analysis_to_seed
+from services.seed_correction import audit_prediction
 from services.rate_limit import get_rate_limit
 from services.throttle import check_rate
 from auth import optional_user, require_user, is_minor
@@ -71,6 +73,8 @@ async def _run_r2_analysis(
     caption: str,
     bio: str,
     platform: str,
+    niche_needs_confirmation: bool = False,
+    secondary_niche: Optional[str] = None,
 ) -> None:
     file_path = os.path.join(uploads_dir, f"{uuid.uuid4()}_r2upload.mp4")
     async with AsyncSessionLocal() as db:
@@ -94,6 +98,7 @@ async def _run_r2_analysis(
             low_seeds: list = []
             niche_insight: str | None = None
             trend_context: str | None = None
+            calibration_note: dict | None = None
             if user:
                 from datetime import timezone
                 insight_row = (await db.execute(
@@ -120,6 +125,10 @@ async def _run_r2_analysis(
                         ref = ref.replace(tzinfo=timezone.utc)
                     if ref >= datetime.now(timezone.utc) - timedelta(days=7):
                         trend_context = trend_row.trend_text
+
+                # Build #3: calibration nudge (applied only in Thinking/Deep + when
+                # high-confidence — gemini.analyze_video makes the final call).
+                calibration_note = await load_calibration_note(db, platform, canonical_niche)
 
             has_usable_seeds = bool(niche_insight or high_seeds or low_seeds)
 
@@ -197,15 +206,21 @@ async def _run_r2_analysis(
             creator_like_baseline=creator_like_baseline,
             niche_insight=niche_insight if effective_mode in ("thinking", "deep_thinking") else None,
             trend_context=trend_context if effective_mode in ("thinking", "deep_thinking") else None,
+            calibration_note=calibration_note if effective_mode in ("thinking", "deep_thinking") else None,
+            secondary_niche=secondary_niche or "",
         )
 
         async with AsyncSessionLocal() as db:
             row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
             if row:
+                result["niche_needs_confirmation"] = niche_needs_confirmation
                 row.scores_json = json.dumps(result)
                 row.verdict = result.get("verdict", "Needs work")
                 row.mode = effective_mode
                 row.status = "complete"
+                # Build #3: record which calibration version nudged this prediction
+                # (0 / absent = un-nudged) so audit_prediction can exclude it later.
+                row.calibration_version = int(result.get("calibration_version") or 0)
                 await db.commit()
 
     except Exception as exc:
@@ -292,9 +307,17 @@ async def analyze(
                 ),
             )
 
-    # Niche: optional — auto-classify empty input to "Lifestyle & Vlogs"
-    raw_niche = niche.strip()[:200] or "Lifestyle & Vlogs"
-    canonical_niche = await classify_niche(raw_niche)
+    # Niche: optional — empty input classifies to Uncategorized (generic rubric),
+    # never a silent default. classify_niche("") returns the Uncategorized sentinel.
+    raw_niche = niche.strip()[:200]
+    niche_class = await classify_niche(raw_niche)
+    canonical_niche = niche_class["canonical"]
+    # Advisory secondary niche (#6 Light blend) — passed to the grading prompt only;
+    # it does NOT change rubric/seed/weight lookups (those stay on the primary).
+    secondary_niche = niche_class.get("secondary")
+    # Rides along in scores_json (no schema change) so the frontend can prompt the
+    # user to confirm/correct a niche Surge wasn't sure about (#4).
+    niche_needs_confirmation = niche_class["needs_confirmation"]
 
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
@@ -305,7 +328,8 @@ async def analyze(
             user_id=user.id if user else None,
             platform=platform,
             filename=os.path.basename(r2_key),
-            niche=raw_niche,
+            niche=raw_niche,  # the user's own words — shown in My Projects
+            canonical_niche=canonical_niche,  # classifier label — calibration keys on this
             caption=caption or None,
             bio=bio or None,
             scores_json="{}",
@@ -327,6 +351,8 @@ async def analyze(
             caption,
             bio,
             platform,
+            niche_needs_confirmation,
+            secondary_niche,
         )
         return {"id": analysis.id, "status": "pending"}
 
@@ -373,6 +399,7 @@ async def analyze(
     low_seeds: list = []
     niche_insight: str | None = None
     trend_context: str | None = None
+    calibration_note: dict | None = None
     if user:
         # Prefer the synthesized niche insight block; fall back to raw seed lists.
         insight_result = await db.execute(
@@ -406,6 +433,10 @@ async def analyze(
                 ref = ref.replace(tzinfo=timezone.utc)
             if ref >= datetime.now(timezone.utc) - timedelta(days=7):
                 trend_context = trend_row.trend_text
+
+        # Build #3: calibration nudge (applied only in Thinking/Deep + when
+        # high-confidence — gemini.analyze_video makes the final call).
+        calibration_note = await load_calibration_note(db, platform, canonical_niche)
 
     has_usable_seeds = bool(niche_insight or high_seeds or low_seeds)
 
@@ -490,6 +521,8 @@ async def analyze(
             creator_like_baseline=creator_like_baseline,
             niche_insight=niche_insight if effective_mode in ("thinking", "deep_thinking") else None,
             trend_context=trend_context if effective_mode in ("thinking", "deep_thinking") else None,
+            calibration_note=calibration_note if effective_mode in ("thinking", "deep_thinking") else None,
+            secondary_niche=secondary_niche or "",
         )
     except _GeminiClientError as e:
         if e.code in (429, 403):
@@ -508,16 +541,20 @@ async def analyze(
         except OSError:
             pass
 
+    result["niche_needs_confirmation"] = niche_needs_confirmation
     analysis = UserAnalysis(
         user_id=user.id if user else None,
         platform=platform,
         filename=safe_name,
-        niche=raw_niche,  # the user's own words — what they see in My Projects
+        niche=raw_niche,  # the user's own words — shown in My Projects
+        canonical_niche=canonical_niche,  # classifier label — calibration keys on this
         caption=caption or None,
         bio=bio or None,
         scores_json=json.dumps(result),
         verdict=result.get("verdict", "Needs work"),
         mode=effective_mode,
+        # Build #3: 0 / absent = un-nudged (the safe default).
+        calibration_version=int(result.get("calibration_version") or 0),
     )
     db.add(analysis)
     await db.commit()
@@ -538,11 +575,12 @@ async def get_analysis(
     analysis = result.scalar_one_or_none()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    # Anonymous users always get the locked view.
-    # Authenticated users only get the full view for their OWN analyses.
-    # If the analysis hasn't been claimed yet (user_id is None), treat as locked
-    # for everyone except the eventual owner (they'll claim then re-fetch).
-    if user is None or (analysis.user_id is not None and analysis.user_id != user.id):
+    # Full view ONLY for the authenticated owner. Everyone else — anonymous users,
+    # non-owners, AND unclaimed analyses (user_id is None) — gets the locked teaser.
+    # An unclaimed analysis is unlocked by its creator via /claim (which sets user_id),
+    # never by a stranger guessing sequential IDs. (Without the `user_id is None` guard,
+    # any logged-in user could read any guest's full analysis — an IDOR + paywall bypass.)
+    if user is None or analysis.user_id is None or analysis.user_id != user.id:
         return _to_locked(analysis)
     return _to_out(analysis)
 
@@ -699,6 +737,9 @@ async def link_video(
     await db.commit()
     await db.refresh(analysis)
 
+    # Audit prediction accuracy against real outcome — independent of promotion gate.
+    background_tasks.add_task(audit_prediction, analysis.id)
+
     # Door B (v1.20): a verified, posted video is the best seed signal there is.
     # Promote it into the reference library in the background so the user's
     # stat-sync stays instant. Idempotent — skipped once already promoted.
@@ -821,6 +862,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "video_url": analysis.video_url,
         "counts_fetched_at": analysis.counts_fetched_at,
         "pending_seed_consent": bool(analysis.pending_seed_consent),
+        "niche_needs_confirmation": bool(scores.get("niche_needs_confirmation")),
         "mode": analysis.mode or "quick",
         "created_at": analysis.created_at,
     }

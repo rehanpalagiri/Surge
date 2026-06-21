@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, func
 
 from database import get_db
-from models import SeedVideo, FetchStatus, NicheInsight, TrendSummary
+from models import SeedVideo, FetchStatus, NicheInsight, TrendSummary, CalibrationNote, UserAnalysis
 from schemas import SeedVideoOut
 from services.seed_analysis import analyze_seed_video
 from services.seed_insights import generate_niche_insight
+from services.calibration import generate_calibration_note, GLOBAL_NICHE
 from services.tiktok_fetch import fetch_tiktok
 from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
 from services.instagram_harvest import harvest_instagram_all, get_last_instagram_harvest
@@ -466,6 +467,111 @@ async def get_insights(
         }
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Calibration notes (Build #3) — mistake summarization from real corrections
+# ---------------------------------------------------------------------------
+
+@router.post("/calibration/generate")
+async def generate_calibration(
+    platform: str = Form("tiktok"),
+    niche: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Regenerate calibration notes FROM SCRATCH from the safe corrections in
+    user_analyses. If `niche` is given, only that one (pass "GLOBAL" for the
+    cross-niche note). Otherwise: every niche that has any correction, plus GLOBAL.
+    Niches below the correction floor are skipped (no note written) — that is the
+    safe default. Never stacks: each note is rebuilt from raw corrections + clamped."""
+    if niche:
+        target_niches = [niche]
+    else:
+        # Candidate niches = canonical labels with at least one stored correction for
+        # this platform. Use canonical_niche (not raw) so notes key the same way
+        # load_calibration_note() reads them at grading time.
+        niche_rows = (await db.execute(
+            select(UserAnalysis.canonical_niche)
+            .where(
+                UserAnalysis.platform == platform,
+                UserAnalysis.correction_json.is_not(None),
+            )
+            .distinct()
+        )).scalars().all()
+        target_niches = sorted({n for n in niche_rows if n}) + [GLOBAL_NICHE]
+
+    results = []
+    for n in target_niches:
+        try:
+            note = await generate_calibration_note(platform, n)
+        except ValueError as e:
+            # Below floor — caller falls back to GLOBAL or skips. No note written.
+            results.append({"niche": n, "status": "skipped", "reason": str(e)})
+            continue
+        except Exception as e:  # noqa: BLE001
+            results.append({"niche": n, "status": "error", "reason": str(e)})
+            continue
+
+        existing = (await db.execute(
+            select(CalibrationNote).where(
+                CalibrationNote.platform == platform,
+                CalibrationNote.niche == n,
+            )
+        )).scalar_one_or_none()
+        if existing:
+            existing.note_json = json.dumps(note)
+            existing.sample_count = note["sample_count"]
+            existing.generated_at = datetime.utcnow()
+        else:
+            db.add(CalibrationNote(
+                platform=platform,
+                niche=n,
+                note_json=json.dumps(note),
+                sample_count=note["sample_count"],
+            ))
+        await db.commit()
+        results.append({
+            "niche": n,
+            "status": "generated",
+            "sample_count": note["sample_count"],
+            "confidence": note.get("confidence"),
+            "overall_tendency": note.get("overall_tendency"),
+        })
+
+    generated = sum(1 for r in results if r["status"] == "generated")
+    return {"platform": platform, "generated": generated, "total": len(target_niches), "results": results}
+
+
+@router.get("/calibration")
+async def get_calibration(
+    platform: str = "tiktok",
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """List all stored calibration notes for a platform."""
+    rows = (await db.execute(
+        select(CalibrationNote)
+        .where(CalibrationNote.platform == platform)
+        .order_by(CalibrationNote.niche)
+    )).scalars().all()
+    out = []
+    for r in rows:
+        try:
+            note = json.loads(r.note_json)
+        except (ValueError, TypeError):
+            note = {}
+        out.append({
+            "niche": r.niche,
+            "sample_count": r.sample_count,
+            "generated_at": r.generated_at,
+            "confidence": note.get("confidence"),
+            "overall_tendency": note.get("overall_tendency"),
+            "directive": note.get("directive"),
+            "dimension_adjustments": note.get("dimension_adjustments"),
+            "caveats": note.get("caveats"),
+        })
+    return out
 
 
 # ---------------------------------------------------------------------------

@@ -153,7 +153,7 @@ export default function AdminPage() {
   const [harvestMinLikes, setHarvestMinLikes] = useState("1000");
   const [harvestMaxPer, setHarvestMaxPer] = useState("3");
   const [harvestPlatform, setHarvestPlatform] = useState<"tiktok" | "instagram">("tiktok");
-  const [harvestDebugNiche, setHarvestDebugNiche] = useState("");
+  const [harvestNiches, setHarvestNiches] = useState<string[]>([]);
   const [harvestDetailExpanded, setHarvestDetailExpanded] = useState<Record<string, boolean>>({});
 
   // Niche Intelligence state
@@ -332,7 +332,7 @@ export default function AdminPage() {
         ...(harvestMaxViews.trim() ? { max_views: parseInt(harvestMaxViews) } : {}),
         min_likes: parseInt(harvestMinLikes) || 1_000,
         max_per_niche: parseInt(harvestMaxPer) || 3,
-        ...(harvestDebugNiche ? { niches: [harvestDebugNiche] } : {}),
+        ...(harvestNiches.length > 0 ? { niches: harvestNiches } : {}),
       });
       const poll = async () => {
         try {
@@ -885,34 +885,59 @@ export default function AdminPage() {
                     onChange={(e) => setHarvestMaxPer(e.target.value)}
                     className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
                 </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">
-                    Debug: single niche
-                    <span className="ml-1 text-text-muted/50 font-normal">(blank = all)</span>
-                  </label>
-                  <select
-                    value={harvestDebugNiche}
-                    onChange={(e) => setHarvestDebugNiche(e.target.value)}
-                    className="w-44 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
-                  >
-                    <option value="">All 50 niches</option>
-                    {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
-                  </select>
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-text-muted">
+                      Target niches
+                      <span className="ml-1.5 text-text-muted/50">
+                        {harvestNiches.length === 0 ? "(all 50)" : `(${harvestNiches.length} selected)`}
+                      </span>
+                    </label>
+                    {harvestNiches.length > 0 && (
+                      <button onClick={() => setHarvestNiches([])} className="text-xs text-text-muted hover:text-danger transition-colors">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 bg-surface border border-border rounded-xl">
+                    {NICHES.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setHarvestNiches((prev) =>
+                          prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]
+                        )}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                          harvestNiches.includes(n)
+                            ? "bg-purple-from/20 border border-purple-to/50 text-text-primary"
+                            : "bg-card border border-border text-text-muted hover:text-text-primary hover:border-border/60"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <button onClick={handleHarvest} disabled={harvesting}
                   className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
                   {harvesting
                     ? "Harvesting…"
-                    : harvestDebugNiche
-                      ? `Test: ${harvestDebugNiche.split(" ")[0]}…`
-                      : `Run ${harvestPlatform === "instagram" ? "Instagram" : "TikTok"} Harvest`}
+                    : harvestNiches.length === 1
+                      ? `Harvest: ${harvestNiches[0].split(" ")[0]}`
+                      : harvestNiches.length > 1
+                        ? `Harvest ${harvestNiches.length} niches`
+                        : `Run ${harvestPlatform === "instagram" ? "Instagram" : "TikTok"} Harvest`}
                 </button>
               </div>
 
-              {harvestDebugNiche && (
+              {harvestNiches.length > 0 && (
                 <p className="text-yellow-400/80 text-xs">
-                  🔬 Debug mode — harvesting only <strong>{harvestDebugNiche}</strong>.
-                  Lower min {harvestPlatform === "tiktok" ? "views (e.g. 10000)" : "likes (e.g. 100)"} and set max=1 for a fast smoke test.
+                  🎯 Targeting{" "}
+                  {harvestNiches.length === 1
+                    ? <strong>{harvestNiches[0]}</strong>
+                    : <><strong>{harvestNiches.length} niches</strong>: {harvestNiches.join(", ")}</>
+                  }{" "}
+                  — raise max-per-niche for stress testing (e.g. 20).
                 </p>
               )}
 

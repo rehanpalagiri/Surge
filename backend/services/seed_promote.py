@@ -26,7 +26,7 @@ from auth import is_minor
 from database import AsyncSessionLocal
 from models import SeedVideo, UserAnalysis, User
 from services.seed_analysis import analyze_seed_video
-from services.niche_classifier import classify_niche
+from services.niche_classifier import classify_niche, UNCATEGORIZED
 from services.tiktok_fetch import fetch_tiktok
 
 logger = logging.getLogger("seed_promote")
@@ -95,7 +95,12 @@ async def promote_analysis_to_seed(
 
         # --- Heavy phase (no open session): classify the niche and (if not handed
         #     to us) fetch metadata for the downloadable play URL + counts. ---
-        canonical = await classify_niche(raw_niche or "")
+        canonical = (await classify_niche(raw_niche or ""))["canonical"]
+        if canonical == UNCATEGORIZED:
+            # We couldn't confidently classify this video — don't pollute the
+            # seed pool with an unknown/wrong bucket. (#4)
+            logger.info("promote %s: niche unclassifiable, skipping", analysis_id)
+            return
         if meta is None:
             meta = await fetch_tiktok(page_url)
         view_count = meta["view_count"]

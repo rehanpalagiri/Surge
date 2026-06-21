@@ -17,7 +17,20 @@ from google.genai.errors import ClientError as _GeminiClientError
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-MIN_SEEDS = 3  # below this, patterns are noise not signal
+MIN_SEEDS = 3       # below this, patterns are noise not signal
+CONFIDENT_FLOOR = 8  # below this many content-driven seeds, force low confidence
+
+
+def _is_content_driven(s) -> bool | None:
+    """True for content/mixed drivers. False for distribution. None for old seeds missing the field."""
+    try:
+        d = json.loads(s.gemini_analysis) if s.gemini_analysis else {}
+    except (ValueError, TypeError):
+        return None
+    drv = d.get("performance_driver")
+    if drv is None:
+        return None  # pre-fix seed — unknown
+    return drv in ("content", "mixed")
 
 
 def _fmt_seed(s) -> str:
@@ -64,26 +77,66 @@ async def generate_niche_insight(seeds: list, platform: str, niche: str) -> str:
             f"({len(rated)} found, {MIN_SEEDS} required). Add more seeds first."
         )
 
-    high = sorted(
-        [s for s in rated if s.rating >= 6],
-        key=lambda s: s.rating,
-        reverse=True,
-    )
-    low = sorted(
-        [s for s in rated if s.rating <= 4],
-        key=lambda s: s.rating,
-    )
-    mid = [s for s in rated if 4 < s.rating < 6]  # included for context, not pattern-driving
+    # Instagram hides view counts — can't de-confound by engagement rate. Key off the
+    # platform only: a stray null-view TikTok seed is already handled per-seed (it gets
+    # driver "unclear" from score_outcome, so _is_content_driven drops it individually)
+    # and must NOT flip the whole TikTok niche out of de-confounding.
+    is_instagram = platform == "instagram"
+
+    low_conf_reason = None
+    if is_instagram:
+        pool = rated
+        low_conf_reason = (
+            "Instagram: views hidden, rubric not de-confounded by engagement rate."
+        )
+    else:
+        content_driven = [s for s in rated if _is_content_driven(s) is True]
+        if len(content_driven) >= MIN_SEEDS:
+            pool = content_driven
+        else:
+            pool = rated
+            low_conf_reason = (
+                "Pre-fix seeds dominate — rubric built on view-anchored data. "
+                "Re-harvest to de-confound."
+            )
+
+    high = sorted([s for s in pool if s.rating >= 6], key=lambda s: s.rating, reverse=True)
+    low = sorted([s for s in pool if s.rating <= 4], key=lambda s: s.rating)
+    mid = [s for s in pool if 4 < s.rating < 6]
 
     pname = "TikTok" if platform == "tiktok" else "Instagram Reels"
 
     high_block = "\n\n".join(_fmt_seed(s) for s in high) if high else "None in dataset."
     low_block = "\n\n".join(_fmt_seed(s) for s in low) if low else "None in dataset."
-    mid_note = f"({len(mid)} average performers excluded from pattern analysis — rating 5, neither signal nor noise)" if mid else ""
+    mid_note = (
+        f"({len(mid)} average performers excluded from pattern analysis — rating 5, neither signal nor noise)"
+        if mid else ""
+    )
+
+    forced_low_conf = low_conf_reason is not None or len(high) < CONFIDENT_FLOOR or len(low) < MIN_SEEDS
+    conf_directive = (
+        f"DATA CONFIDENCE: LOW. {low_conf_reason or 'Small post-filter sample.'} "
+        "State this caveat at the top of your report and avoid asserting hard rules."
+        if forced_low_conf
+        else "DATA CONFIDENCE: adequate sample of content-driven videos — you may state firm patterns."
+    )
+    neg_warning = (
+        "INSUFFICIENT NEGATIVE EXAMPLES — fewer than 3 low performers. You cannot "
+        "reliably define what FAILS; lower confidence accordingly.\n"
+        if len(low) < MIN_SEEDS else ""
+    )
+    # Only tell the model the pool was filtered when it actually was.
+    # Transition fallback and Instagram both land on the unfiltered rated pool.
+    deconfound_note = (
+        "CRITICAL — these HIGH performers were filtered to CONTENT-DRIVEN wins (strong engagement rate), "
+        "not reach-driven ones, so their patterns reflect content quality, not audience size.\n"
+        if (not is_instagram and low_conf_reason is None)
+        else ""
+    )
 
     prompt = f"""You are building a niche intelligence report for a video scoring AI. This report will be injected into future AI sessions as the sole reference context when scoring new {pname} videos in the {niche} niche. It replaces injecting individual seed examples entirely — so it must be comprehensive, dense, and actionable.
 
-You have data from {len(rated)} real {pname} videos in the {niche} niche: {len(high)} high performers (rating 6–10) and {len(low)} low performers (rating 0–4).
+You have data from {len(pool)} real {pname} videos in the {niche} niche: {len(high)} high performers (rating 6–10) and {len(low)} low performers (rating 0–4).
 {mid_note}
 
 HIGH PERFORMERS (succeeded on {pname}):
@@ -91,6 +144,9 @@ HIGH PERFORMERS (succeeded on {pname}):
 
 LOW PERFORMERS (failed on {pname}):
 {low_block}
+
+{conf_directive}
+{neg_warning}{deconfound_note}A pattern counts ONLY if it appears consistently across MANY videos in the SAME direction — a pattern from 2–3 videos is noise; discard it. Do not treat a single video's quirk as a rule.
 
 Write the niche intelligence report. Every claim must be grounded in the data above — no generic advice. Be specific and causal: not "good hooks" but "creators open with X which removes the viewer's reason to scroll because Y." Write for an AI reader, not a human.
 

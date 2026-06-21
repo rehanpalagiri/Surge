@@ -32,6 +32,25 @@ class NicheInsight(Base):
     __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_insight"),)
 
 
+class CalibrationNote(Base):
+    """Mistake-summarization (Build #3). Aggregates safe-to-learn-from corrections
+    (from audit_prediction) into a bounded calibration nudge per (platform, niche),
+    or the literal "GLOBAL" pseudo-niche. Regenerated FROM SCRATCH each run — never
+    stacked — and every adjustment is clamped server-side before storage. Parallel to
+    NicheInsight; additive new table (auto-created by create_all)."""
+
+    __tablename__ = "calibration_notes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    platform = Column(String, nullable=False)   # "tiktok" | "instagram"
+    niche = Column(String, nullable=False)       # canonical niche, or "GLOBAL"
+    note_json = Column(Text, nullable=False)     # clamped calibration note (see services/calibration.py)
+    sample_count = Column(Integer, nullable=False)  # how many safe corrections fed this note
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_calibration"),)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -105,10 +124,20 @@ class UserAnalysis(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     platform = Column(String, nullable=True, default="tiktok")  # "tiktok" | "instagram"
     filename = Column(String, nullable=False)
-    niche = Column(String, nullable=False)
+    niche = Column(String, nullable=False)  # the user's own words (display, shown in My Projects)
+    # The canonical niche the classifier resolved (or "Uncategorized"). Drives all
+    # niche-keyed lookups so they don't fragment on free-text — notably calibration
+    # grouping/loading, which both key on the canonical label. Nullable for pre-existing rows.
+    canonical_niche = Column(String, nullable=True)
     caption = Column(Text, nullable=True)
     bio = Column(Text, nullable=True)
     scores_json = Column(Text, nullable=False)
+    correction_json = Column(Text, nullable=True)
+    # Build #3: the calibration version that nudged this prediction. 0 = no nudge applied
+    # (the safe default). audit_prediction copies this into the correction as
+    # audited_calibration_version so the next calibration generation can exclude
+    # already-nudged predictions (no runaway self-reinforcement).
+    calibration_version = Column(Integer, nullable=True, default=0)
     verdict = Column(String, nullable=False)
     actual_views = Column(Integer, nullable=True)
     actual_likes = Column(Integer, nullable=True)

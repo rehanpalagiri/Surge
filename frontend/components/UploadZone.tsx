@@ -417,7 +417,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
 
         {/* ── Upload / Compression Zone ── */}
         {compressing ? (
-          <div className="rounded-2xl border-2 border-purple-500 bg-purple-500/5 p-10 min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-2xl border-2 border-purple-500 bg-purple-500/5 p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
             <Loader2 className="w-10 h-10 text-purple-400 animate-spin" strokeWidth={1.5} />
             <div className="space-y-1">
               <p className="text-white font-semibold text-sm">{compressPhase}</p>
@@ -443,7 +443,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
             onDragLeave={onDragLeave}
             onClick={() => inputRef.current?.click()}
             className={`cursor-pointer rounded-2xl border-2 transition-all duration-200
-              p-10 min-h-[220px] flex flex-col items-center justify-center gap-3 text-center
+              p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-3 text-center
               ${dragging
                 ? "border-purple-500 border-solid bg-purple-500/10"
                 : file
@@ -492,24 +492,23 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
         )}
 
         {/* ── Niche ── */}
-        <div className="space-y-2.5">
+        <div className="flex flex-col gap-4 mb-6">
           <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Content Niche</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={customNicheValue}
-              onChange={(e) => setNiche(e.target.value)}
-              maxLength={80}
-              placeholder="Type your own…"
-              className="w-36 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition-colors text-sm"
-            />
-            <div className="h-5 w-px bg-zinc-700 shrink-0" />
+          <input
+            type="text"
+            value={customNicheValue}
+            onChange={(e) => setNiche(e.target.value)}
+            maxLength={80}
+            placeholder="Type your own…"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition-colors text-sm"
+          />
+          <div className="flex flex-wrap gap-3">
             {NICHE_SUGGESTIONS.map((n) => (
               <button
                 key={n}
                 type="button"
                 onClick={() => setNiche(isChipSelected(n) ? "" : n)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
                   isChipSelected(n)
                     ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
                     : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-purple-500/50 hover:text-white hover:bg-zinc-700/80"

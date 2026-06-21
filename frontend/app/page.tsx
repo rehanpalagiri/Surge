@@ -198,8 +198,8 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         )}
 
         {/* ── Hero ── */}
-        <section className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-          <div className="w-full max-w-2xl space-y-8 text-center">
+        <section className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12">
+          <div className="w-full max-w-2xl space-y-6 sm:space-y-8 text-center">
 
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold px-4 py-1.5 rounded-full">
@@ -208,12 +208,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             </div>
 
             {/* Headline */}
-            <div className="space-y-4">
-              <h1 className="text-4xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
-                Find Out Exactly Where Your<br />
+            <div className="space-y-3 sm:space-y-4">
+              <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
+                Find Out Exactly Where Your{" "}
                 <span className="text-purple-400">Viewers Are Scrolling Away.</span>
               </h1>
-              <p className="text-zinc-400 text-lg max-w-xl mx-auto leading-relaxed">
+              <p className="text-zinc-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
                 Upload your video before you post it. Our AI engine analyzes your pacing, hook
                 velocity, and UI collisions to predict your viral potential.
               </p>
@@ -228,7 +228,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
                 onClick={() => fileInputRef.current?.click()}
-                className={`cursor-pointer rounded-2xl border-2 transition-all duration-200 p-10 flex flex-col items-center justify-center gap-3 text-center min-h-[180px]
+                className={`cursor-pointer rounded-2xl border-2 transition-all duration-200 p-6 sm:p-10 flex flex-col items-center justify-center gap-3 text-center min-h-[160px] sm:min-h-[180px]
                   ${dragging
                     ? "border-purple-500 bg-purple-500/10"
                     : file
@@ -264,15 +264,18 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               </div>
 
               {/* Niche chips (optional) */}
-              <div className="space-y-2.5">
-                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Content Niche</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                  Content Niche{" "}
+                  <span className="text-zinc-600 font-normal normal-case tracking-normal">— optional</span>
+                </p>
+                <div className="flex flex-wrap gap-2.5">
                   {NICHE_CHIPS.map((n) => (
                     <button
                       key={n}
                       type="button"
                       onClick={() => setNiche(niche === n ? "" : n)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
                         niche === n
                           ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
                           : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-purple-500/50 hover:text-white hover:bg-zinc-700/80"

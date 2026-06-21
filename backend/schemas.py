@@ -68,6 +68,9 @@ class AnalysisOut(BaseModel):
     counts_fetched_at: Optional[datetime] = None
     # v1.24: owner's seed_consent was "ask" — results page shows the consent banner
     pending_seed_consent: bool = False
+    # #4: Surge wasn't confident about the niche (routed to the generic rubric) —
+    # frontend can prompt the user to confirm/correct it. Mirrors scores_json.
+    niche_needs_confirmation: bool = False
     mode: Optional[str] = "quick"  # effective mode that ran
     created_at: datetime
 
