@@ -30,11 +30,12 @@ _ALL_DIMS = [
     "loop_seamlessness",
 ]
 
-# All 50 canonical niches. Keys MUST match CANONICAL_NICHES in niche_classifier.py.
+# Keys MUST match CANONICAL_NICHES in niche_classifier.py. Niches without a profile
+# fall back to the generic dimension hierarchy.
 NICHE_PROFILES: dict[str, NicheProfile] = {
 
     # ── COMEDY / ENTERTAINMENT ─────────────────────────────────────────────────
-    "Comedy & Skits": NicheProfile(
+    "Comedy": NicheProfile(
         critical=["hook_velocity"],
         high=["cut_frequency", "curiosity_gap"],
         standard=["audio_visual_sync", "loop_seamlessness"],
@@ -59,7 +60,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "True Crime & Mystery": NicheProfile(
+    "True Crime": NicheProfile(
         critical=["curiosity_gap"],
         high=["hook_velocity", "audio_visual_sync"],
         standard=["cut_frequency", "text_scannability"],
@@ -71,7 +72,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "News & Commentary": NicheProfile(
+    "News": NicheProfile(
         critical=["curiosity_gap"],
         high=["hook_velocity"],
         standard=["cut_frequency", "audio_visual_sync", "text_scannability"],
@@ -83,7 +84,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Books & Reading": NicheProfile(
+    "Books": NicheProfile(
         critical=["curiosity_gap"],
         high=["hook_velocity"],
         standard=["text_scannability", "cut_frequency", "audio_visual_sync"],
@@ -95,7 +96,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Astrology & Spirituality": NicheProfile(
+    "Spirituality": NicheProfile(
         critical=["curiosity_gap"],
         high=["hook_velocity"],
         standard=["audio_visual_sync", "text_scannability", "cut_frequency"],
@@ -108,7 +109,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── MUSIC / AUDIO ─────────────────────────────────────────────────────────
-    "Music & Dance": NicheProfile(
+    "Music": NicheProfile(
         critical=["audio_visual_sync"],
         high=["hook_velocity", "loop_seamlessness"],
         standard=["cut_frequency", "curiosity_gap"],
@@ -116,12 +117,12 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Cuts must land on beats — audio-visual sync IS the product in this niche. "
             "Loop seamlessness drives the replay count that signals virality (people rewatch "
-            "dance content). Text scannability and curiosity gap are least important: "
+            "music content). Text scannability and curiosity gap are least important: "
             "viewers come for the performance, not the reveal."
         ),
     ),
 
-    "ASMR & Relaxation": NicheProfile(
+    "ASMR": NicheProfile(
         critical=["audio_visual_sync"],
         high=["loop_seamlessness"],
         standard=["hook_velocity", "text_scannability", "curiosity_gap"],
@@ -134,7 +135,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Yoga & Meditation": NicheProfile(
+    "Yoga": NicheProfile(
         critical=["audio_visual_sync"],
         high=["loop_seamlessness", "hook_velocity"],
         standard=["curiosity_gap", "text_scannability"],
@@ -148,7 +149,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── PETS / KIDS ────────────────────────────────────────────────────────────
-    "Pets & Animals": NicheProfile(
+    "Pets": NicheProfile(
         critical=["hook_velocity"],
         high=["loop_seamlessness", "audio_visual_sync"],
         standard=["cut_frequency", "curiosity_gap"],
@@ -160,7 +161,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Kids & Baby": NicheProfile(
+    "Kids": NicheProfile(
         critical=["hook_velocity"],
         high=["loop_seamlessness", "audio_visual_sync"],
         standard=["cut_frequency", "curiosity_gap"],
@@ -172,7 +173,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Parenting & Family": NicheProfile(
+    "Parenting": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["audio_visual_sync"],
         standard=["cut_frequency", "loop_seamlessness"],
@@ -186,7 +187,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── FITNESS / HEALTH ───────────────────────────────────────────────────────
-    "Fitness & Gym": NicheProfile(
+    "Fitness": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["cut_frequency", "loop_seamlessness"],
         standard=["audio_visual_sync", "text_scannability"],
@@ -199,19 +200,8 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Weight Loss Journey": NicheProfile(
-        critical=["hook_velocity", "curiosity_gap"],
-        high=["text_scannability"],
-        standard=["cut_frequency", "audio_visual_sync"],
-        low=["loop_seamlessness"],
-        context=(
-            "Transformation reveal or stat reveal (pounds lost, timeline) must appear immediately. "
-            "Curiosity gap drives watch time (the 'how' must be teased). Text scannability is "
-            "high because viewers screenshot weight and calorie stats."
-        ),
-    ),
 
-    "Health & Wellness": NicheProfile(
+    "Health": NicheProfile(
         critical=["curiosity_gap", "hook_velocity"],
         high=["text_scannability"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -236,7 +226,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Sports & Athletics": NicheProfile(
+    "Sports": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync", "cut_frequency"],
         standard=["curiosity_gap", "loop_seamlessness"],
@@ -248,7 +238,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Outdoor & Hiking": NicheProfile(
+    "Outdoors": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync"],
         standard=["curiosity_gap", "loop_seamlessness", "cut_frequency"],
@@ -261,7 +251,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Travel & Adventure": NicheProfile(
+    "Travel": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync"],
         standard=["curiosity_gap", "loop_seamlessness", "cut_frequency"],
@@ -274,7 +264,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── FOOD / COOKING ─────────────────────────────────────────────────────────
-    "Food & Cooking": NicheProfile(
+    "Food": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["text_scannability"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -286,19 +276,8 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Baking & Desserts": NicheProfile(
-        critical=["hook_velocity", "curiosity_gap"],
-        high=["text_scannability", "audio_visual_sync"],
-        standard=["cut_frequency"],
-        low=["loop_seamlessness"],
-        context=(
-            "Baking content uses 'money shot first' (the finished dessert) to hook and then walks "
-            "back to the process. Audio-visual sync matters for satisfying cutting sounds and "
-            "ASMR-adjacent moments. Text scannability is critical for recipe steps."
-        ),
-    ),
 
-    "Vegan & Plant-Based": NicheProfile(
+    "Vegan": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["text_scannability"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -310,20 +289,9 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Cooking on a Budget": NicheProfile(
-        critical=["curiosity_gap", "hook_velocity"],
-        high=["text_scannability"],
-        standard=["cut_frequency", "audio_visual_sync"],
-        low=["loop_seamlessness"],
-        context=(
-            "Budget cooking's core value prop is the numbers — cost per meal, savings vs regular "
-            "price. Text scannability is elevated because the price callouts on screen ARE the "
-            "hook and the entire value proposition. Curiosity gap frames the challenge."
-        ),
-    ),
 
     # ── EDUCATION / INFORMATION ────────────────────────────────────────────────
-    "Education & Tutorials": NicheProfile(
+    "Education": NicheProfile(
         critical=["curiosity_gap"],
         high=["text_scannability", "hook_velocity"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -336,7 +304,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Career & Job Tips": NicheProfile(
+    "Career": NicheProfile(
         critical=["curiosity_gap"],
         high=["text_scannability", "hook_velocity"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -348,7 +316,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Finance & Investing": NicheProfile(
+    "Finance": NicheProfile(
         critical=["curiosity_gap"],
         high=["text_scannability", "hook_velocity"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -360,7 +328,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Business & Entrepreneurship": NicheProfile(
+    "Business": NicheProfile(
         critical=["curiosity_gap"],
         high=["text_scannability", "hook_velocity"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -396,7 +364,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Crypto & Web3": NicheProfile(
+    "Crypto": NicheProfile(
         critical=["curiosity_gap"],
         high=["hook_velocity", "text_scannability"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -408,7 +376,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Sustainability & Eco": NicheProfile(
+    "Sustainability": NicheProfile(
         critical=["curiosity_gap", "hook_velocity"],
         high=["text_scannability"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -421,7 +389,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── FASHION / BEAUTY ───────────────────────────────────────────────────────
-    "Fashion & Style": NicheProfile(
+    "Fashion": NicheProfile(
         critical=["hook_velocity"],
         high=["curiosity_gap", "text_scannability"],
         standard=["audio_visual_sync", "cut_frequency"],
@@ -433,7 +401,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Beauty & Makeup": NicheProfile(
+    "Beauty": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync", "text_scannability"],
         standard=["curiosity_gap", "cut_frequency"],
@@ -445,19 +413,8 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Skincare & Glow": NicheProfile(
-        critical=["hook_velocity", "curiosity_gap"],
-        high=["text_scannability"],
-        standard=["audio_visual_sync", "cut_frequency"],
-        low=["loop_seamlessness"],
-        context=(
-            "Skincare content hooks with before/after transformation reveals and ingredient "
-            "curiosity gap. Text scannability is elevated because ingredient callouts, product "
-            "names, and skin stat overlays are what drive saves."
-        ),
-    ),
 
-    "Hair Care & Styling": NicheProfile(
+    "Hair": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["text_scannability"],
         standard=["audio_visual_sync", "cut_frequency"],
@@ -469,7 +426,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Street Style & Thrift": NicheProfile(
+    "Thrifting": NicheProfile(
         critical=["hook_velocity"],
         high=["curiosity_gap", "text_scannability"],
         standard=["audio_visual_sync", "cut_frequency"],
@@ -482,7 +439,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── HOME / LIFESTYLE ───────────────────────────────────────────────────────
-    "Home Decor & Interior": NicheProfile(
+    "Home Decor": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync", "text_scannability"],
         standard=["curiosity_gap", "cut_frequency"],
@@ -494,7 +451,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Cleaning & Organization": NicheProfile(
+    "Cleaning": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync"],
         standard=["curiosity_gap", "text_scannability", "cut_frequency"],
@@ -519,7 +476,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Lifestyle & Vlogs": NicheProfile(
+    "Lifestyle": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["loop_seamlessness"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -532,19 +489,8 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Couples & Romance": NicheProfile(
-        critical=["hook_velocity"],
-        high=["loop_seamlessness", "curiosity_gap"],
-        standard=["audio_visual_sync", "cut_frequency"],
-        low=["text_scannability"],
-        context=(
-            "Couple content hooks with a sweet or funny moment that must appear immediately. "
-            "Loop seamlessness is elevated because couple content gets replayed ('watching "
-            "this 10 times'). Text scannability is lowest priority."
-        ),
-    ),
 
-    "Relationships & Dating": NicheProfile(
+    "Dating": NicheProfile(
         critical=["curiosity_gap"],
         high=["hook_velocity"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -570,7 +516,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Tech & Gadgets": NicheProfile(
+    "Tech": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["text_scannability"],
         standard=["cut_frequency", "audio_visual_sync"],
@@ -582,7 +528,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Photography & Editing": NicheProfile(
+    "Photography": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync", "text_scannability"],
         standard=["curiosity_gap", "cut_frequency"],
@@ -595,7 +541,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── CREATIVE ───────────────────────────────────────────────────────────────
-    "Art & Creativity": NicheProfile(
+    "Art": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync", "loop_seamlessness"],
         standard=["curiosity_gap", "cut_frequency", "text_scannability"],
@@ -608,7 +554,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── MOTIVATION / SELF-IMPROVEMENT ──────────────────────────────────────────
-    "Motivation & Mindset": NicheProfile(
+    "Motivation": NicheProfile(
         critical=["hook_velocity"],
         high=["curiosity_gap", "audio_visual_sync"],
         standard=["cut_frequency", "loop_seamlessness"],
@@ -622,7 +568,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── LUXURY / AUTOMOTIVE ────────────────────────────────────────────────────
-    "Luxury & Wealth": NicheProfile(
+    "Luxury": NicheProfile(
         critical=["hook_velocity"],
         high=["text_scannability"],
         standard=["curiosity_gap", "audio_visual_sync", "cut_frequency"],
@@ -635,7 +581,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         ),
     ),
 
-    "Cars & Automotive": NicheProfile(
+    "Cars": NicheProfile(
         critical=["hook_velocity"],
         high=["audio_visual_sync"],
         standard=["curiosity_gap", "cut_frequency", "text_scannability"],
@@ -648,7 +594,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
     ),
 
     # ── COMMUNITY / COLLEGE ────────────────────────────────────────────────────
-    "College & Student Life": NicheProfile(
+    "College": NicheProfile(
         critical=["hook_velocity", "curiosity_gap"],
         high=["audio_visual_sync"],
         standard=["cut_frequency", "loop_seamlessness"],
@@ -657,6 +603,72 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
             "College content hooks with a highly relatable shared experience or an 'only at "
             "[university]' moment that creates instant identification. Both hook velocity and "
             "curiosity gap are equally important. Text scannability is lowest priority."
+        ),
+    ),
+
+    # ── NEW (2026-06): Money / Dance / Looksmaxxing / Edits / Anime ─────────────
+    "Money": NicheProfile(
+        critical=["curiosity_gap"],
+        high=["hook_velocity", "text_scannability"],
+        standard=["cut_frequency", "audio_visual_sync"],
+        low=["loop_seamlessness"],
+        context=(
+            "Money content is pure curiosity-gap — the savings claim, the 'nobody tells you this' "
+            "money hack, or the income/net-worth reveal must land in the first 3 seconds. Text "
+            "scannability is high because viewers screenshot dollar figures, percentages, and "
+            "step lists. Loop seamlessness is lowest priority."
+        ),
+    ),
+
+    "Dance": NicheProfile(
+        critical=["audio_visual_sync"],
+        high=["hook_velocity", "loop_seamlessness"],
+        standard=["cut_frequency", "curiosity_gap"],
+        low=["text_scannability"],
+        context=(
+            "Dance virality lives on audio-visual sync — the moves must hit exactly on the beat. "
+            "The first move has to land in the opening second (no walk-up, no intro). Loop "
+            "seamlessness drives the rewatches and duets that signal virality. Text scannability "
+            "is least important — viewers come for the performance."
+        ),
+    ),
+
+    "Looksmaxxing": NicheProfile(
+        critical=["hook_velocity", "curiosity_gap"],
+        high=["text_scannability"],
+        standard=["audio_visual_sync", "cut_frequency"],
+        low=["loop_seamlessness"],
+        context=(
+            "Looksmaxxing content hooks with a before/after transformation reveal and a 'how-to' "
+            "curiosity gap (the routine, tip, or product that drove the glow-up). The reveal or "
+            "rating must appear immediately. Text scannability is elevated for step lists, product "
+            "names, and rating overlays viewers screenshot."
+        ),
+    ),
+
+    "Edits": NicheProfile(
+        critical=["audio_visual_sync", "hook_velocity"],
+        high=["loop_seamlessness", "cut_frequency"],
+        standard=["curiosity_gap"],
+        low=["text_scannability"],
+        context=(
+            "Edits live and die on audio-visual sync — every cut, zoom, and transition must hit "
+            "the beat or the drop. The most striking frame has to open the video (no build-up). "
+            "Cut frequency and loop seamlessness drive the rewatches that make edits go viral. "
+            "Text scannability is least important — edits are felt, not read."
+        ),
+    ),
+
+    "Anime": NicheProfile(
+        critical=["hook_velocity"],
+        high=["curiosity_gap", "audio_visual_sync"],
+        standard=["cut_frequency", "loop_seamlessness"],
+        low=["text_scannability"],
+        context=(
+            "Anime content hooks with the clip — the iconic moment, the power-up, the plot twist — "
+            "and it must hit in the first 2 seconds. Curiosity gap drives takes, rankings, and "
+            "'if you know, you know' framing; audio-visual sync matters because anime edits and "
+            "scenes are scored to music. Text scannability is lowest priority."
         ),
     ),
 }

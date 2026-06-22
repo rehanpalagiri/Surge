@@ -392,18 +392,53 @@ async def generate_insights(
     """Generate (or regenerate) niche intelligence summaries from the seed library.
     If niche is provided, regenerate only that niche. Otherwise regenerate all niches
     that have enough rated seeds (>= 3). Returns a summary of what was generated.
+
+    Also loads safe user corrections (thinking/deep, ≤120d, un-nudged) per niche and
+    passes them to the insight generator so the synthesis captures both seed patterns
+    AND real-world calibration signal in one unified prompt.
     """
+    from collections import defaultdict
+    from datetime import timedelta
+
     seeds_result = await db.execute(
         select(SeedVideo).where(SeedVideo.platform == platform)
     )
     all_seeds = seeds_result.scalars().all()
 
-    # Group by niche, filter to only niches with rated seeds
-    from collections import defaultdict
+    # Group seeds by niche, filter to only niches with rated seeds
     by_niche: dict[str, list] = defaultdict(list)
     for s in all_seeds:
         if s.rating is not None:
             by_niche[s.niche].append(s)
+
+    # Load safe corrections for this platform (all niches at once, filter in Python).
+    # Same filtering rules as calibration.py: safe, un-nudged, thinking/deep, ≤120d.
+    corrections_cutoff = datetime.utcnow() - timedelta(days=120)
+    corr_rows = (await db.execute(
+        select(UserAnalysis).where(
+            UserAnalysis.platform == platform,
+            UserAnalysis.correction_json.is_not(None),
+            UserAnalysis.counts_fetched_at >= corrections_cutoff,
+        )
+    )).scalars().all()
+
+    corrections_by_niche: dict[str, list] = defaultdict(list)
+    for r in corr_rows:
+        try:
+            c = json.loads(r.correction_json)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(c, dict):
+            continue
+        if c.get("safe_to_learn_from") is not True:
+            continue
+        if c.get("audited_calibration_version", 0) != 0:
+            continue
+        if c.get("mode") not in ("thinking", "deep_thinking"):
+            continue
+        cn = r.canonical_niche or ""
+        if cn:
+            corrections_by_niche[cn].append(c)
 
     target_niches = [niche] if niche else list(by_niche.keys())
     results = []
@@ -413,8 +448,9 @@ async def generate_insights(
         if len(seeds) < 3:
             results.append({"niche": n, "status": "skipped", "reason": f"only {len(seeds)} rated seeds"})
             continue
+        niche_corrections = corrections_by_niche.get(n, [])
         try:
-            insight_text = await generate_niche_insight(seeds, platform, n)
+            insight_text = await generate_niche_insight(seeds, platform, n, corrections=niche_corrections)
         except Exception as e:
             results.append({"niche": n, "status": "error", "reason": str(e)})
             continue
@@ -439,7 +475,12 @@ async def generate_insights(
                 seed_count=len(seeds),
             ))
         await db.commit()
-        results.append({"niche": n, "status": "generated", "seed_count": len(seeds)})
+        results.append({
+            "niche": n,
+            "status": "generated",
+            "seed_count": len(seeds),
+            "correction_count": len(niche_corrections),
+        })
 
     generated = sum(1 for r in results if r["status"] == "generated")
     return {"platform": platform, "generated": generated, "total": len(target_niches), "results": results}

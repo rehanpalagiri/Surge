@@ -159,7 +159,7 @@ async def generate_calibration_note(platform: str, niche: str) -> dict:
         )
         # GLOBAL aggregates across every niche; a named niche scopes to itself.
         # Key on canonical_niche (not the raw display niche) so free-text inputs
-        # ("fitness") aggregate under their canonical label ("Fitness & Gym") and
+        # ("fitness") aggregate under their canonical label ("Fitness") and
         # match what load_calibration_note() looks up at grading time.
         if niche != GLOBAL_NICHE:
             stmt = stmt.where(UserAnalysis.canonical_niche == niche)

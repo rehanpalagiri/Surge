@@ -185,12 +185,14 @@ export async function analyzeVideo(
   caption: string = "",
   bio: string = "",
   platform: string = "tiktok",
-  videoUrl: string = ""
+  videoUrl: string = "",
+  secondary: string = ""
 ): Promise<{ id: number }> {
   const form = new FormData();
   if (file) form.append("file", file);
   if (videoUrl) form.append("video_url", videoUrl);
   form.append("niche", niche);
+  if (secondary) form.append("secondary", secondary);
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
@@ -635,11 +637,13 @@ export async function analyzeFromR2(
   niche: string,
   caption: string = "",
   bio: string = "",
-  platform: string = "tiktok"
+  platform: string = "tiktok",
+  secondary: string = ""
 ): Promise<{ id: number; status: string }> {
   const form = new FormData();
   form.append("r2_key", r2Key);
   form.append("niche", niche);
+  if (secondary) form.append("secondary", secondary);
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
@@ -676,7 +680,7 @@ export interface GenerateInsightsResult {
   platform: string;
   generated: number;
   total: number;
-  results: { niche: string; status: "generated" | "skipped" | "error"; seed_count?: number; reason?: string }[];
+  results: { niche: string; status: "generated" | "skipped" | "error"; seed_count?: number; correction_count?: number; reason?: string }[];
 }
 
 export async function generateInsights(

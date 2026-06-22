@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UploadCloud, CheckCircle2, Lock } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
+import NichePicker from "@/components/NichePicker";
 import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
@@ -17,8 +18,6 @@ const PLATFORM_LABEL: Record<Platform, string> = {
   tiktok: "TikTok",
   instagram: "Instagram",
 };
-
-const NICHE_CHIPS = ["Fitness", "Comedy", "Gaming", "Food", "Fashion", "Lifestyle"];
 
 const PROCESSING_STEPS = [
   "Analyzing first 3-second hook...",
@@ -81,7 +80,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
-  const [niche, setNiche] = useState("");
+  const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -141,12 +140,17 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
       return;
     }
     setError("");
-    track("upload_started", { platform: "tiktok", niche_set: !!niche.trim(), logged_in: false });
+    track("upload_started", { platform: "tiktok", niche_count: niches.length, logged_in: false });
     setProcessing(true);
 
     try {
       await wakeBackend();
-      const { id } = await analyzeVideo(file, niche || "Lifestyle & Vlogs");
+      const { id } = await analyzeVideo(
+        file,
+        niches[0] || "Lifestyle",
+        "", "", "tiktok", "",
+        niches[1] ?? "",
+      );
       track("analysis_complete", { platform: "tiktok", mode: "direct" });
       router.push(`/results/${id}`);
     } catch (err: unknown) {
@@ -263,29 +267,8 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 )}
               </div>
 
-              {/* Niche chips (optional) */}
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Content Niche{" "}
-                  <span className="text-zinc-600 font-normal normal-case tracking-normal">— optional</span>
-                </p>
-                <div className="flex flex-wrap gap-2.5">
-                  {NICHE_CHIPS.map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setNiche(niche === n ? "" : n)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
-                        niche === n
-                          ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
-                          : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-purple-500/50 hover:text-white hover:bg-zinc-700/80"
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Niche — searchable multi-select (up to 2) */}
+              <NichePicker selected={niches} onChange={setNiches} />
 
               {/* Error */}
               {error && (

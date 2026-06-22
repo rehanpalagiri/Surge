@@ -20,6 +20,8 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MIN_SEEDS = 3       # below this, patterns are noise not signal
 CONFIDENT_FLOOR = 8  # below this many content-driven seeds, force low confidence
 
+_CORRECTION_CAP = 25  # max corrections fed into the prompt (avoids token bloat)
+
 
 def _is_content_driven(s) -> bool | None:
     """True for content/mixed drivers. False for distribution. None for old seeds missing the field."""
@@ -31,6 +33,22 @@ def _is_content_driven(s) -> bool | None:
     if drv is None:
         return None  # pre-fix seed — unknown
     return drv in ("content", "mixed")
+
+
+def _fmt_correction(c: dict) -> str:
+    parts = [
+        f"direction={c.get('direction') or 'unknown'}",
+        f"dimension={c.get('likely_miscalibrated_dimension') or 'overall'}",
+        f"confidence={c.get('confidence') or 'unknown'}",
+        f"views_at_audit={c.get('audited_at_views') or '?'}",
+    ]
+    gap = (c.get("gap") or "").strip()
+    if gap:
+        parts.append(f"gap: {gap}")
+    note = (c.get("note") or "").strip()
+    if note and note.lower() != "none":
+        parts.append(f"note: {note}")
+    return " | ".join(parts)
 
 
 def _fmt_seed(s) -> str:
@@ -64,8 +82,18 @@ def _fmt_seed(s) -> str:
     return "\n".join(parts)
 
 
-async def generate_niche_insight(seeds: list, platform: str, niche: str) -> str:
+async def generate_niche_insight(
+    seeds: list,
+    platform: str,
+    niche: str,
+    corrections: list | None = None,
+) -> str:
     """Synthesize all rated seeds for a (platform, niche) pair into a pattern block.
+
+    `corrections` is an optional list of safe correction dicts (from UserAnalysis.correction_json)
+    filtered by the caller. When present they are woven into the SCORING CALIBRATION section so
+    the synthesis captures both "what works" (seeds) and "where we historically mispredict"
+    (real-world outcomes). No minimum floor on corrections — 0 is fine.
 
     Returns the insight text. Raises ValueError if there aren't enough seeds.
     Raises _GeminiClientError (re-raised) on quota/key failure.
@@ -134,6 +162,25 @@ async def generate_niche_insight(seeds: list, platform: str, niche: str) -> str:
         else ""
     )
 
+    safe_corrections = (corrections or [])[:_CORRECTION_CAP]
+    if safe_corrections:
+        corr_lines = "\n\n".join(_fmt_correction(c) for c in safe_corrections)
+        corrections_block = f"""
+REAL-WORLD CALIBRATION CORRECTIONS ({len(safe_corrections)} verified predictions compared to actual outcomes):
+These are cases where this scoring model's predictions were compared to real verified performance data
+for {niche} videos on {pname}. Each entry shows the direction of error, which dimension was
+miscalibrated, and the confidence of that assessment.
+
+{corr_lines}
+
+Use these in your SCORING CALIBRATION FOR THIS NICHE and DIMENSION WEIGHTS sections: if corrections
+show a consistent direction (over_rate/under_rate) across multiple entries for the same dimension,
+name the bias explicitly — e.g. "Historical bias: Surge over-rates hook_velocity in this niche —
+apply extra scrutiny to hook scores here." Only flag a bias if multiple corrections agree.
+"""
+    else:
+        corrections_block = ""
+
     prompt = f"""You are building a niche intelligence report for a video scoring AI. This report will be injected into future AI sessions as the sole reference context when scoring new {pname} videos in the {niche} niche. It replaces injecting individual seed examples entirely — so it must be comprehensive, dense, and actionable.
 
 You have data from {len(pool)} real {pname} videos in the {niche} niche: {len(high)} high performers (rating 6–10) and {len(low)} low performers (rating 0–4).
@@ -144,7 +191,7 @@ HIGH PERFORMERS (succeeded on {pname}):
 
 LOW PERFORMERS (failed on {pname}):
 {low_block}
-
+{corrections_block}
 {conf_directive}
 {neg_warning}{deconfound_note}A pattern counts ONLY if it appears consistently across MANY videos in the SAME direction — a pattern from 2–3 videos is noise; discard it. Do not treat a single video's quirk as a rule.
 

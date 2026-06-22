@@ -31,58 +31,56 @@ import {
 // Must stay in sync with CANONICAL_NICHES in backend/services/niche_classifier.py —
 // seed matching is an exact string compare against the classified user niche.
 const NICHES = [
-  // Original 20
-  "Fitness & Gym",
-  "Comedy & Skits",
-  "Food & Cooking",
-  "Fashion & Style",
-  "Beauty & Makeup",
-  "Education & Tutorials",
+  "Fitness",
+  "Comedy",
+  "Food",
+  "Fashion",
+  "Beauty",
+  "Education",
   "Gaming",
-  "Music & Dance",
-  "Tech & Gadgets",
-  "Finance & Investing",
-  "Health & Wellness",
-  "Travel & Adventure",
-  "Lifestyle & Vlogs",
-  "Motivation & Mindset",
-  "Sports & Athletics",
-  "Relationships & Dating",
-  "Art & Creativity",
-  "Business & Entrepreneurship",
-  "Pets & Animals",
-  "Parenting & Family",
-  // Extended 30
-  "Skincare & Glow",
-  "Weight Loss Journey",
-  "Yoga & Meditation",
-  "Baking & Desserts",
-  "Vegan & Plant-Based",
-  "DIY & Crafts",
-  "Home Decor & Interior",
-  "Cleaning & Organization",
-  "Career & Job Tips",
-  "Real Estate",
+  "Music",
+  "Dance",
+  "Tech",
+  "Finance",
+  "Money",
   "Side Hustles",
-  "Crypto & Web3",
-  "Outdoor & Hiking",
-  "True Crime & Mystery",
-  "Books & Reading",
-  "Astrology & Spirituality",
-  "Movies & TV",
-  "Cars & Automotive",
-  "Photography & Editing",
-  "Sustainability & Eco",
+  "Crypto",
+  "Business",
+  "Health",
   "Mental Health",
-  "Cooking on a Budget",
-  "Couples & Romance",
-  "College & Student Life",
-  "Luxury & Wealth",
-  "Street Style & Thrift",
-  "Hair Care & Styling",
-  "Kids & Baby",
-  "ASMR & Relaxation",
-  "News & Commentary",
+  "Yoga",
+  "Travel",
+  "Lifestyle",
+  "Motivation",
+  "Sports",
+  "Dating",
+  "Art",
+  "Pets",
+  "Parenting",
+  "Kids",
+  "Vegan",
+  "DIY & Crafts",
+  "Home Decor",
+  "Cleaning",
+  "Career",
+  "Real Estate",
+  "Outdoors",
+  "True Crime",
+  "Books",
+  "Spirituality",
+  "Movies & TV",
+  "Anime",
+  "Edits",
+  "Cars",
+  "Photography",
+  "Sustainability",
+  "College",
+  "Luxury",
+  "Thrifting",
+  "Hair",
+  "Looksmaxxing",
+  "ASMR",
+  "News",
 ];
 
 type Tab = "url" | "manual";
@@ -138,7 +136,7 @@ export default function AdminPage() {
 
   // URL fetch state
   const [fetchUrl, setFetchUrl] = useState("");
-  const [fetchNiche, setFetchNiche] = useState("Fitness & Gym");
+  const [fetchNiche, setFetchNiche] = useState("Fitness");
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [fetchStatus, setFetchStatus] = useState<FetchStatus | null>(null);
@@ -177,7 +175,7 @@ export default function AdminPage() {
 
   // Manual upload state
   const [file, setFile] = useState<File | null>(null);
-  const [niche, setNiche] = useState("Fitness & Gym");
+  const [niche, setNiche] = useState("Fitness");
   const [viewCount, setViewCount] = useState("");
   const [likeCount, setLikeCount] = useState("");
   const [notes, setNotes] = useState("");
@@ -1195,7 +1193,9 @@ export default function AdminPage() {
                       <p key={r.niche} className={`text-xs ${r.status === "generated" ? "text-success" : r.status === "error" ? "text-danger" : "text-text-muted"}`}>
                         {r.status === "generated" ? "✓" : r.status === "error" ? "✗" : "–"}{" "}
                         {r.niche}
-                        {r.status === "generated" && r.seed_count != null && ` (${r.seed_count} seeds)`}
+                        {r.status === "generated" && r.seed_count != null && (
+                          ` (${r.seed_count} seeds${r.correction_count ? ` + ${r.correction_count} corrections` : ""})`
+                        )}
                         {r.status === "skipped" && r.reason && ` — ${r.reason}`}
                         {r.status === "error" && r.reason && `: ${r.reason}`}
                       </p>

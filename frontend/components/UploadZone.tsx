@@ -8,11 +8,7 @@ import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUpl
 import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
 import { track } from "@vercel/analytics";
-
-const NICHE_SUGGESTIONS = [
-  "Fitness", "Comedy", "Gaming", "Food", "Fashion",
-  "Beauty", "Finance", "Music", "Lifestyle", "Tech",
-];
+import NichePicker from "@/components/NichePicker";
 
 
 const TIPS = [
@@ -158,7 +154,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [originalSize, setOriginalSize] = useState<number | null>(null);
-  const [niche, setNiche] = useState("");
+  const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -280,12 +276,12 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    if (!niche.trim()) {
-      setError("Select a content niche above — tap any chip to get started.");
+    if (niches.length === 0) {
+      setError("Pick a content niche above — choose up to two.");
       return;
     }
     setError("");
-    track("upload_started", { platform, niche_set: !!niche.trim(), logged_in: loggedIn });
+    track("upload_started", { platform, niche_count: niches.length, logged_in: loggedIn });
     setLoading(true);
     setUploadPhase("idle");
     setUploadProgress(0);
@@ -311,7 +307,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       setUploadPhase("analyzing");
       tipInterval = setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 4000);
 
-      const { id } = await analyzeFromR2(key, niche.trim(), caption, bio, platform);
+      const { id } = await analyzeFromR2(key, niches[0], caption, bio, platform, niches[1] ?? "");
 
       // Track guest usage immediately after analysis is accepted
       if (!loggedIn) {
@@ -358,8 +354,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
     }
   };
 
-  const isChipSelected = (n: string) => niche === n;
-  const customNicheValue = NICHE_SUGGESTIONS.includes(niche) ? "" : niche;
   const guestLimitReached = !loggedIn && guestCount >= GUEST_LIMIT;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -491,33 +485,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
           </div>
         )}
 
-        {/* ── Niche ── */}
-        <div className="flex flex-col gap-4 mb-6">
-          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Content Niche</p>
-          <input
-            type="text"
-            value={customNicheValue}
-            onChange={(e) => setNiche(e.target.value)}
-            maxLength={80}
-            placeholder="Type your own…"
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition-colors text-sm"
-          />
-          <div className="flex flex-wrap gap-3">
-            {NICHE_SUGGESTIONS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setNiche(isChipSelected(n) ? "" : n)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
-                  isChipSelected(n)
-                    ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]"
-                    : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-purple-500/50 hover:text-white hover:bg-zinc-700/80"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+        {/* ── Niche — searchable multi-select (up to 2) ── */}
+        <div className="mb-6">
+          <NichePicker selected={niches} onChange={setNiches} />
         </div>
 
         {/* ── Caption ── */}

@@ -266,6 +266,7 @@ async def analyze(
     video_url: str = Form(""),
     r2_key: str = Form(""),
     niche: str = Form(""),
+    secondary: str = Form(""),  # user's optional 2nd niche pick (#6 blend) — advisory only
     caption: str = Form(""),
     bio: str = Form(""),
     platform: str = Form("tiktok"),
@@ -315,6 +316,11 @@ async def analyze(
     # Advisory secondary niche (#6 Light blend) — passed to the grading prompt only;
     # it does NOT change rubric/seed/weight lookups (those stay on the primary).
     secondary_niche = niche_class.get("secondary")
+    # If the user explicitly picked a 2nd niche, it overrides the auto-detected one.
+    # Advisory-only (grading-prompt prose), so it needs no canonicalization or lookup.
+    _explicit_secondary = (secondary or "").strip()[:80]
+    if _explicit_secondary and _explicit_secondary.lower() != raw_niche.lower():
+        secondary_niche = _explicit_secondary
     # Rides along in scores_json (no schema change) so the frontend can prompt the
     # user to confirm/correct a niche Surge wasn't sure about (#4).
     niche_needs_confirmation = niche_class["needs_confirmation"]
