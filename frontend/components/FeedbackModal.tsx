@@ -13,6 +13,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
   const [views, setViews] = useState("");
   const [likes, setLikes] = useState("");
   const [link, setLink] = useState("");
+  const [instagramLink, setInstagramLink] = useState("");
   const [manualMode, setManualMode] = useState(!isTikTok);
   const [submitted, setSubmitted] = useState(false);
   const [fetchedStats, setFetchedStats] = useState<{ views: number; likes: number } | null>(null);
@@ -105,7 +106,9 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
       <p className="text-text-muted text-sm mb-4">
         {isTikTok && !manualMode
           ? "Paste your posted TikTok link and we'll pull the real numbers — no typing, always current."
-          : "Share your actual stats to help improve Surge's predictions."}
+          : isTikTok
+          ? "Share your actual stats to help improve Surge's predictions."
+          : "Enter how many likes your Reel got — Instagram doesn't share view counts publicly, so likes are the best signal we can use."}
       </p>
 
       {isTikTok && !manualMode ? (
@@ -136,6 +139,27 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
         </form>
       ) : (
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-3">
+          {!isTikTok && (
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="instagram.com/reel/… (optional — helps you find likes)"
+                value={instagramLink}
+                onChange={(e) => setInstagramLink(e.target.value)}
+                className="flex-1 min-w-0 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to text-sm"
+              />
+              {instagramLink.trim() && (
+                <a
+                  href={instagramLink.trim()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 border border-border text-text-muted hover:text-text-primary hover:border-purple-to px-3 py-2.5 rounded-xl text-sm transition-colors whitespace-nowrap"
+                >
+                  Open ↗
+                </a>
+              )}
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row gap-3">
             {isTikTok && (
               <input

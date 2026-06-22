@@ -20,6 +20,18 @@ function scoreColor(score: number | null): string {
   return "text-danger";
 }
 
+function ScoreDelta({ prev, curr }: { prev: number | null; curr: number | null }) {
+  if (prev === null || curr === null) return null;
+  const delta = curr - prev;
+  if (Math.abs(delta) < 0.05) return null;
+  const positive = delta > 0;
+  return (
+    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${positive ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
+      {positive ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}
+    </span>
+  );
+}
+
 function groupByDate(analyses: AnalysisSummary[]): { label: string; items: AnalysisSummary[] }[] {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -163,10 +175,12 @@ function TikTokStatsRow({
 
 function ProjectCard({
   a,
+  parentScore,
   onDeleted,
   onUpdated,
 }: {
   a: AnalysisSummary;
+  parentScore: number | null;
   onDeleted: (id: number) => void;
   onUpdated: (id: number, patch: Partial<AnalysisSummary>) => void;
 }) {
@@ -196,6 +210,8 @@ function ProjectCard({
     setConfirmDelete(false);
   }
 
+  const reanalyzeUrl = `/?parent=${a.id}&niche=${encodeURIComponent(a.niche)}&platform=${a.platform}`;
+
   return (
     <div className="relative group bg-card border border-border rounded-2xl hover:border-purple-to transition-colors">
       <Link href={`/results/${a.id}`} className="block p-5 pb-3">
@@ -218,6 +234,8 @@ function ProjectCard({
               {a.overall_score}/10
             </span>
           )}
+          {/* Score delta badge when this is an updated version */}
+          <ScoreDelta prev={parentScore} curr={a.overall_score} />
         </div>
         {a.caption_preview && (
           <p className="text-text-muted text-sm mt-2 line-clamp-2">
@@ -234,8 +252,22 @@ function ProjectCard({
             ` · ${a.actual_views.toLocaleString()} views`}
           {a.actual_likes !== null &&
             ` · ${a.actual_likes.toLocaleString()} likes`}
+          {a.parent_id != null && (
+            <span className="ml-2 text-purple-to font-medium">↺ Re-analyzed</span>
+          )}
         </p>
       </Link>
+
+      {/* Re-analyze button */}
+      <div className="px-5 pb-4">
+        <Link
+          href={reanalyzeUrl}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-to/50 rounded-lg px-3 py-1.5 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          🔄 Re-analyze
+        </Link>
+      </div>
 
       {a.platform === "tiktok" && <TikTokStatsRow a={a} onUpdated={onUpdated} />}
 
@@ -301,7 +333,20 @@ export default function ProjectsPage() {
     );
   }
 
-  const filtered = analyses?.filter((a) => a.platform === platform) ?? null;
+  const allForPlatform = analyses?.filter((a) => a.platform === platform) ?? null;
+
+  // Identify superseded analyses: those whose ID appears as parent_id of another.
+  // Only show the latest version of each lineage (leaf nodes).
+  const supersededIds = new Set(
+    (allForPlatform ?? []).map((a) => a.parent_id).filter((id): id is number => id != null)
+  );
+  const filtered = allForPlatform?.filter((a) => !supersededIds.has(a.id)) ?? null;
+
+  // Build a score lookup for parent analyses so we can show deltas.
+  const scoreById = new Map<number, number | null>(
+    (allForPlatform ?? []).map((a) => [a.id, a.overall_score])
+  );
+
   const cfg = PLATFORM_TABS.find((p) => p.id === platform)!;
   const groups = filtered ? groupByDate(filtered) : null;
 
@@ -379,7 +424,13 @@ export default function ProjectsPage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {group.items.map((a) => (
-                    <ProjectCard key={a.id} a={a} onDeleted={handleDeleted} onUpdated={handleUpdated} />
+                    <ProjectCard
+                      key={a.id}
+                      a={a}
+                      parentScore={a.parent_id != null ? (scoreById.get(a.parent_id) ?? null) : null}
+                      onDeleted={handleDeleted}
+                      onUpdated={handleUpdated}
+                    />
                   ))}
                 </div>
               </div>

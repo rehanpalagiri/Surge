@@ -158,6 +158,9 @@ class UserAnalysis(Base):
     # Async analysis lifecycle: "pending" → "processing" → "complete" | "error".
     # Defaults to "complete" so all pre-existing rows are treated as finished.
     status = Column(String, nullable=True, default="complete")
+    # Re-analysis lineage: points to the analysis this one was created to improve.
+    # NULL = original upload; non-NULL = user clicked "Re-analyze" on an old result.
+    parent_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

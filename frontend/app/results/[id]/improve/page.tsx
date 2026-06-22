@@ -19,6 +19,12 @@ function scoreBorder(score: number): string {
   return "border-danger/30";
 }
 
+function scoreBarBg(score: number): string {
+  if (score >= 7) return "bg-success";
+  if (score >= 4) return "bg-warning";
+  return "bg-danger";
+}
+
 export default function ImprovePage() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
@@ -235,6 +241,91 @@ export default function ImprovePage() {
             </p>
           </div>
         )}
+
+        {/* Emotional impact */}
+        {s.emotional_analysis &&
+          Array.isArray(s.emotional_analysis.target_emotions) &&
+          s.emotional_analysis.target_emotions.length > 0 && (
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h3 className="text-text-primary font-semibold flex items-center gap-2">
+                  <span>❤️‍🔥</span> Emotional impact
+                </h3>
+                <span
+                  className={`text-sm font-bold ${scoreColor(s.emotional_analysis.achieved_score)}`}
+                >
+                  {s.emotional_analysis.achieved_score}/10
+                </span>
+              </div>
+
+              <div>
+                <p className="text-text-muted text-xs uppercase tracking-wide mb-1.5">
+                  Should make viewers feel
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {s.emotional_analysis.target_emotions.map((e, i) => (
+                    <span
+                      key={i}
+                      className="text-xs font-medium bg-surface border border-border rounded-lg px-2.5 py-1 text-text-primary"
+                    >
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full h-2 rounded-full bg-surface overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${scoreBarBg(s.emotional_analysis.achieved_score)}`}
+                  style={{
+                    width: `${Math.max(0, Math.min(10, s.emotional_analysis.achieved_score)) * 10}%`,
+                  }}
+                />
+              </div>
+
+              {s.emotional_analysis.what_lands && (
+                <div>
+                  <p className="text-text-muted text-xs uppercase tracking-wide mb-0.5">
+                    What lands
+                  </p>
+                  <p className="text-text-primary text-sm">
+                    {s.emotional_analysis.what_lands}
+                  </p>
+                </div>
+              )}
+
+              {s.emotional_analysis.what_misses && (
+                <div>
+                  <p className="text-text-muted text-xs uppercase tracking-wide mb-0.5">
+                    What&apos;s missing
+                  </p>
+                  <p className="text-text-primary text-sm">
+                    {s.emotional_analysis.what_misses}
+                  </p>
+                </div>
+              )}
+
+              {Array.isArray(s.emotional_analysis.how_to_amplify) &&
+                s.emotional_analysis.how_to_amplify.length > 0 && (
+                  <div>
+                    <p className="text-text-muted text-xs uppercase tracking-wide mb-1">
+                      How to amplify
+                    </p>
+                    <ul className="space-y-1.5">
+                      {s.emotional_analysis.how_to_amplify.map((t, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 text-text-primary text-sm"
+                        >
+                          <span className="text-purple-to mt-0.5">→</span>
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+            </div>
+          )}
 
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2 pb-4">

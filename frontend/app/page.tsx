@@ -327,6 +327,8 @@ export default function Home() {
   const [platform, setPlatform] = useState<Platform>("tiktok");
   const [showSplash, setShowSplash] = useState<boolean | null>(null);
   const [deleted, setDeleted] = useState(false);
+  const [reanalyzeParentId, setReanalyzeParentId] = useState<number | undefined>(undefined);
+  const [reanalyzeNiches, setReanalyzeNiches] = useState<string[] | undefined>(undefined);
 
   useEffect(() => {
     const token = getToken();
@@ -337,6 +339,18 @@ export default function Home() {
       window.history.replaceState({}, "", "/");
       const timer = setTimeout(() => setDeleted(false), 5000);
       return () => clearTimeout(timer);
+    }
+    // Re-analyze flow: ?parent=ID&niche=Fitness&platform=tiktok
+    const parentParam = params.get("parent");
+    const nicheParam = params.get("niche");
+    const platformParam = params.get("platform") as Platform | null;
+    if (parentParam && /^\d+$/.test(parentParam)) {
+      setReanalyzeParentId(Number(parentParam));
+      if (nicheParam) setReanalyzeNiches([nicheParam]);
+      if (platformParam && (platformParam === "tiktok" || platformParam === "instagram")) {
+        setPlatform(platformParam);
+      }
+      window.history.replaceState({}, "", "/");
     }
   }, []);
 
@@ -381,7 +395,7 @@ export default function Home() {
 
       {/* ── Upload form ── */}
       <section className="flex-1 px-4 pb-16">
-        <UploadZone platform={platform} />
+        <UploadZone platform={platform} parentId={reanalyzeParentId} initialNiches={reanalyzeNiches} />
         <p className="text-zinc-600 text-xs text-center mt-5 max-w-xl mx-auto">
           Your video is analyzed privately and not stored permanently.
         </p>

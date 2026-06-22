@@ -56,6 +56,7 @@ export interface AnalysisOut {
     projected_views?: string;
     projected_likes?: string;
     first_improvement?: ImprovementItem | null;
+    emotional_analysis?: EmotionalAnalysis;
     locked?: boolean;
     error?: string;
   };
@@ -66,6 +67,7 @@ export interface AnalysisOut {
   counts_fetched_at?: string | null;
   pending_seed_consent?: boolean;     // owner's consent is "ask" — show the banner
   mode?: string;
+  parent_id?: number | null;          // ID of the analysis this re-analyzes
   created_at: string;
 }
 
@@ -82,6 +84,7 @@ export interface AnalysisSummary {
   video_url?: string | null;
   counts_fetched_at?: string | null;
   mode?: string;
+  parent_id?: number | null;
   created_at: string;
 }
 
@@ -99,6 +102,14 @@ export interface UserOut {
   seed_consent?: "yes" | "no" | "ask";
   is_minor?: boolean;
   created_at: string;
+}
+
+export interface EmotionalAnalysis {
+  target_emotions: string[];      // the feeling(s) the video should evoke
+  achieved_score: number;         // 0-10, how well this video lands the intended feeling
+  what_lands?: string;            // what makes the feeling work ("" if it doesn't land)
+  what_misses?: string;           // what blunts the feeling ("" if it lands fully)
+  how_to_amplify?: string[];      // concrete changes to deepen the feeling
 }
 
 export interface ImprovementItem {
@@ -638,7 +649,8 @@ export async function analyzeFromR2(
   caption: string = "",
   bio: string = "",
   platform: string = "tiktok",
-  secondary: string = ""
+  secondary: string = "",
+  parentId?: number
 ): Promise<{ id: number; status: string }> {
   const form = new FormData();
   form.append("r2_key", r2Key);
@@ -647,6 +659,7 @@ export async function analyzeFromR2(
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
+  if (parentId != null) form.append("parent_id", String(parentId));
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",
     headers: authHeaders(),

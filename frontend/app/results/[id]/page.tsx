@@ -12,8 +12,80 @@ import { getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus, Ana
 import { getToken } from "@/lib/auth";
 import { track } from "@vercel/analytics";
 
+const SCORE_DIMENSIONS = [
+  { key: "overall_score",      label: "Overall Score" },
+  { key: "hook_velocity",      label: "Hook Velocity" },
+  { key: "cut_frequency",      label: "Cut Frequency" },
+  { key: "text_scannability",  label: "Text Scannability" },
+  { key: "curiosity_gap",      label: "Curiosity Gap" },
+  { key: "audio_visual_sync",  label: "Audio-Visual Sync" },
+  { key: "loop_seamlessness",  label: "Loop Seamlessness" },
+] as const;
+
+type ScoreKey = typeof SCORE_DIMENSIONS[number]["key"];
+
+function ScoreComparison({ current, parent }: { current: AnalysisOut; parent: AnalysisOut }) {
+  const cs = current.scores_json as unknown as Record<string, number>;
+  const ps = parent.scores_json as unknown as Record<string, number>;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-text-primary font-semibold text-lg">Score Comparison</h2>
+        <Link
+          href={`/results/${parent.id}`}
+          className="text-text-muted text-xs hover:text-text-primary underline"
+        >
+          View previous →
+        </Link>
+      </div>
+      <div className="grid grid-cols-3 text-xs font-semibold text-text-muted uppercase tracking-widest mb-3 px-1">
+        <span>Dimension</span>
+        <span className="text-center">Before</span>
+        <span className="text-center">After</span>
+      </div>
+      <div className="space-y-2">
+        {SCORE_DIMENSIONS.map(({ key, label }) => {
+          const prev = ps[key as ScoreKey] ?? null;
+          const curr = cs[key as ScoreKey] ?? null;
+          const delta = prev != null && curr != null ? curr - prev : null;
+          return (
+            <div key={key} className="grid grid-cols-3 items-center px-1 py-1.5 rounded-lg hover:bg-surface/50 transition-colors">
+              <span className="text-text-muted text-sm">{label}</span>
+              <span className="text-center text-text-muted text-sm tabular-nums">
+                {prev != null ? prev.toFixed(1) : "—"}
+              </span>
+              <span className="text-center flex items-center justify-center gap-1.5">
+                <span className={`text-sm font-semibold tabular-nums ${
+                  curr == null ? "text-text-muted" :
+                  curr >= 7 ? "text-success" :
+                  curr >= 4 ? "text-warning" : "text-danger"
+                }`}>
+                  {curr != null ? curr.toFixed(1) : "—"}
+                </span>
+                {delta != null && Math.abs(delta) >= 0.05 && (
+                  <span className={`text-xs font-bold ${delta > 0 ? "text-success" : "text-danger"}`}>
+                    {delta > 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-text-muted/60 text-xs mt-4 text-center">
+        Compared to{" "}
+        {new Date(parent.created_at).toLocaleDateString(undefined, {
+          month: "short", day: "numeric", year: "numeric",
+        })}
+      </p>
+    </div>
+  );
+}
+
 function ShareButton({ analysisId, score, locked }: { analysisId: number | string; score: number; locked: boolean }) {
   const [copied, setCopied] = useState(false);
+  const scoreNum = Math.round(score * 10);
 
   async function handleShare() {
     const url = window.location.href;
@@ -27,7 +99,7 @@ function ShareButton({ analysisId, score, locked }: { analysisId: number | strin
       document.execCommand("copy");
       document.body.removeChild(ta);
     }
-    track("result_shared", { analysis_id: analysisId, score: Math.round(score * 10), is_locked: locked });
+    track("result_shared", { analysis_id: analysisId, score: scoreNum, is_locked: locked });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -35,12 +107,18 @@ function ShareButton({ analysisId, score, locked }: { analysisId: number | strin
   return (
     <button
       onClick={handleShare}
-      className="inline-flex items-center gap-2 border border-border text-text-muted hover:text-text-primary hover:border-purple-to px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+      className="inline-flex items-center gap-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
     >
       {copied ? (
-        <><span>✓</span> Link copied!</>
+        <>
+          <span className="text-emerald-400 text-base leading-none">✓</span>
+          <span>Link copied!</span>
+        </>
       ) : (
-        <><span>↗</span> Share my score</>
+        <>
+          <span className="text-base leading-none">🔗</span>
+          <span>Share · <span className="text-purple-400">{scoreNum}/100</span></span>
+        </>
       )}
     </button>
   );
@@ -117,6 +195,7 @@ export default function ResultsPage() {
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
 
   const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
+  const [parentAnalysis, setParentAnalysis] = useState<AnalysisOut | null>(null);
   const [status, setStatus] = useState<"loading" | "ok" | "notfound" | "timeout">("loading");
   const [loadingText, setLoadingText] = useState("Loading your results…");
   const [showUpsell, setShowUpsell] = useState(false);
@@ -170,6 +249,10 @@ export default function ResultsPage() {
       if (!cancelled) {
         setAnalysis(a);
         setStatus("ok");
+        // Fetch the parent analysis for score comparison (best-effort, no error shown).
+        if (a.parent_id && token) {
+          getAnalysis(a.parent_id, token).then(setParentAnalysis).catch(() => {});
+        }
       }
     }
 
@@ -375,6 +458,11 @@ export default function ResultsPage() {
               </div>
             </div>
 
+            {/* Score comparison vs previous version */}
+            {parentAnalysis && !parentAnalysis.scores_json.locked && (
+              <ScoreComparison current={analysis} parent={parentAnalysis} />
+            )}
+
             {/* Strengths + Improvements */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-success/5 border border-success/20 rounded-2xl p-5">
@@ -466,10 +554,16 @@ export default function ResultsPage() {
             {/* CTA */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-4">
               <Link
-                href="/"
+                href={`/?parent=${analysis.id}&niche=${encodeURIComponent(analysis.niche)}&platform=${analysis.platform}`}
                 className="inline-block gradient-btn text-white font-semibold px-8 py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
               >
-                Analyze another video →
+                🔄 Re-analyze this project
+              </Link>
+              <Link
+                href="/"
+                className="inline-block bg-card border border-border text-text-primary font-semibold px-8 py-3 rounded-xl hover:border-purple-to transition-colors"
+              >
+                Analyze a new video →
               </Link>
               <ShareButton analysisId={analysis.id} score={s.overall_score ?? 0} locked={false} />
             </div>

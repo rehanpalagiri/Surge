@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from google import genai
 from google.genai import types
 from google.genai.errors import ClientError as _GeminiClientError
-from services.niche_weights import get_dimension_hierarchy_block
+from services.niche_weights import get_dimension_hierarchy_block, get_blend_note, get_emotional_target_block
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -251,16 +251,15 @@ def _build_system_prompt(
             f'(creator describes their content as: "{raw}").'
         )
 
-    # Advisory secondary niche (#6 Light blend). Primary still drives the rubric,
-    # seeds, and weights — this only tells the model to judge a blended video as a
-    # blend. None/empty/equal-to-primary → no note (identical to single-niche scoring).
+    # Real multi-niche. The DIMENSION HIERARCHY block below now carries the promote-only
+    # weight merge (primary spine, secondary raises weights, primary wins conflicts), so this
+    # is just a one-line framing. None/empty/equal-to-primary → no note (single-niche scoring).
     blend_block = ""
     if secondary_niche and secondary_niche.strip() and secondary_niche != niche:
         blend_block = (
-            f"\nBLEND: This video is primarily **{niche}** with strong **{secondary_niche}** "
-            f"elements. Apply {niche} scoring standards as the base, but recognize "
-            f"{secondary_niche} conventions where they appear — do not penalize the video for "
-            f"not being a pure {niche} post. Score the 6 dimensions on what you actually observe."
+            f"\nThis is primarily a **{niche}** video genuinely blended with **{secondary_niche}** — "
+            f"reward authentic {secondary_niche} execution, but judge success by the merged "
+            f"DIMENSION HIERARCHY below."
         )
 
     if creator_like_baseline and creator_like_baseline.get("sample_count", 0) >= 2:
@@ -313,9 +312,11 @@ def _build_system_prompt(
             "- LOW dimensions: score independently; a low score here has minimal effect on overall_score.\n\n"
             "improvement_plan ordering: CRITICAL fixes first, then HIGH, then STANDARD, then LOW — "
             "unless a higher-tier dimension is already ≥ 6."
+            # The data-derived weights key on the primary niche; layer the secondary on top.
+            + get_blend_note(niche, secondary_niche)
         )
     else:
-        hierarchy_block = get_dimension_hierarchy_block(niche, platform)
+        hierarchy_block = get_dimension_hierarchy_block(niche, platform, secondary_niche)
 
     # --- Calibration nudge (Build #3) — soft guidance from REAL past outcomes ---
     # Only applied when high-confidence + real sample (see _calibration_applies). The
@@ -341,6 +342,9 @@ def _build_system_prompt(
             "This is derived from a small sample and may reflect selection bias. Apply it gently; "
             "never let calibration move any single score by more than 1 point."
         )
+
+    # --- Emotional intent block (always present — the feeling the niche(s) must evoke) ---
+    emotional_block = get_emotional_target_block(niche, secondary_niche)
 
     return f"""You are an {ctx["analyst_title"]}. Score this video accurately. If something is broken, name it plainly. If something works, say so.
 {benchmark_block}
@@ -382,6 +386,8 @@ SIX DIMENSIONS — score each independently on what you observe in this video:
 {hierarchy_block}
 {cal_block}
 
+{emotional_block}
+
 VERDICT (apply exactly, no exceptions):
 - "High potential": overall_score ≥ 7 AND hook_velocity or curiosity_gap ≥ 5.
 - "Average potential": overall_score 5–6, OR overall_score ≥ 7 but BOTH hook_velocity < 5 AND curiosity_gap < 5.
@@ -403,6 +409,7 @@ FEEDBACK RULES — apply to every field before writing:
 - caption_rewrite: rewrite their caption for {pname} performance. If none was given, write one from what the video shows.
 - hook_rewrite: describe the structural change for the first 2 seconds. Name the format (cold open, mid-action start, on-screen text overlay, etc.) and the angle to lead with. Do not write their dialogue or scripted words — describe the approach and angle, not the exact copy.
 - projected_verdict: honest assessment of the verdict if the creator applies every fix.
+- emotional_analysis: judge the EMOTIONAL INTENT above. target_emotions = the feeling(s) the video should evoke (from the intent block). achieved_score 0–10 = how well THIS video lands that feeling (0 = evokes nothing, 10 = unmissable). what_lands / what_misses ≤ 25 words each, specific to this video. how_to_amplify = 2 concrete changes to deepen the feeling. Score the feeling independently of the 6 craft dimensions — a technically clean video can still evoke nothing.
 
 Return ONLY valid JSON with exactly this structure:
 {{
@@ -429,6 +436,13 @@ Return ONLY valid JSON with exactly this structure:
   ],
   "caption_rewrite": "<rewritten or new caption for {pname}>",
   "hook_rewrite": "<structural description: format and angle for the first 2 seconds — no scripted words>",
+  "emotional_analysis": {{
+    "target_emotions": ["<feeling the video should evoke>"],
+    "achieved_score": <0-10, how well this video lands the intended feeling>,
+    "what_lands": "<what makes the feeling work, ≤ 25 words — or '' if it doesn't land>",
+    "what_misses": "<what blunts the feeling, ≤ 25 words — or '' if it lands fully>",
+    "how_to_amplify": ["<concrete change to deepen the feeling>", "<another concrete change>"]
+  }},
 {projection_schema}
 }}"""
 

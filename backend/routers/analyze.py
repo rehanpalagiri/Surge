@@ -15,7 +15,7 @@ from services.gemini import analyze_video, select_seed_examples
 from services.calibration import load_calibration_note
 from google.genai.errors import ClientError as _GeminiClientError
 from services.channel_profile import build_channel_profile
-from services.niche_classifier import classify_niche
+from services.niche_classifier import classify_niche, _match_canonical
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
 from services.seed_promote import promote_analysis_to_seed
 from services.seed_correction import audit_prediction
@@ -75,6 +75,7 @@ async def _run_r2_analysis(
     platform: str,
     niche_needs_confirmation: bool = False,
     secondary_niche: Optional[str] = None,
+    parent_id: Optional[int] = None,
 ) -> None:
     file_path = os.path.join(uploads_dir, f"{uuid.uuid4()}_r2upload.mp4")
     async with AsyncSessionLocal() as db:
@@ -270,6 +271,7 @@ async def analyze(
     caption: str = Form(""),
     bio: str = Form(""),
     platform: str = Form("tiktok"),
+    parent_id: str = Form(""),  # optional: ID of the analysis this re-analyzes
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(optional_user),
 ):
@@ -313,20 +315,31 @@ async def analyze(
     raw_niche = niche.strip()[:200]
     niche_class = await classify_niche(raw_niche)
     canonical_niche = niche_class["canonical"]
-    # Advisory secondary niche (#6 Light blend) — passed to the grading prompt only;
-    # it does NOT change rubric/seed/weight lookups (those stay on the primary).
+    # Real multi-niche: the secondary niche drives a promote-only weight merge in the
+    # grading prompt (the PRIMARY still owns all rubric/seed/calibration lookups). It must
+    # be canonical to key into NICHE_PROFILES — classify_niche already returns a canonical
+    # secondary; an explicit pick is canonicalized here (no Gemini call). A custom/off-list
+    # secondary that matches no canonical niche falls through and the merge simply no-ops.
     secondary_niche = niche_class.get("secondary")
-    # If the user explicitly picked a 2nd niche, it overrides the auto-detected one.
-    # Advisory-only (grading-prompt prose), so it needs no canonicalization or lookup.
     _explicit_secondary = (secondary or "").strip()[:80]
     if _explicit_secondary and _explicit_secondary.lower() != raw_niche.lower():
-        secondary_niche = _explicit_secondary
+        secondary_niche = _match_canonical(_explicit_secondary) or _explicit_secondary
     # Rides along in scores_json (no schema change) so the frontend can prompt the
     # user to confirm/correct a niche Surge wasn't sure about (#4).
     niche_needs_confirmation = niche_class["needs_confirmation"]
 
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
+
+    # Resolve parent_id — must belong to the current user (ownership check).
+    resolved_parent_id: Optional[int] = None
+    if parent_id.strip().isdigit() and user:
+        _pid = int(parent_id.strip())
+        _parent = (await db.execute(
+            select(UserAnalysis).where(UserAnalysis.id == _pid, UserAnalysis.user_id == user.id)
+        )).scalar_one_or_none()
+        if _parent:
+            resolved_parent_id = _pid
 
     # --- R2 async path: file already in cloud storage, process in background ---
     if has_r2:
@@ -342,6 +355,7 @@ async def analyze(
             verdict="",
             mode="quick",
             status="pending",
+            parent_id=resolved_parent_id,
         )
         db.add(analysis)
         await db.commit()
@@ -359,6 +373,7 @@ async def analyze(
             platform,
             niche_needs_confirmation,
             secondary_niche,
+            resolved_parent_id,
         )
         return {"id": analysis.id, "status": "pending"}
 
@@ -561,6 +576,7 @@ async def analyze(
         mode=effective_mode,
         # Build #3: 0 / absent = un-nudged (the safe default).
         calibration_version=int(result.get("calibration_version") or 0),
+        parent_id=resolved_parent_id,
     )
     db.add(analysis)
     await db.commit()
@@ -632,6 +648,7 @@ async def my_analyses(
                 "video_url": a.video_url,
                 "counts_fetched_at": a.counts_fetched_at,
                 "mode": a.mode or "quick",
+                "parent_id": a.parent_id,
                 "created_at": a.created_at,
             }
         )
@@ -870,6 +887,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "pending_seed_consent": bool(analysis.pending_seed_consent),
         "niche_needs_confirmation": bool(scores.get("niche_needs_confirmation")),
         "mode": analysis.mode or "quick",
+        "parent_id": analysis.parent_id,
         "created_at": analysis.created_at,
     }
 
@@ -903,5 +921,6 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "counts_fetched_at": None,
         "pending_seed_consent": False,
         "mode": analysis.mode or "quick",
+        "parent_id": analysis.parent_id,
         "created_at": analysis.created_at,
     }

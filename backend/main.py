@@ -140,6 +140,11 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN canonical_niche TEXT"
         )
+    # Re-analysis lineage: NULL = original; non-NULL = improved version of parent.
+    if "parent_id" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN parent_id INTEGER"
+        )
 
     # --- users: email auth + age gate + seed consent (v1.24) ---
     # NOTE: SQLite forbids adding a UNIQUE column via ALTER TABLE, so email
@@ -204,6 +209,8 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS calibration_version INTEGER DEFAULT 0",
         # Canonical niche (calibration keys on this, not the raw display niche).
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS canonical_niche VARCHAR",
+        # Re-analysis lineage: NULL = original; non-NULL = improved version of parent.
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS parent_id INTEGER",
         # Dedup: if any email appears more than once (case-insensitive), null out all
         # but the newest account (highest id). Idempotent — no-op when no duplicates.
         "UPDATE users SET email = NULL WHERE email IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM users WHERE email IS NOT NULL GROUP BY lower(email))",

@@ -147,14 +147,16 @@ function sanitizeName(name: string) {
 interface Props {
   platform?: string;
   initialFile?: File | null;
+  parentId?: number;
+  initialNiches?: string[];
 }
 
-export default function UploadZone({ platform = "tiktok", initialFile = null }: Props) {
+export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [originalSize, setOriginalSize] = useState<number | null>(null);
-  const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
+  const [niches, setNiches] = useState<string[]>(initialNiches ?? []);  // up to 2; first = primary, second = blend
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -307,7 +309,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       setUploadPhase("analyzing");
       tipInterval = setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 4000);
 
-      const { id } = await analyzeFromR2(key, niches[0], caption, bio, platform, niches[1] ?? "");
+      const { id } = await analyzeFromR2(key, niches[0], caption, bio, platform, niches[1] ?? "", parentId);
 
       // Track guest usage immediately after analysis is accepted
       if (!loggedIn) {
@@ -408,6 +410,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null }: 
       )}
 
       <form onSubmit={handleSubmit} className="w-full max-w-xl mx-auto space-y-5">
+
+        {/* ── Re-analysis banner ── */}
+        {parentId != null && (
+          <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-xl px-4 py-3">
+            <span className="text-purple-400 text-sm">🔄</span>
+            <p className="text-purple-300 text-sm font-medium">
+              Re-analyzing project — upload a new version to compare scores
+            </p>
+          </div>
+        )}
 
         {/* ── Upload / Compression Zone ── */}
         {compressing ? (

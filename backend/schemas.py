@@ -72,6 +72,8 @@ class AnalysisOut(BaseModel):
     # frontend can prompt the user to confirm/correct it. Mirrors scores_json.
     niche_needs_confirmation: bool = False
     mode: Optional[str] = "quick"  # effective mode that ran
+    # Re-analysis lineage: None = original upload; int = improved version of parent.
+    parent_id: Optional[int] = None
     created_at: datetime
 
     class Config:
@@ -159,6 +161,7 @@ class AnalysisSummaryOut(BaseModel):
     video_url: Optional[str] = None
     counts_fetched_at: Optional[datetime] = None
     mode: Optional[str] = "quick"
+    parent_id: Optional[int] = None
     created_at: datetime
 
 
