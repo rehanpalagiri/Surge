@@ -13,17 +13,16 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
   const [views, setViews] = useState("");
   const [likes, setLikes] = useState("");
   const [link, setLink] = useState("");
-  const [instagramLink, setInstagramLink] = useState("");
-  const [manualMode, setManualMode] = useState(!isTikTok);
+  const [manualMode, setManualMode] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [fetchedStats, setFetchedStats] = useState<{ views: number; likes: number } | null>(null);
+  const [fetchedStats, setFetchedStats] = useState<{ views: number | null; likes: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleLinkSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!link.trim()) {
-      setError("Paste the link to your posted TikTok first.");
+      setError(isTikTok ? "Paste the link to your posted TikTok first." : "Paste the link to your posted Reel first.");
       return;
     }
     setLoading(true);
@@ -31,7 +30,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
     try {
       const updated = await linkTikTokVideo(analysisId, link.trim());
       setFetchedStats({
-        views: updated.actual_views ?? 0,
+        views: updated.actual_views ?? null,
         likes: updated.actual_likes ?? 0,
       });
       setSubmitted(true);
@@ -60,7 +59,6 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
       setError("Please enter a valid like count.");
       return;
     }
-    // For Instagram, likes are the only meaningful metric — require them.
     if (!isTikTok && likeNum === undefined) {
       setError("Please enter your like count.");
       return;
@@ -83,11 +81,12 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
       <div className="bg-card border border-border rounded-2xl p-6 text-center">
         <div className="text-3xl mb-2">🎉</div>
         <p className="text-success font-semibold text-lg">
-          {fetchedStats ? "Stats synced from TikTok!" : "Thanks for the feedback!"}
+          {fetchedStats ? (isTikTok ? "Stats synced from TikTok!" : "Reel stats synced!") : "Thanks for the feedback!"}
         </p>
         {fetchedStats && (
           <p className="text-text-primary text-sm mt-2 font-medium">
-            {fetchedStats.views.toLocaleString()} views · {fetchedStats.likes.toLocaleString()} likes
+            {fetchedStats.views != null && `${fetchedStats.views.toLocaleString()} views · `}
+            {fetchedStats.likes.toLocaleString()} likes
           </p>
         )}
         <p className="text-text-muted text-sm mt-1">
@@ -104,19 +103,19 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
         How did your video actually perform?
       </h3>
       <p className="text-text-muted text-sm mb-4">
-        {isTikTok && !manualMode
-          ? "Paste your posted TikTok link and we'll pull the real numbers — no typing, always current."
-          : isTikTok
-          ? "Share your actual stats to help improve Surge's predictions."
-          : "Enter how many likes your Reel got — Instagram doesn't share view counts publicly, so likes are the best signal we can use."}
+        {!manualMode
+          ? isTikTok
+            ? "Paste your posted TikTok link and we'll pull the real numbers — no typing, always current."
+            : "Paste your posted Reel link and we'll pull the like count automatically."
+          : "Share your actual stats to help improve Surge's predictions."}
       </p>
 
-      {isTikTok && !manualMode ? (
+      {!manualMode ? (
         <form onSubmit={handleLinkSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="url"
-              placeholder="https://www.tiktok.com/@you/video/…"
+              placeholder={isTikTok ? "https://www.tiktok.com/@you/video/…" : "https://www.instagram.com/reel/…"}
               value={link}
               onChange={(e) => setLink(e.target.value)}
               className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
@@ -134,32 +133,11 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
             onClick={() => { setManualMode(true); setError(""); }}
             className="text-text-muted text-xs hover:text-text-primary self-start underline-offset-2 hover:underline"
           >
-            Haven&apos;t posted it yet? Enter stats manually
+            {isTikTok ? "Haven't posted it yet? Enter stats manually" : "Enter likes manually instead"}
           </button>
         </form>
       ) : (
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-3">
-          {!isTikTok && (
-            <div className="flex gap-2">
-              <input
-                type="url"
-                placeholder="instagram.com/reel/… (optional — helps you find likes)"
-                value={instagramLink}
-                onChange={(e) => setInstagramLink(e.target.value)}
-                className="flex-1 min-w-0 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to text-sm"
-              />
-              {instagramLink.trim() && (
-                <a
-                  href={instagramLink.trim()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 border border-border text-text-muted hover:text-text-primary hover:border-purple-to px-3 py-2.5 rounded-xl text-sm transition-colors whitespace-nowrap"
-                >
-                  Open ↗
-                </a>
-              )}
-            </div>
-          )}
           <div className="flex flex-col sm:flex-row gap-3">
             {isTikTok && (
               <input
@@ -187,15 +165,13 @@ export default function FeedbackModal({ analysisId, platform = "tiktok" }: Feedb
           >
             {loading ? "Submitting..." : "Submit"}
           </button>
-          {isTikTok && (
-            <button
-              type="button"
-              onClick={() => { setManualMode(false); setError(""); }}
-              className="text-text-muted text-xs hover:text-text-primary self-start underline-offset-2 hover:underline"
-            >
-              ← Or paste your TikTok link instead
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => { setManualMode(false); setError(""); }}
+            className="text-text-muted text-xs hover:text-text-primary self-start underline-offset-2 hover:underline"
+          >
+            ← {isTikTok ? "Or paste your TikTok link instead" : "Or paste your Reel link instead"}
+          </button>
         </form>
       )}
       {error && <p className="text-danger text-sm mt-2">{error}</p>}

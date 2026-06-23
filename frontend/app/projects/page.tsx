@@ -173,6 +173,91 @@ function TikTokStatsRow({
   );
 }
 
+function InstagramStatsRow({
+  a,
+  onUpdated,
+}: {
+  a: AnalysisSummary;
+  onUpdated: (id: number, patch: Partial<AnalysisSummary>) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function fetchStats(url?: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await linkTikTokVideo(a.id, url);
+      onUpdated(a.id, {
+        actual_likes: updated.actual_likes,
+        video_url: updated.video_url,
+        counts_fetched_at: updated.counts_fetched_at,
+      });
+      setExpanded(false);
+      setLink("");
+    } catch (err: unknown) {
+      setError(apiErrorDetail(err, "Couldn't fetch stats — try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="px-5 pb-4">
+      {a.video_url ? (
+        <button
+          onClick={() => fetchStats()}
+          disabled={busy}
+          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+        >
+          {busy ? "Refreshing…" : "↻ Refresh likes from Instagram"}
+        </button>
+      ) : !expanded ? (
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors"
+        >
+          🔗 Link posted Reel to auto-track likes
+        </button>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (link.trim()) fetchStats(link.trim());
+          }}
+          className="flex gap-2"
+        >
+          <input
+            type="url"
+            autoFocus
+            placeholder="https://www.instagram.com/reel/…"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+          />
+          <button
+            type="submit"
+            disabled={busy || !link.trim()}
+            className="gradient-btn text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap"
+          >
+            {busy ? "…" : "Fetch"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setExpanded(false); setError(""); }}
+            className="text-text-muted text-xs hover:text-text-primary"
+          >
+            ✕
+          </button>
+        </form>
+      )}
+      {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
 function ProjectCard({
   a,
   parentScore,
@@ -270,6 +355,7 @@ function ProjectCard({
       </div>
 
       {a.platform === "tiktok" && <TikTokStatsRow a={a} onUpdated={onUpdated} />}
+      {a.platform === "instagram" && <InstagramStatsRow a={a} onUpdated={onUpdated} />}
 
       {/* Delete button — appears on hover */}
       {!confirmDelete ? (

@@ -17,6 +17,7 @@ from google.genai.errors import ClientError as _GeminiClientError
 from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche, _match_canonical
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
+from services.instagram_fetch import fetch_instagram_likes, is_instagram_url
 from services.seed_promote import promote_analysis_to_seed
 from services.seed_correction import audit_prediction
 from services.rate_limit import get_rate_limit
@@ -688,10 +689,11 @@ async def link_video(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
-    """Attach the user's posted TikTok link to an analysis and auto-fetch its
-    real view/like counts via tikwm. Call with url=None to refresh counts from
-    the already-stored link (throttled to once per 24h). TikTok only —
-    Instagram has no free uncapped metadata API, so it stays manual entry.
+    """Attach the user's posted video link to an analysis and auto-fetch its
+    real stats. For TikTok: fetches views + likes via tikwm. For Instagram:
+    fetches likes via RapidAPI (Instagram never exposes view counts).
+    Call with url=None to refresh counts from the already-stored link
+    (throttled to once per 24h).
     """
     result = await db.execute(
         select(UserAnalysis).where(UserAnalysis.id == analysis_id)
@@ -701,13 +703,44 @@ async def link_video(
         raise HTTPException(status_code=404, detail="Analysis not found")
     if analysis.user_id != user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this analysis")
-    if (analysis.platform or "tiktok") != "tiktok":
-        raise HTTPException(
-            status_code=400,
-            detail="Auto-fetch only works for TikTok videos — enter Instagram stats manually.",
-        )
 
+    is_ig = (analysis.platform or "tiktok") == "instagram"
     new_url = (payload.url or "").strip() or None
+
+    # ── Instagram branch ────────────────────────────────────────────────────
+    if is_ig:
+        if new_url and not is_instagram_url(new_url):
+            raise HTTPException(
+                status_code=400,
+                detail="That doesn't look like an Instagram Reel link — paste the URL of your posted Reel.",
+            )
+        url = new_url or analysis.video_url
+        if not url:
+            raise HTTPException(status_code=400, detail="Paste the link to your posted Reel first.")
+
+        if not new_url and analysis.counts_fetched_at:
+            elapsed = datetime.utcnow() - analysis.counts_fetched_at
+            if elapsed < REFRESH_COOLDOWN:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Stats were refreshed less than 24 hours ago — check back tomorrow.",
+                )
+
+        try:
+            likes = await fetch_instagram_likes(url)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Couldn't fetch that Reel: {e}")
+
+        analysis.video_url = url
+        analysis.actual_likes = likes
+        analysis.counts_fetched_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(analysis)
+
+        background_tasks.add_task(audit_prediction, analysis.id)
+        return _to_out(analysis)
+
+    # ── TikTok branch ───────────────────────────────────────────────────────
     if new_url and not is_tiktok_url(new_url):
         raise HTTPException(
             status_code=400,
@@ -717,7 +750,6 @@ async def link_video(
     if not url:
         raise HTTPException(status_code=400, detail="Paste the link to your posted TikTok first.")
 
-    # Throttle pure refreshes (no new link supplied) — counts don't move that fast.
     if not new_url and analysis.counts_fetched_at:
         elapsed = datetime.utcnow() - analysis.counts_fetched_at
         if elapsed < REFRESH_COOLDOWN:
@@ -760,13 +792,8 @@ async def link_video(
     await db.commit()
     await db.refresh(analysis)
 
-    # Audit prediction accuracy against real outcome — independent of promotion gate.
     background_tasks.add_task(audit_prediction, analysis.id)
 
-    # Door B (v1.20): a verified, posted video is the best seed signal there is.
-    # Promote it into the reference library in the background so the user's
-    # stat-sync stays instant. Idempotent — skipped once already promoted.
-    # meta is passed through so the task doesn't hit tikwm again (~1 req/sec cap).
     if analysis.promoted_seed_id is None:
         background_tasks.add_task(promote_analysis_to_seed, analysis.id, meta)
 

@@ -83,46 +83,6 @@ function ScoreComparison({ current, parent }: { current: AnalysisOut; parent: An
   );
 }
 
-function ShareButton({ analysisId, score, locked }: { analysisId: number | string; score: number; locked: boolean }) {
-  const [copied, setCopied] = useState(false);
-  const scoreNum = Math.round(score * 10);
-
-  async function handleShare() {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = url;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-    track("result_shared", { analysis_id: analysisId, score: scoreNum, is_locked: locked });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <button
-      onClick={handleShare}
-      className="inline-flex items-center gap-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-    >
-      {copied ? (
-        <>
-          <span className="text-emerald-400 text-base leading-none">✓</span>
-          <span>Link copied!</span>
-        </>
-      ) : (
-        <>
-          <span className="text-base leading-none">🔗</span>
-          <span>Share · <span className="text-purple-400">{scoreNum}/100</span></span>
-        </>
-      )}
-    </button>
-  );
-}
 
 function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
   const [dismissed, setDismissed] = useState(false);
@@ -333,6 +293,17 @@ export default function ResultsPage() {
   };
   const modeLabel = MODE_LABEL[analysis.mode ?? "quick"] ?? MODE_LABEL.quick;
 
+  // Emotional teaser (owner only). Full lands/misses/amplify lives on the improve page.
+  // Guard achieved_score — Gemini can omit/malform it (would render "undefined/10").
+  const ea = s.emotional_analysis;
+  const hasEmotional =
+    !!ea && Array.isArray(ea.target_emotions) && ea.target_emotions.length > 0;
+  const emoScore =
+    ea && typeof ea.achieved_score === "number" && Number.isFinite(ea.achieved_score)
+      ? ea.achieved_score
+      : 0;
+  const emoColor = emoScore >= 7 ? "text-success" : emoScore >= 4 ? "text-warning" : "text-danger";
+
   return (
     <main className="min-h-screen bg-background">
       <Nav subtitle={analysis.niche} />
@@ -423,14 +394,13 @@ export default function ResultsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-4">
+            <div className="flex justify-center pb-4">
               <Link
                 href="/"
                 className="inline-block bg-card border border-border text-text-primary font-semibold px-8 py-3 rounded-xl hover:border-purple-to transition-colors"
               >
                 Analyze another video →
               </Link>
-              <ShareButton analysisId={analysis.id} score={s.overall_score ?? 0} locked={true} />
             </div>
           </>
         ) : (
@@ -493,6 +463,34 @@ export default function ResultsPage() {
                 </ul>
               </div>
             </div>
+
+            {/* Emotional impact — teaser (full breakdown on the improve page) */}
+            {hasEmotional && ea && (
+              <div className="bg-card border border-border rounded-2xl p-6">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-text-primary font-semibold flex items-center gap-2">
+                    <span>❤️‍🔥</span> Emotional impact
+                  </h3>
+                  <span className={`text-sm font-bold ${emoColor}`}>{emoScore}/10</span>
+                </div>
+                <p className="text-text-muted text-xs uppercase tracking-wide mb-2">
+                  Should make viewers feel
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ea.target_emotions.map((e: string, i: number) => (
+                    <span
+                      key={i}
+                      className="text-xs font-medium bg-surface border border-border rounded-lg px-2.5 py-1 text-text-primary"
+                    >
+                      {e}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-text-muted text-xs mt-3">
+                  See what lands, what&apos;s missing, and how to amplify it in your full plan below.
+                </p>
+              </div>
+            )}
 
             {/* CTA → full improvement plan */}
             <Link
@@ -565,7 +563,6 @@ export default function ResultsPage() {
               >
                 Analyze a new video →
               </Link>
-              <ShareButton analysisId={analysis.id} score={s.overall_score ?? 0} locked={false} />
             </div>
           </>
         )}

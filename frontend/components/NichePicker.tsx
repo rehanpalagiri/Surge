@@ -59,11 +59,17 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
     }
   };
 
+  // Reorder which niche is primary. Order is meaningful: selected[0] is the spine that
+  // drives the score; selected[1] only nudges the weighting.
+  const swap = () => {
+    if (selected.length === 2) onChange([selected[1], selected[0]]);
+  };
+
   return (
     <div className="space-y-2" ref={ref}>
       <div className="flex items-baseline justify-between">
         <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Content Niche</p>
-        <p className="text-[11px] text-zinc-500">{selected.length}/{max} · pick up to two</p>
+        <p className="text-[11px] text-zinc-500">primary + optional 2nd</p>
       </div>
 
       {/* Field */}
@@ -81,15 +87,25 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
             selected.map((n, i) => (
               <span
                 key={n}
-                className="inline-flex items-center gap-1.5 bg-purple-600/20 border border-purple-500/40 text-purple-100 text-xs font-medium pl-1.5 pr-1 py-1 rounded-full"
+                className={`inline-flex items-center gap-1.5 text-xs font-medium pl-1.5 pr-1 py-1 rounded-full ${
+                  i === 0
+                    ? "bg-purple-600/30 border border-purple-500/60 text-purple-50"
+                    : "bg-zinc-800 border border-zinc-600 text-zinc-300"
+                }`}
               >
-                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-500/40 text-[10px] font-bold">{i + 1}</span>
+                <span
+                  className={`flex items-center justify-center px-1.5 h-4 rounded-full text-[9px] font-bold uppercase tracking-wide ${
+                    i === 0 ? "bg-purple-500 text-white" : "bg-zinc-600 text-zinc-200"
+                  }`}
+                >
+                  {i === 0 ? "Primary" : "2nd"}
+                </span>
                 {n}
                 <button
                   type="button"
                   aria-label={`Remove ${n}`}
                   onClick={(e) => { e.stopPropagation(); toggle(n); }}
-                  className="hover:bg-purple-500/40 rounded-full p-0.5 transition-colors"
+                  className="hover:bg-white/10 rounded-full p-0.5 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -154,19 +170,34 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
             </div>
             {atMax && (
               <div className="px-3 py-2 text-[11px] text-zinc-500 border-t border-zinc-800">
-                2 selected — remove one to swap.
+                2 niches max — remove one to pick a different one.
               </div>
             )}
           </div>
         </div>
       )}
 
-      {selected.length === 2 && (
+      {selected.length === 1 && (
         <p className="text-[11px] text-zinc-500">
-          Scoring as a <span className="text-purple-300 font-medium">{selected[0]}</span> ×{" "}
-          <span className="text-purple-300 font-medium">{selected[1]}</span> blend
-          <span className="text-zinc-600"> — {selected[0]} drives the score.</span>
+          <span className="text-purple-300 font-medium">{selected[0]}</span> is your{" "}
+          <span className="text-zinc-400">primary</span> niche — it drives the score. Add a 2nd for a blend.
         </p>
+      )}
+
+      {selected.length === 2 && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] text-zinc-500">
+            <span className="text-purple-300 font-medium">{selected[0]}</span> drives the score ·{" "}
+            <span className="text-zinc-400 font-medium">{selected[1]}</span> adds nuance
+          </p>
+          <button
+            type="button"
+            onClick={swap}
+            className="shrink-0 text-[11px] font-medium text-zinc-400 hover:text-purple-300 transition-colors"
+          >
+            ⇄ Swap primary
+          </button>
+        </div>
       )}
     </div>
   );
