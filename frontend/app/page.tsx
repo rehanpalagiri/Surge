@@ -110,7 +110,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
     setError("");
 
     if (!isAllowedVideoFile(f)) {
-      setError("Please upload a video file (.mp4 or .mov).");
+      setError("Please upload a supported video file (MP4, MOV, WEBM, AVI & more).");
       return;
     }
 
@@ -143,7 +143,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
       return;
     }
     if (!file) {
-      setError("Upload a video to get started — MP4 or MOV.");
+      setError("Upload a video to get started — MP4, MOV, WEBM, AVI & more.");
       return;
     }
     setError("");
