@@ -15,7 +15,7 @@ export const NICHE_OPTIONS = [
   "Parenting", "Kids", "Vegan", "DIY & Crafts", "Home Decor",
   "Cleaning", "Career", "Real Estate", "Outdoors", "True Crime",
   "Books", "Spirituality", "Movies & TV", "Anime", "Edits",
-  "Cars", "Photography", "Sustainability", "College", "Luxury",
+  "Cars", "Photography", "Video Production", "Sustainability", "College", "Luxury",
   "Thrifting", "Hair", "Looksmaxxing", "ASMR", "News",
 ];
 

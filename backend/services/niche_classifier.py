@@ -66,6 +66,7 @@ CANONICAL_NICHES = [
     "Edits",
     "Cars",
     "Photography",
+    "Video Production",
     "Sustainability",
     "College",
     "Luxury",

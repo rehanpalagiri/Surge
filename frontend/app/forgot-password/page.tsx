@@ -65,7 +65,7 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
           type="text"
           inputMode="numeric"
           maxLength={1}
-          value={digits[i] || ""}
+          value={digits[i].trim()}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}
@@ -80,7 +80,7 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
           type="text"
           inputMode="numeric"
           maxLength={1}
-          value={digits[i] || ""}
+          value={digits[i].trim()}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}

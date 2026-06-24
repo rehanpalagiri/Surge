@@ -30,14 +30,9 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
     setLoading(true);
     setError("");
     try {
-      if (!isTikTok && !captureAge) {
-        setError("Choose the Reel's age when these likes were captured.");
-        return;
-      }
       const updated = await linkTikTokVideo(
         analysisId,
         link.trim(),
-        !isTikTok ? Number(captureAge) : undefined,
       );
       setFetchedStats({
         views: updated.actual_views ?? null,
@@ -122,17 +117,6 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
       {/* ── Instagram: link only ── */}
       {!isTikTok && (
         <form onSubmit={handleLinkSubmit} className="flex flex-col gap-3">
-          <select
-            value={captureAge}
-            onChange={(e) => setCaptureAge(e.target.value)}
-            className="bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
-            required
-          >
-            <option value="">When were these likes captured?</option>
-            <option value="24">About 24 hours after posting</option>
-            <option value="168">About 7 days after posting</option>
-            <option value="720">About 30 days after posting</option>
-          </select>
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="url"

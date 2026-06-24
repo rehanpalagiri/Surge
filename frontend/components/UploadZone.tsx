@@ -8,6 +8,7 @@ import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUpl
 import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
+import { ReportSkeleton } from "@/components/Skeleton";
 import { track } from "@vercel/analytics";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import NichePicker from "@/components/NichePicker";
@@ -176,6 +177,17 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   const [uploadPhase, setUploadPhase] = useState<"idle" | "uploading" | "analyzing">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const analysisProgress = useFakeProgress(uploadPhase === "analyzing");
+  // After ~4s of analyzing, shrink the bar to a top loader and show the report
+  // skeleton so the review feels like it's already materializing.
+  const [analysisPreview, setAnalysisPreview] = useState(false);
+  useEffect(() => {
+    if (uploadPhase !== "analyzing" || waking) {
+      setAnalysisPreview(false);
+      return;
+    }
+    const t = setTimeout(() => setAnalysisPreview(true), 4000);
+    return () => clearTimeout(t);
+  }, [uploadPhase, waking]);
 
   useEffect(() => {
     const authed = !!getToken();
@@ -394,6 +406,21 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                   <span>Keep this tab open</span>
                   <span>{uploadProgress < 100 ? "Transferring…" : "Upload complete"}</span>
                 </div>
+              </div>
+            </>
+          ) : analysisPreview ? (
+            <>
+              {/* Thin top loader — the only progress affordance once the skeleton shows */}
+              <div className="fixed top-0 left-0 right-0 h-1 bg-zinc-800 z-[60]">
+                <div
+                  className="h-full bg-purple-500"
+                  style={{ width: `${analysisProgress}%`, transition: "width 500ms cubic-bezier(0.25, 1, 0.5, 1)" }}
+                />
+              </div>
+              <p className="text-center text-white text-lg font-bold mb-1">Building your review…</p>
+              <p className="text-center text-zinc-500 text-sm mb-6 animate-pulse">{TIPS[tipIndex]}</p>
+              <div className="w-full">
+                <ReportSkeleton />
               </div>
             </>
           ) : (

@@ -646,13 +646,7 @@ export default function ResultsPage() {
             />
 
             {/* CTA */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-4">
-              <Link
-                href={`/?parent=${analysis.id}&niche=${encodeURIComponent(analysis.niche)}&platform=${analysis.platform}`}
-                className="inline-block gradient-btn text-white font-semibold px-8 py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
-              >
-                Update this project
-              </Link>
+            <div className="flex justify-center pb-4">
               <Link
                 href="/"
                 className="inline-block btn-soft text-text-primary font-semibold px-8 py-3 rounded-xl transition-colors"

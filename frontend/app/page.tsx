@@ -11,7 +11,7 @@ import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
 import { isAllowedVideoFile } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
-import { Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
+import { ReportSkeleton, Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import PlatformTabs from "@/components/PlatformTabs";
 import { track } from "@vercel/analytics";
@@ -34,35 +34,58 @@ const PROCESSING_STEPS = [
 
 function ProcessingOverlay({ step }: { step: number }) {
   const progress = useFakeProgress(true, 22);
+  // First ~4s: a full-screen "analyzing" state with a centered bar. After that,
+  // the bar shrinks to a thin loader pinned to the top and the report skeleton
+  // fills the screen, so the report feels like it's already materializing.
+  const [preview, setPreview] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setPreview(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const stepText = PROCESSING_STEPS[step] ?? PROCESSING_STEPS[PROCESSING_STEPS.length - 1];
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
+      className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-sm overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-busy="true"
       aria-labelledby="analysis-progress-title"
       aria-describedby="analysis-progress-detail"
     >
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
-
-      <div className="text-center space-y-1.5">
-        <p id="analysis-progress-title" className="text-white text-xl font-bold">Analyzing your video...</p>
-        <p id="analysis-progress-detail" className="text-zinc-500 text-sm">Hang tight while the video is processed and reviewed</p>
-      </div>
-
-      <div className="w-full max-w-xs space-y-3">
-        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-purple-500 rounded-full"
-            style={{ width: `${progress}%`, transition: "width 600ms cubic-bezier(0.25, 1, 0.5, 1)" }}
-          />
+      {preview ? (
+        <>
+          {/* Thin top loader — the only progress affordance once the skeleton shows */}
+          <div className="fixed top-0 left-0 right-0 h-1 bg-zinc-800 z-[60]">
+            <div
+              className="h-full bg-purple-500"
+              style={{ width: `${progress}%`, transition: "width 500ms cubic-bezier(0.25, 1, 0.5, 1)" }}
+            />
+          </div>
+          <div className="mx-auto w-full max-w-3xl px-4 py-10">
+            <p id="analysis-progress-title" className="text-center text-white text-lg font-bold mb-1">Building your review…</p>
+            <p id="analysis-progress-detail" className="text-center text-zinc-500 text-sm mb-6 animate-pulse">{stepText}</p>
+            <ReportSkeleton />
+          </div>
+        </>
+      ) : (
+        <div className="min-h-full flex flex-col items-center justify-center gap-5 px-4 py-10">
+          <div className="text-center space-y-1.5">
+            <p id="analysis-progress-title" className="text-white text-xl font-bold">Analyzing your video...</p>
+            <p id="analysis-progress-detail" className="text-zinc-500 text-sm">Hang tight while the video is processed and reviewed</p>
+          </div>
+          <div className="w-full max-w-xs space-y-3">
+            <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-purple-500 rounded-full"
+                style={{ width: `${progress}%`, transition: "width 600ms cubic-bezier(0.25, 1, 0.5, 1)" }}
+              />
+            </div>
+            <p className="text-zinc-400 text-sm text-center animate-pulse">{stepText}</p>
+          </div>
         </div>
-        <p className="text-zinc-400 text-sm text-center animate-pulse">
-          {PROCESSING_STEPS[step] ?? PROCESSING_STEPS[PROCESSING_STEPS.length - 1]}
-        </p>
-      </div>
-      </div>
+      )}
     </div>
   );
 }
