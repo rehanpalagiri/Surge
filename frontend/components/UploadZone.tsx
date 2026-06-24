@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { UploadCloud, CheckCircle2 } from "lucide-react";
+import { FileVideo2 } from "lucide-react";
 import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUploadUrl, uploadFileToR2, analyzeFromR2, getAnalysisStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
 import { track } from "@vercel/analytics";
 import { ReportSkeleton } from "@/components/Skeleton";
+import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import NichePicker from "@/components/NichePicker";
 
 
@@ -155,7 +156,6 @@ interface Props {
 
 export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches }: Props) {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [originalSize, setOriginalSize] = useState<number | null>(null);
   const [niches, setNiches] = useState<string[]>(initialNiches ?? []);  // up to 2; first = primary, second = blend
@@ -165,7 +165,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   const [waking, setWaking] = useState(false);
   const [tipIndex, setTipIndex] = useState(0);
   const [error, setError] = useState("");
-  const [dragging, setDragging] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [rateLimit, setRateLimit] = useState<RateLimitStatus | null>(null);
   const [guestCount, setGuestCount] = useState(0);
@@ -265,25 +264,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   }
 
   const handleFile = (f: File) => processFile(f);
-
-  const openFilePicker = () => inputRef.current?.click();
-
-  const handleFilePickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openFilePicker();
-    }
-  };
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragging(true); };
-  const onDragLeave = () => setDragging(false);
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -386,19 +366,31 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
           <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
           {uploadPhase === "uploading" ? (
             <>
-              <div className="text-4xl">📤</div>
               <div className="text-center space-y-1">
                 <p className="text-xl font-bold text-white">Uploading your video...</p>
                 <p className="text-zinc-500 text-sm">Going straight to the cloud — no server in the way</p>
               </div>
-              <div className="w-full max-w-xs space-y-2.5">
-                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="reactive-transfer-card w-full max-w-xl space-y-4" role="status">
+                <div className="relative z-10 flex items-center gap-3 text-left">
+                  <div className="dropzone-file-icon">
+                    <FileVideo2 className="h-6 w-6" strokeWidth={1.6} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white">{file?.name ?? "Video file"}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">Secure direct upload</p>
+                  </div>
+                  <span className="text-sm font-bold tabular-nums text-purple-300">{uploadProgress}%</span>
+                </div>
+                <div className="transfer-progress-track relative z-10">
                   <div
-                    className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                    className="transfer-progress-fill"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <p className="text-zinc-400 text-sm text-center">{uploadProgress}% uploaded</p>
+                <div className="relative z-10 flex items-center justify-between text-[11px] text-zinc-500">
+                  <span>Keep this tab open</span>
+                  <span>{uploadProgress < 100 ? "Transferring…" : "Upload complete"}</span>
+                </div>
               </div>
             </>
           ) : (
@@ -451,16 +443,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
         {/* ── Upload / Compression Zone ── */}
         {compressing ? (
-          <div className="rounded-2xl border-2 border-purple-500 bg-purple-500/5 p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
+          <div className="reactive-transfer-card min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
             <div className="text-3xl">⚙️</div>
             <div className="space-y-1">
               <p className="text-white font-semibold text-sm">Compressing your video...</p>
               <p className="text-zinc-500 text-xs">This may take 30–90 seconds — please keep this tab open</p>
             </div>
             <div className="w-full max-w-xs space-y-2.5">
-              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="transfer-progress-track">
                 <div
-                  className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                  className="transfer-progress-fill"
                   style={{ width: `${compressProgress}%` }}
                 />
               </div>
@@ -468,66 +460,17 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             </div>
           </div>
         ) : (
-          <div
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onClick={openFilePicker}
-            onKeyDown={handleFilePickerKeyDown}
-            role="button"
-            tabIndex={0}
-            aria-label={file ? `Change selected video: ${file.name}` : "Choose a video to analyze"}
-            className={`cursor-pointer rounded-2xl border-2 transition-all duration-200
-              p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-3 text-center
-              ${dragging
-                ? "border-purple-500 border-solid bg-purple-500/10"
-                : file
-                ? "border-emerald-500 border-solid bg-emerald-500/5"
-                : "border-dashed border-zinc-700 bg-zinc-900 hover:border-purple-500 hover:bg-purple-500/5"
-              }`}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => {
-                const selected = e.currentTarget.files?.[0];
-                e.currentTarget.value = "";
-                if (selected) void handleFile(selected);
-              }}
-            />
-            {file ? (
+          <ReactiveVideoDropzone
+            file={file}
+            onFileSelected={handleFile}
+            selectedDetail={file ? (
               <>
-                <CheckCircle2 className="w-10 h-10 text-emerald-400" strokeWidth={1.5} />
-                <p className="text-white font-semibold text-sm">{file.name}</p>
-                <p className="text-zinc-400 text-xs">
-                  {fmtSize(file.size)}
-                  {originalSize && (
-                    <span className="text-purple-400 ml-1.5">
-                      (compressed from {fmtSize(originalSize)})
-                    </span>
-                  )}
-                </p>
-                <p className="text-zinc-500 text-xs">Tap to change file</p>
+                {fmtSize(file.size)}
+                {originalSize && <span className="ml-1.5 text-purple-400">compressed from {fmtSize(originalSize)}</span>}
               </>
-            ) : (
-              <>
-                <UploadCloud
-                  className={`w-10 h-10 transition-colors ${dragging ? "text-purple-400" : "text-zinc-500"}`}
-                  strokeWidth={1.5}
-                />
-                <div className="space-y-1">
-                  <p className="text-white font-semibold text-base">
-                    <span className="sm:hidden">Tap to upload your video</span>
-                    <span className="hidden sm:block">Drop your video here or click to browse</span>
-                  </p>
-                  <p className="text-zinc-500 text-sm">.mp4 or .mov · up to 10 min</p>
-                </div>
-                <p className="text-zinc-600 text-xs">Videos over 100 MB are automatically compressed</p>
-              </>
-            )}
-          </div>
+            ) : undefined}
+            idleNote="Large videos are compressed automatically in your browser"
+          />
         )}
 
         {/* ── Niche — searchable multi-select (up to 2) ── */}

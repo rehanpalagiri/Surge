@@ -92,6 +92,7 @@ New tables are created by `create_all`. Existing-column additions require model 
 - `components/FeedbackModal.tsx`: manual unverified observations; provider fetches are preferred where available.
 - `lib/api.ts`: typed review and outcome contracts.
 - `components/Skeleton.tsx` and shared motion rules in `app/globals.css`: reusable dark-theme loading shapes, delayed shimmer, busy indicators, focus states, and reduced-motion behavior. Prefer page-shaped skeletons for unavailable content and localized busy feedback for background refreshes.
+- `components/ReactiveVideoDropzone.tsx`: shared guest/authenticated upload target with pointer spotlight, drag state, validated-file state, keyboard operation, and matching transfer progress styling from `app/globals.css`.
 
 Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `useSearchParams`, and auth state. The theme is dark-only. PWA assets are under `frontend/public`.
 

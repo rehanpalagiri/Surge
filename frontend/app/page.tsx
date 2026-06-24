@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { UploadCloud, CheckCircle2, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
 import NichePicker from "@/components/NichePicker";
 import Nav from "@/components/Nav";
@@ -12,6 +12,7 @@ import { analyzeVideo, wakeBackend } from "@/lib/api";
 import { isAllowedVideoFile } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
 import { ReportSkeleton, Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
+import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import { track } from "@vercel/analytics";
 
 type Platform = "tiktok" | "instagram";
@@ -86,11 +87,9 @@ function formatBadRequestMessage(msg: string) {
 
 function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
-  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
@@ -134,22 +133,6 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
     setFile(f);
   };
-
-  const openFilePicker = () => fileInputRef.current?.click();
-
-  const handleFilePickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openFilePicker();
-    }
-  };
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,53 +228,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <form onSubmit={handleSubmit} className="space-y-4 text-left">
 
               {/* File drop zone */}
-              <div
-                onDrop={onDrop}
-                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onClick={openFilePicker}
-                onKeyDown={handleFilePickerKeyDown}
-                role="button"
-                tabIndex={0}
-                aria-label={file ? `Change selected video: ${file.name}` : "Choose a video to analyze"}
-                className={`cursor-pointer rounded-2xl border-2 transition-all duration-200 p-6 sm:p-10 flex flex-col items-center justify-center gap-3 text-center min-h-[160px] sm:min-h-[180px]
-                  ${dragging
-                    ? "border-purple-500 bg-purple-500/10"
-                    : file
-                    ? "border-emerald-500 bg-emerald-500/5"
-                    : "border-dashed border-zinc-700 bg-zinc-900 hover:border-purple-500 hover:bg-purple-500/5"
-                  }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const selected = e.currentTarget.files?.[0];
-                    e.currentTarget.value = "";
-                    if (selected) void handleFile(selected);
-                  }}
-                />
-                {file ? (
-                  <>
-                    <CheckCircle2 className="w-10 h-10 text-emerald-400 flex-shrink-0" strokeWidth={1.5} />
-                    <p className="text-white font-semibold text-sm">{file.name}</p>
-                    <p className="text-zinc-500 text-xs">Tap to change file</p>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className={`w-10 h-10 flex-shrink-0 ${dragging ? "text-purple-400" : "text-zinc-500"}`} strokeWidth={1.5} />
-                    <div className="space-y-1">
-                      <p className="text-white font-semibold text-base">
-                        <span className="sm:hidden">Tap to upload your video</span>
-                        <span className="hidden sm:block">Drop your video here or click to browse</span>
-                      </p>
-                      <p className="text-zinc-500 text-sm">.mp4 or .mov · up to 10 min</p>
-                    </div>
-                  </>
-                )}
-              </div>
+              <ReactiveVideoDropzone
+                file={file}
+                onFileSelected={handleFile}
+                selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}
+                idleNote="Private upload · maximum file size 100 MB"
+              />
 
               {/* Niche — searchable multi-select (up to 2) */}
               <NichePicker selected={niches} onChange={setNiches} />

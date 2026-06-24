@@ -85,10 +85,224 @@ body {
 .motion-pop { animation: motion-pop 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .skeleton-delay { animation: skeleton-reveal 1ms 140ms both; }
 
+/* Reactive video drop target: cursor spotlight, drag pulse, and file-state motion. */
+.reactive-dropzone {
+  --drop-x: 50%;
+  --drop-y: 50%;
+  position: relative;
+  isolation: isolate;
+  min-height: 220px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1.5px dashed rgb(82 82 91 / 0.9);
+  border-radius: 1.25rem;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(360px circle at var(--drop-x) var(--drop-y), rgb(168 85 247 / 0.13), transparent 48%),
+    linear-gradient(145deg, rgb(24 24 27 / 0.96), rgb(9 9 11 / 0.98));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025), 0 18px 55px rgb(0 0 0 / 0.22);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
+}
+
+.reactive-dropzone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(240px circle at var(--drop-x) var(--drop-y), rgb(192 132 252 / 0.16), transparent 68%);
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+.reactive-dropzone:hover,
+.reactive-dropzone:focus-visible {
+  border-color: rgb(168 85 247 / 0.78);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 22px 65px rgb(88 28 135 / 0.22), 0 0 0 1px rgb(168 85 247 / 0.08);
+}
+
+.reactive-dropzone:hover::before,
+.reactive-dropzone:focus-visible::before,
+.reactive-dropzone.is-dragging::before { opacity: 1; }
+
+.reactive-dropzone.is-dragging {
+  border-style: solid;
+  border-color: rgb(192 132 252 / 0.95);
+  background:
+    radial-gradient(420px circle at var(--drop-x) var(--drop-y), rgb(168 85 247 / 0.22), transparent 52%),
+    linear-gradient(145deg, rgb(46 16 101 / 0.44), rgb(9 9 11 / 0.98));
+  box-shadow: 0 0 0 4px rgb(168 85 247 / 0.08), 0 25px 80px rgb(88 28 135 / 0.32);
+  transform: translateY(-2px) scale(1.008);
+  animation: dropzone-pulse 1.15s ease-in-out infinite;
+}
+
+.reactive-dropzone.has-file {
+  border-style: solid;
+  border-color: rgb(34 197 94 / 0.34);
+  background:
+    radial-gradient(380px circle at var(--drop-x) var(--drop-y), rgb(168 85 247 / 0.12), transparent 52%),
+    linear-gradient(145deg, rgb(20 32 29 / 0.94), rgb(9 9 11 / 0.98));
+}
+
+.reactive-dropzone.is-disabled { cursor: not-allowed; opacity: 0.65; }
+
+.dropzone-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  opacity: 0.17;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, black, transparent 92%);
+}
+
+.dropzone-scan {
+  position: absolute;
+  z-index: 0;
+  left: 8%;
+  right: 8%;
+  top: -2px;
+  height: 1px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgb(192 132 252 / 0.8), transparent);
+  box-shadow: 0 0 14px rgb(168 85 247 / 0.65);
+}
+
+.reactive-dropzone.is-dragging .dropzone-scan {
+  opacity: 1;
+  animation: dropzone-scan 1.25s ease-in-out infinite;
+}
+
+.dropzone-icon-shell,
+.dropzone-file-icon {
+  display: grid;
+  place-items: center;
+  color: rgb(161 161 170);
+  border: 1px solid rgb(255 255 255 / 0.06);
+  background: rgb(255 255 255 / 0.035);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.dropzone-icon-shell {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.35rem;
+  transition: color 180ms ease, transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.reactive-dropzone:hover .dropzone-icon-shell {
+  color: rgb(216 180 254);
+  border-color: rgb(168 85 247 / 0.25);
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 10px 30px rgb(88 28 135 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.dropzone-icon-shell.is-active {
+  color: rgb(233 213 255);
+  border-color: rgb(192 132 252 / 0.42);
+  background: rgb(168 85 247 / 0.13);
+  animation: dropzone-icon-float 1.15s ease-in-out infinite;
+}
+
+.dropzone-file-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  border-radius: 1rem;
+  color: rgb(216 180 254);
+  border-color: rgb(168 85 247 / 0.22);
+  background: rgb(168 85 247 / 0.09);
+}
+
+.dropzone-ready-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(39 39 42);
+}
+
+.dropzone-ready-fill {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(124 58 237), rgb(168 85 247));
+  animation: dropzone-fill 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.dropzone-ready-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: dropzone-shine 1.6s ease-in-out infinite 420ms;
+}
+
+.reactive-transfer-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(168 85 247 / 0.3);
+  border-radius: 1.25rem;
+  padding: 1.1rem;
+  background:
+    radial-gradient(280px circle at 15% 10%, rgb(168 85 247 / 0.14), transparent 62%),
+    rgb(24 24 27 / 0.92);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 18px 60px rgb(0 0 0 / 0.28);
+}
+
+.reactive-transfer-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  transform: translateX(-180%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.035), transparent);
+  animation: transfer-card-sweep 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.transfer-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(39 39 42);
+}
+
+.transfer-progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(124 58 237), rgb(192 132 252));
+  box-shadow: 0 0 16px rgb(168 85 247 / 0.42);
+  transition: width 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 @keyframes skeleton-shimmer { to { transform: translateX(100%); } }
 @keyframes pending-spin { to { transform: rotate(360deg); } }
 @keyframes motion-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes skeleton-reveal { from { visibility: hidden; } to { visibility: visible; } }
+@keyframes dropzone-pulse {
+  50% { box-shadow: 0 0 0 7px rgb(168 85 247 / 0.06), 0 28px 90px rgb(88 28 135 / 0.38); }
+}
+@keyframes dropzone-scan {
+  0% { top: 4%; opacity: 0; }
+  18%, 82% { opacity: 1; }
+  100% { top: 96%; opacity: 0; }
+}
+@keyframes dropzone-icon-float {
+  50% { transform: translateY(-5px) scale(1.025); }
+}
+@keyframes dropzone-fill { from { width: 0; } }
+@keyframes dropzone-shine { to { transform: translateX(100%); } }
+@keyframes transfer-card-sweep { to { transform: translateX(430%); } }
 @keyframes motion-pop {
   from { opacity: 0; transform: translateY(6px) scale(0.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }
