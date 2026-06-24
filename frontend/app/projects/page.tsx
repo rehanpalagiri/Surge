@@ -7,6 +7,7 @@ import Nav from "@/components/Nav";
 import { getMyAnalyses, deleteAnalysis, linkTikTokVideo, apiErrorDetail, AnalysisSummary } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ProjectsSkeleton } from "@/components/Skeleton";
+import PlatformTabs from "@/components/PlatformTabs";
 import { ArrowUpRight, CalendarDays, Link2, RefreshCw, Trash2, Video } from "lucide-react";
 
 function verdictColor(verdict: string): string {
@@ -47,22 +48,18 @@ type Platform = "tiktok" | "instagram";
 
 const PLATFORM_TABS: {
   id: Platform;
-  icon: string;
-  label: string;
+  // TikTok uses its iconic glitch (white text, offset red+cyan shadow) instead
+  // of the old cyan→red gradient; Instagram keeps its brand gradient.
   textGradient: string;
   btnGradient: string;
 }[] = [
   {
     id: "tiktok",
-    icon: "🎵",
-    label: "TikTok",
-    textGradient: "gradient-text-tiktok",
+    textGradient: "tiktok-glitch",
     btnGradient: "gradient-btn-tiktok",
   },
   {
     id: "instagram",
-    icon: "📸",
-    label: "Instagram",
     textGradient: "gradient-text-instagram",
     btnGradient: "gradient-btn-instagram",
   },
@@ -313,7 +310,7 @@ function ProjectCard({
             {a.verdict}
           </p>
           {a.parent_id != null && (
-            <span className="rounded-full bg-purple-from/10 px-2 py-0.5 text-[10px] font-semibold text-purple-300">Updated</span>
+            <span className="rounded-full bg-purple-from/10 px-2 py-0.5 text-[10px] font-semibold text-purple-300">Re-analyzed</span>
           )}
         </div>
         {a.caption_preview && (
@@ -338,7 +335,7 @@ function ProjectCard({
           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:border-purple-to/50 hover:text-text-primary"
           onClick={(e) => e.stopPropagation()}
         >
-          <RefreshCw className="h-3.5 w-3.5" /> Update
+          <RefreshCw className="h-3.5 w-3.5" /> Re-analyze
         </Link>
       </div>
 
@@ -440,27 +437,11 @@ export default function ProjectsPage() {
 
         {/* Platform Switcher */}
         <div className="flex justify-center">
-          <div className="flex bg-card border border-border rounded-2xl p-1 gap-1">
-            {PLATFORM_TABS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setPlatform(p.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  platform === p.id
-                    ? `${p.btnGradient} text-white shadow-sm`
-                    : "text-text-muted hover:text-text-primary"
-                }`}
-              >
-                <span>{p.icon}</span>
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <PlatformTabs value={platform} onChange={setPlatform} />
         </div>
 
         {loadFailed ? (
           <div className="bg-card border border-border rounded-2xl p-10 text-center">
-            <div className="text-4xl mb-3">🔄</div>
             <p className="text-text-primary font-semibold">
               Couldn&apos;t reach the server
             </p>
@@ -478,7 +459,6 @@ export default function ProjectsPage() {
           <ProjectsSkeleton />
         ) : filtered.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-10 text-center">
-            <div className="text-4xl mb-3">🎬</div>
             <p className="text-text-primary font-semibold">No projects yet</p>
             <p className="text-text-muted text-sm mt-1 mb-5">
               Analyze your first {platform === "tiktok" ? "TikTok" : "Reel"} to see it here.

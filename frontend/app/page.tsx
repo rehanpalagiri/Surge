@@ -11,9 +11,9 @@ import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
 import { isAllowedVideoFile } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
-import { ReportSkeleton, Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
+import { Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
-import ProjectNameField from "@/components/ProjectNameField";
+import PlatformTabs from "@/components/PlatformTabs";
 import { track } from "@vercel/analytics";
 
 type Platform = "tiktok" | "instagram";
@@ -45,7 +45,6 @@ function ProcessingOverlay({ step }: { step: number }) {
       aria-describedby="analysis-progress-detail"
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
-      <div className="text-4xl">🎬</div>
 
       <div className="text-center space-y-1.5">
         <p id="analysis-progress-title" className="text-white text-xl font-bold">Analyzing your video...</p>
@@ -62,9 +61,6 @@ function ProcessingOverlay({ step }: { step: number }) {
         <p className="text-zinc-400 text-sm text-center animate-pulse">
           {PROCESSING_STEPS[step] ?? PROCESSING_STEPS[PROCESSING_STEPS.length - 1]}
         </p>
-      </div>
-      <div className="w-full pt-2">
-        <ReportSkeleton compact />
       </div>
       </div>
     </div>
@@ -90,7 +86,6 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
   const router = useRouter();
 
   const [file, setFile] = useState<File | null>(null);
-  const [projectName, setProjectName] = useState("");
   const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -138,10 +133,6 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectName.trim()) {
-      setError("Give your project a name so you can find it later.");
-      return;
-    }
     if (!file) {
       setError("Upload a video to get started — MP4, MOV, WEBM, AVI & more.");
       return;
@@ -157,7 +148,6 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         niches[0] || "Lifestyle",
         "", "", "tiktok", "",
         niches[1] ?? "",
-        projectName.trim(),
       );
       track("analysis_complete", { platform: "tiktok", mode: "direct" });
       router.push(`/results/${id}`);
@@ -241,8 +231,6 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}
               />
 
-              <ProjectNameField value={projectName} onChange={setProjectName} />
-
               {/* Niche — searchable multi-select (up to 2) */}
               <NichePicker selected={niches} onChange={setNiches} />
 
@@ -303,7 +291,6 @@ export default function Home() {
   const [deleted, setDeleted] = useState(false);
   const [reanalyzeParentId, setReanalyzeParentId] = useState<number | undefined>(undefined);
   const [reanalyzeNiches, setReanalyzeNiches] = useState<string[] | undefined>(undefined);
-  const [updateProjectName, setUpdateProjectName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const token = getToken();
@@ -318,12 +305,10 @@ export default function Home() {
     // Update flow: ?parent=ID&niche=Fitness&platform=tiktok&project=Name
     const parentParam = params.get("parent");
     const nicheParam = params.get("niche");
-    const projectParam = params.get("project");
     const platformParam = params.get("platform") as Platform | null;
     if (parentParam && /^\d+$/.test(parentParam)) {
       setReanalyzeParentId(Number(parentParam));
       if (nicheParam) setReanalyzeNiches([nicheParam]);
-      if (projectParam) setUpdateProjectName(projectParam);
       if (platformParam && (platformParam === "tiktok" || platformParam === "instagram")) {
         setPlatform(platformParam);
       }
@@ -365,21 +350,7 @@ export default function Home() {
 
       {/* ── Platform toggle ── */}
       <div className="flex justify-center pt-8 px-4">
-        <div className="flex bg-zinc-900 border border-zinc-800 rounded-full p-1 gap-1">
-          {(["tiktok", "instagram"] as Platform[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPlatform(p)}
-              className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
-                platform === p
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              {PLATFORM_LABEL[p]}
-            </button>
-          ))}
-        </div>
+        <PlatformTabs value={platform} onChange={setPlatform} />
       </div>
 
       {/* ── Hero ── */}
@@ -398,7 +369,6 @@ export default function Home() {
           platform={platform}
           parentId={reanalyzeParentId}
           initialNiches={reanalyzeNiches}
-          initialProjectName={updateProjectName}
         />
         <p className="text-zinc-600 text-xs text-center mt-5 max-w-xl mx-auto">
           Your video is analyzed privately and not stored permanently.

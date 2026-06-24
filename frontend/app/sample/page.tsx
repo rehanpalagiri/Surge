@@ -72,7 +72,7 @@ export default function SamplePage() {
 
       {/* Sample banner */}
       <div className="bg-purple-from/10 border-b border-purple-to/20 px-4 py-3 text-center text-sm text-text-muted">
-        📋 This is a <span className="text-text-primary font-semibold">sample report</span> — the real thing is generated from your actual video.{" "}
+        This is a <span className="text-text-primary font-semibold">sample report</span> — the real thing is generated from your actual video.{" "}
         <Link href="/" className="text-purple-to hover:underline font-medium">
           Try it with your video →
         </Link>
@@ -103,8 +103,8 @@ export default function SamplePage() {
         {/* Strengths + Improvements */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-success/5 border border-success/20 rounded-2xl p-5">
-            <h3 className="text-success font-semibold mb-3 flex items-center gap-2">
-              <span>✅</span> Strengths
+            <h3 className="text-success font-semibold mb-3">
+              Strengths
             </h3>
             <ul className="space-y-2">
               {SAMPLE.strengths.map((s, i) => (
@@ -117,8 +117,8 @@ export default function SamplePage() {
           </div>
 
           <div className="bg-danger/5 border border-danger/20 rounded-2xl p-5">
-            <h3 className="text-danger font-semibold mb-3 flex items-center gap-2">
-              <span>🔺</span> Improvements
+            <h3 className="text-danger font-semibold mb-3">
+              Improvements
             </h3>
             <ul className="space-y-2">
               {SAMPLE.improvements.map((imp, i) => (

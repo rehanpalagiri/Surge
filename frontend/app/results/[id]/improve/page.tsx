@@ -225,8 +225,8 @@ export default function ImprovePage() {
         {/* Rewrites — only when the richer data exists */}
         {hasPlan && s.hook_rewrite && (
           <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-text-primary font-semibold mb-2 flex items-center gap-2">
-              <span>🎬</span> Rewrite your hook
+            <h3 className="text-text-primary font-semibold mb-2">
+              Rewrite your hook
             </h3>
             <p className="text-text-primary text-sm whitespace-pre-wrap bg-surface border border-border rounded-xl px-4 py-3">
               {s.hook_rewrite}
@@ -236,8 +236,8 @@ export default function ImprovePage() {
 
         {hasPlan && s.caption_rewrite && (
           <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-text-primary font-semibold mb-2 flex items-center gap-2">
-              <span>✍️</span> Rewrite your caption
+            <h3 className="text-text-primary font-semibold mb-2">
+              Rewrite your caption
             </h3>
             <p className="text-text-primary text-sm whitespace-pre-wrap bg-surface border border-border rounded-xl px-4 py-3">
               {s.caption_rewrite}
@@ -249,8 +249,8 @@ export default function ImprovePage() {
         {hasEmotional && ea && (
             <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h3 className="text-text-primary font-semibold flex items-center gap-2">
-                  <span>❤️‍🔥</span> Emotional impact
+                <h3 className="text-text-primary font-semibold">
+                  Emotional impact
                 </h3>
                 <span className={`text-sm font-bold ${scoreColor(emoScore)}`}>
                   {emoScore}/10

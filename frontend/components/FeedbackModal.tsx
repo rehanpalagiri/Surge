@@ -89,7 +89,6 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
   if (submitted) {
     return (
       <div className="bg-card border border-border rounded-2xl p-6 text-center">
-        <div className="text-3xl mb-2">🎉</div>
         <p className="text-success font-semibold text-lg">
           {fetchedStats ? (isTikTok ? "Stats synced from TikTok!" : "Reel stats synced!") : "Thanks for the feedback!"}
         </p>

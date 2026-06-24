@@ -32,7 +32,6 @@ export default function InstallBanner() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 bg-card border border-purple-from/40 rounded-2xl p-4 shadow-2xl flex items-start gap-3 motion-pop">
-      <div className="text-2xl flex-shrink-0 mt-0.5">📲</div>
       <div className="flex-1 min-w-0">
         <p className="text-text-primary text-sm font-semibold">
           Add Surge to your Home Screen

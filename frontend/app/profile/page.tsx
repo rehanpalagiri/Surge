@@ -6,17 +6,13 @@ import Nav from "@/components/Nav";
 import { getProfile, upsertProfile, UserProfileIn } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ProfileSkeleton } from "@/components/Skeleton";
-
-const NICHE_SUGGESTIONS = [
-  "Fitness", "Comedy", "Food", "Beauty", "Gaming",
-  "Music", "Finance", "Tech", "Travel", "Lifestyle", "Fashion", "Mental Health",
-];
+import PlatformTabs from "@/components/PlatformTabs";
 
 type Platform = "tiktok" | "instagram";
 
-const PLATFORM_META: Record<Platform, { icon: string; label: string }> = {
-  tiktok: { icon: "🎵", label: "TikTok" },
-  instagram: { icon: "📸", label: "Instagram" },
+const PLATFORM_META: Record<Platform, { label: string }> = {
+  tiktok: { label: "TikTok" },
+  instagram: { label: "Instagram" },
 };
 
 interface FormState {
@@ -93,7 +89,6 @@ export default function ProfilePage() {
         display_name: f.display_name.trim() || undefined,
         bio: f.bio.trim() || undefined,
         target_audience: f.target_audience.trim() || undefined,
-        niche: f.niche || undefined,
       };
       await upsertProfile(activePlatform, data);
       setSaved(true);
@@ -120,28 +115,19 @@ export default function ProfilePage() {
         </div>
 
         {/* Platform tabs */}
-        <div className="flex gap-2">
-          {(["tiktok", "instagram"] as Platform[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => { setActivePlatform(p); setSaved(false); setError(""); }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                activePlatform === p
-                  ? "gradient-btn text-white border-transparent"
-                  : "bg-card border-border text-text-muted hover:text-text-primary"
-              }`}
-            >
-              {PLATFORM_META[p].icon} {PLATFORM_META[p].label}
-            </button>
-          ))}
+        <div className="flex justify-center sm:justify-start">
+          <PlatformTabs
+            value={activePlatform}
+            onChange={(p) => { setActivePlatform(p); setSaved(false); setError(""); }}
+          />
         </div>
 
         {loading ? (
           <ProfileSkeleton />
         ) : (
           <div className="bg-card border border-border rounded-2xl p-6 space-y-5 motion-enter">
-            <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-              {meta.icon} {meta.label} Profile
+            <h2 className="text-lg font-semibold text-text-primary">
+              {meta.label} Profile
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -168,35 +154,6 @@ export default function ProfilePage() {
                   onChange={(e) => update("display_name", e.target.value)}
                   className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
                 />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-muted mb-1.5">
-                Primary niche
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Fitness, Comedy, Beauty…"
-                value={form.niche}
-                onChange={(e) => update("niche", e.target.value)}
-                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
-              />
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {NICHE_SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => update("niche", s)}
-                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                      form.niche === s
-                        ? "bg-purple-to/15 border-purple-to/40 text-text-primary"
-                        : "border-border text-text-muted hover:text-text-primary hover:border-text-muted"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
               </div>
             </div>
 

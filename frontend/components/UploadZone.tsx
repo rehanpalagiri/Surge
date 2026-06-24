@@ -9,9 +9,7 @@ import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
 import { track } from "@vercel/analytics";
-import { ReportSkeleton } from "@/components/Skeleton";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
-import ProjectNameField from "@/components/ProjectNameField";
 import NichePicker from "@/components/NichePicker";
 
 
@@ -153,14 +151,12 @@ interface Props {
   initialFile?: File | null;
   parentId?: number;
   initialNiches?: string[];
-  initialProjectName?: string;
 }
 
-export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches, initialProjectName }: Props) {
+export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches }: Props) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [niches, setNiches] = useState<string[]>(initialNiches ?? []);  // up to 2; first = primary, second = blend
-  const [projectName, setProjectName] = useState(initialProjectName ?? "");
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -268,10 +264,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectName.trim()) {
-      setError("Give your project a name so you can find it later.");
-      return;
-    }
     if (!file) return;
     if (niches.length === 0) {
       setError("Pick a content niche above — choose up to two.");
@@ -312,7 +304,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         platform,
         niches[1] ?? "",
         parentId,
-        projectName.trim(),
       );
 
       // Track guest usage immediately after analysis is accepted
@@ -407,7 +398,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             </>
           ) : (
             <>
-              <div className="text-4xl">🎬</div>
               <div className="text-center space-y-1">
                 <p className="text-xl font-bold text-white">
                   {waking ? "Waking up the server…" : "Surge is analyzing your video..."}
@@ -434,9 +424,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
               </div>
             </>
           )}
-          <div className="w-full pt-2">
-            <ReportSkeleton compact />
-          </div>
           </div>
         </div>
       )}
@@ -446,7 +433,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         {/* ── Update banner ── */}
         {parentId != null && (
           <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-xl px-4 py-3">
-            <span className="text-purple-400 text-sm">🔄</span>
             <p className="text-purple-300 text-sm font-medium">
               Updating this project — compare the same craft dimensions
             </p>
@@ -482,12 +468,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             ) : undefined}
           />
         )}
-
-        <ProjectNameField
-          value={projectName}
-          onChange={setProjectName}
-          isUpdate={parentId != null}
-        />
 
         {/* ── Niche — searchable multi-select (up to 2) ── */}
         <div className="mb-6">

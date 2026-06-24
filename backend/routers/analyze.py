@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, Form
@@ -48,7 +49,19 @@ ALLOWED_CONTENT_TYPES = {
 MAX_ACTUAL_VIEWS = 500_000_000  # sanity ceiling for feedback (no real video tops this)
 REFRESH_COOLDOWN = timedelta(hours=24)  # min gap between video-link count refreshes
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["analyze"])
+
+
+def _title_from_caption(caption: str, max_words: int = 3) -> str:
+    """Build a short project title from the first few words of the caption.
+
+    Replaces the old dedicated project-name field — the caption now doubles as
+    the project label. Returns "" when there's no usable caption (caller falls
+    back to the parent title, then to a niche-based label in the UI)."""
+    words = (caption or "").strip().split()
+    return " ".join(words[:max_words])[:80]
 
 
 def resolve_mode(user, has_usable_seeds: bool, channel_profile) -> str:
@@ -129,6 +142,10 @@ async def _run_r2_analysis(
                 await db.commit()
 
     except Exception as exc:
+        # Log the real cause (status code + message) so prod can tell quota (429)
+        # from auth/permission (403) from anything else — the stored message is
+        # deliberately generic for users.
+        logger.warning("R2 analysis %s failed: %r", analysis_id, exc)
         err_msg = "AI analysis is temporarily unavailable." if isinstance(exc, _GeminiClientError) and exc.code in (429, 403) else "Analysis failed."
         async with AsyncSessionLocal() as db:
             row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
@@ -248,11 +265,13 @@ async def analyze(
             resolved_parent_id = _pid
             parent_analysis = _parent
 
-    resolved_project_name = project_name.strip()[:80]
+    # Project title: no dedicated name field anymore — derive it from the first
+    # few words of the caption. Falls back to the parent's title (re-analyses);
+    # if still empty it stays None and the UI labels it "{niche} project".
+    resolved_project_name = project_name.strip()[:80] or _title_from_caption(caption)
     if not resolved_project_name and parent_analysis and parent_analysis.project_name:
         resolved_project_name = parent_analysis.project_name
-    if not resolved_project_name:
-        resolved_project_name = "Untitled project"
+    resolved_project_name = resolved_project_name or None
 
     # --- R2 async path: file already in cloud storage, process in background ---
     if has_r2:
@@ -311,6 +330,10 @@ async def analyze(
             raise HTTPException(status_code=400, detail=f"Could not fetch TikTok video: {exc}")
         if not caption and auto_caption:
             caption = auto_caption
+        # The caption may only now be available (auto-pulled from the TikTok URL),
+        # so derive the title from it if we still don't have one.
+        if not resolved_project_name:
+            resolved_project_name = _title_from_caption(caption) or None
         safe_name = f"{uuid.uuid4()}_tiktok.mp4"
         file_path = os.path.join(uploads_dir, safe_name)
         with open(file_path, "wb") as fh:
@@ -346,6 +369,7 @@ async def analyze(
             secondary_niche=secondary_niche or "",
         )
     except _GeminiClientError as e:
+        logger.warning("Direct analysis Gemini error (code=%s): %r", getattr(e, "code", "?"), e)
         if e.code in (429, 403):
             # Gemini quota exhausted or bad API key — return 503 without storing
             # a broken analysis row and without burning a rate-limit credit.

@@ -241,7 +241,6 @@ export default function ForgotPasswordPage() {
 
         {step === "done" && (
           <div className="space-y-4 text-center">
-            <div className="text-4xl">✅</div>
             <p className="text-text-primary font-semibold">Password updated!</p>
             <p className="text-text-muted text-sm">You can now log in with your new password.</p>
             <button onClick={() => router.push("/login")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
@@ -14,6 +14,7 @@ import {
   getOutcomeSnapshots, AnalysisOut, OutcomeSnapshot,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { fireConfetti } from "@/lib/confetti";
 import { track } from "@vercel/analytics";
 
 const SCORE_DIMENSIONS = [
@@ -158,7 +159,7 @@ function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
   return (
     <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-5 space-y-3">
       <div>
-        <p className="text-text-primary font-semibold">🎯 Help other creators?</p>
+        <p className="text-text-primary font-semibold">Help other creators?</p>
         <p className="text-text-muted text-sm mt-1">
           Your post got {views}. With your permission, Surge can retain the public metrics
           as research data. They are not treated as proof that a specific edit caused the result.
@@ -287,6 +288,18 @@ export default function ResultsPage() {
   }, [id]);
 
   const locked = !!analysis?.scores_json.locked;
+
+  // Celebrate a top-tier review. "Strong craft" is the highest qualitative
+  // verdict (≥4 of 6 dimensions ≥7, none below 4) — the product's contract-safe
+  // stand-in for "great score" since there is no aggregate score. Fire once.
+  const confettiFired = useRef(false);
+  useEffect(() => {
+    if (confettiFired.current) return;
+    if (status === "ok" && analysis?.verdict === "Strong craft" && !analysis.scores_json.error) {
+      confettiFired.current = true;
+      fireConfetti();
+    }
+  }, [status, analysis]);
 
   // Auto-show the upsell modal once per analysis for anonymous (locked) views.
   useEffect(() => {
@@ -437,7 +450,6 @@ export default function ResultsPage() {
                 ))}
               </div>
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-b from-background/30 to-background/95 text-center px-6 py-10">
-                <div className="text-3xl">🔒</div>
                 <p className="text-text-primary font-bold text-lg max-w-xs">
                   See why each dimension scored that way, plus timestamped evidence and one experiment to test in your next version.
                 </p>
@@ -515,8 +527,8 @@ export default function ResultsPage() {
             {/* Strengths + Improvements */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-success/5 border border-success/20 rounded-2xl p-5">
-                <h3 className="text-success font-semibold mb-3 flex items-center gap-2">
-                  <span>✅</span> Strengths
+                <h3 className="text-success font-semibold mb-3">
+                  Strengths
                 </h3>
                 <ul className="space-y-2">
                   {(s.strengths ?? []).map((str: string, i: number) => (
@@ -529,8 +541,8 @@ export default function ResultsPage() {
               </div>
 
               <div className="bg-danger/5 border border-danger/20 rounded-2xl p-5">
-                <h3 className="text-danger font-semibold mb-3 flex items-center gap-2">
-                  <span>🔺</span> Improvements
+                <h3 className="text-danger font-semibold mb-3">
+                  Improvements
                 </h3>
                 <ul className="space-y-2">
                   {(s.improvements ?? []).map((imp: string, i: number) => (
@@ -547,8 +559,8 @@ export default function ResultsPage() {
             {hasEmotional && ea && (
               <div className="bg-card border border-border rounded-2xl p-6">
                 <div className="flex items-center justify-between gap-3 mb-3">
-                  <h3 className="text-text-primary font-semibold flex items-center gap-2">
-                    <span>❤️‍🔥</span> Emotional impact
+                  <h3 className="text-text-primary font-semibold">
+                    Emotional impact
                   </h3>
                   <span className={`text-sm font-bold ${emoColor}`}>{emoScore}/10</span>
                 </div>
@@ -585,7 +597,6 @@ export default function ResultsPage() {
                     Prioritized editing hypotheses plus hook and caption rewrites.
                   </p>
                 </div>
-                <span className="text-2xl flex-shrink-0">🚀</span>
               </div>
             </Link>
 
@@ -640,7 +651,7 @@ export default function ResultsPage() {
                 href={`/?parent=${analysis.id}&niche=${encodeURIComponent(analysis.niche)}&platform=${analysis.platform}`}
                 className="inline-block gradient-btn text-white font-semibold px-8 py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
               >
-                🔄 Update this project
+                Update this project
               </Link>
               <Link
                 href="/"

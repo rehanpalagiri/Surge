@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 
 /**
- * Indeterminate progress bar value (0–100) for long async work with no real
- * percentage. While `active`, it snaps to `snapTo` then eases toward ~88% and
- * holds (so it never looks finished before the work is). Resets to 0 when idle.
+ * Indeterminate progress value (0–100) for long async work with no real
+ * percentage. While `active`, it rushes quickly to ~90% (so it feels
+ * responsive), then crawls slowly toward ~98% and holds — it never reaches
+ * 100% before the work actually finishes. Resets to 0 when idle.
  * Shared by the upload and analysis overlays so the easing stays in one place.
+ * `snapTo` optionally sets the starting value when work begins.
  */
-export function useFakeProgress(active: boolean, snapTo = 20): number {
+export function useFakeProgress(active: boolean, snapTo = 0): number {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -14,15 +16,16 @@ export function useFakeProgress(active: boolean, snapTo = 20): number {
       setProgress(0);
       return;
     }
-    setProgress(0);
-    const snap = setTimeout(() => setProgress(snapTo), 80);
-    const crawl = setInterval(() => {
-      setProgress((p) => (p >= 88 ? p : p + Math.max(0.3, (88 - p) * 0.018)));
-    }, 500);
-    return () => {
-      clearTimeout(snap);
-      clearInterval(crawl);
-    };
+    setProgress(snapTo);
+    const tick = setInterval(() => {
+      setProgress((p) => {
+        // Fast ease-out to ~90%, then a slow crawl so it never looks finished.
+        if (p < 90) return p + (90 - p) * 0.16;
+        if (p < 98) return p + (98 - p) * 0.012;
+        return p;
+      });
+    }, 80);
+    return () => clearInterval(tick);
   }, [active, snapTo]);
 
   return progress;

@@ -36,7 +36,7 @@ export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
           </button>
 
           <h2 className="text-2xl font-extrabold text-text-primary mb-3">
-            Your craft review is just the start 🚀
+            Your craft review is just the start
           </h2>
           <p className="text-text-muted leading-relaxed mb-6">
             Sign up free to unlock timestamped craft observations, editing hypotheses,

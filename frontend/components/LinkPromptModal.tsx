@@ -96,7 +96,7 @@ export default function LinkPromptModal() {
               ×
             </button>
             <p className="text-sm font-bold text-text-primary mb-1 pr-5">
-              👋 Welcome back!
+              Welcome back!
             </p>
             <p className="text-sm text-text-muted leading-relaxed">
               Any questions about your results? Reply to any Surge email — we read every one.
@@ -130,9 +130,6 @@ export default function LinkPromptModal() {
           </button>
 
           <div className="text-center mb-5">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-600/20 text-3xl mb-4">
-              📊
-            </div>
             <h2 className="text-2xl font-extrabold text-text-primary leading-tight mb-2">
               How did your videos actually do?
             </h2>
@@ -147,7 +144,6 @@ export default function LinkPromptModal() {
               {unlinked.map((a) => (
                 <div key={a.id} className="flex items-center justify-between px-4 py-3 gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">🎵</span>
                     <span className="text-sm font-semibold text-text-primary capitalize truncate">
                       {a.niche}
                     </span>

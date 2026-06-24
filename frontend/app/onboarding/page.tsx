@@ -27,9 +27,9 @@ const EMPTY: ProfileForm = {
   niche: "",
 };
 
-const STEPS: { platform: "tiktok" | "instagram"; icon: string; label: string }[] = [
-  { platform: "tiktok", icon: "🎵", label: "TikTok" },
-  { platform: "instagram", icon: "📸", label: "Instagram" },
+const STEPS: { platform: "tiktok" | "instagram"; label: string }[] = [
+  { platform: "tiktok", label: "TikTok" },
+  { platform: "instagram", label: "Instagram" },
 ];
 
 function OnboardingForm() {
@@ -126,7 +126,7 @@ function OnboardingForm() {
                   : "bg-surface border border-border text-text-muted"
               }`}
             >
-              {i < step ? "✓" : s.icon} {s.label}
+              {i < step ? "✓ " : ""}{s.label}
             </div>
           ))}
         </div>
@@ -134,7 +134,6 @@ function OnboardingForm() {
         {/* Form */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">{current.icon}</span>
             <h2 className="text-lg font-semibold text-text-primary">
               {current.label} Profile
             </h2>
