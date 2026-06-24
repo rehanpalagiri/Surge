@@ -1,388 +1,141 @@
-# Blueprint — Three-Mode Analysis Engine
+# Surge Product Blueprint
 
-Reference document for the Quick / Thinking / Deep Thinking upgrade.
-Every section is the **locked** design. Build in the order in §11.
+Status: implemented locally; not deployed by this task.
 
----
+## Decision
 
-## 0. Prerequisites you (the operator) own
+The algorithm audit did not support a broad performance-prediction product. Likes/views is an observed response rate, not retention or content quality, and it is vulnerable to distribution differences and metric gaming. Surge therefore keeps its name but narrows the product:
 
-- [ ] Confirm the original curated seed video files exist locally (needed to re-populate the library — the pipeline deletes them server-side after analysis).
-- [ ] Run the Neon migration SQL (§1) **before** deploying new code.
-- [ ] Run the seed wipe (§11 step 10) **after** deploying new code.
-- [ ] Re-upload seeds while the backend is warm (sync Gemini call on a single worker).
+> Outcome-blind craft review + fixed-age post experiments.
 
----
+This is intentionally smaller than “predict what goes viral.” The old aggregate score, predicted counts, performance calibration, and correction loop are retired from live analyses. Legacy columns and offline admin code remain for compatibility but cannot affect a new craft review.
 
-## 1. Schema migration (run on Neon FIRST, app stays up)
+## Live product contract
 
-Adding columns is backward-compatible — old code ignores them. `performed` is
-relaxed, not dropped (drop is irreversible and buys nothing).
+### AI review
 
-```sql
-ALTER TABLE seed_videos   ADD COLUMN IF NOT EXISTS rating INTEGER;
-ALTER TABLE seed_videos   ADD COLUMN IF NOT EXISTS gemini_analysis TEXT;
-ALTER TABLE seed_videos   ALTER COLUMN performed DROP NOT NULL;
-ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'quick';
-```
+Gemini sees the uploaded media and creator-supplied context, but not seed outcomes, post counts, prior performance, or calibration notes. It returns:
 
-Local SQLite dev: delete `viraliq.db` and let `create_all` rebuild from the model
-(throwaway data), or add the same columns to `_ensure_columns` in `main.py`.
+- six independent observable craft assessments;
+- concrete evidence and editing hypotheses;
+- caption/hook alternatives;
+- a qualitative craft verdict; and
+- one experiment: change one thing, hold named variables constant, observe a named result.
 
----
+The system instruction treats all creator/provider content as delimited untrusted data. Output validation strips legacy aggregate and prediction fields.
 
-## 2. Data model changes
+### Observed outcomes
 
-### `seed_videos`
-| field | change | notes |
-|---|---|---|
-| `rating` | **ADD** `INTEGER` | 0–10 virality, extracted from `gemini_analysis.virality_rating` |
-| `gemini_analysis` | **ADD** `TEXT` | full JSON from the seed-analysis prompt |
-| `performed` | **STOP USING** | left in DB (nullable); removed from model/schema/frontend |
-| everything else | keep | filename, platform, niche, view_count, like_count, notes, posted_at, created_at |
+Published-post observations are stored as immutable snapshots. Each snapshot can contain views, likes, comments, shares, saves, creator followers, capture time, post time, age, source, provider post ID, integrity flags, metric version, and a provider-payload hash.
 
-### `user_analyses`
-| field | change | notes |
-|---|---|---|
-| `mode` | **ADD** `TEXT DEFAULT 'quick'` | stores the **effective** mode that actually ran |
-| everything else | unchanged | |
+Maturity labels are assigned only inside explicit windows:
 
-No new tables. The creator channel profile is computed live from `user_analyses`.
+| Label | Target age | Tolerance | Purpose |
+|---|---:|---:|---|
+| 24h | 24 hours | ±6 hours | early response |
+| 7d | 168 hours | ±24 hours | settled short-term response |
+| 30d | 720 hours | ±72 hours | longer-tail response |
 
----
+These are operational collection windows, not minimum sample sizes and not claims of statistical power. Off-window observations remain usable as timestamped history but cannot be compared as if equally mature.
 
-## 3. The three modes
+Observed like rate is `likes / views` only when both are present and views is positive. It is descriptive, not causal. Comments are retained as raw public observations but excluded from any quality metric.
 
-| Mode | Context injected | Who | Approx (warm) |
+## UX migration
+
+- Landing page: “Make Each Post Teach You Something.”
+- Result page: AI-assessed craft dimensions, explicit evidence disclaimer, and one next experiment.
+- Outcome timeline: separate 24h/7d/30d cards with provenance and integrity labels.
+- Experiments page: latest capture is clearly labelled as mixed-age history, with prompts to refresh near fixed windows.
+- Sample, social cards, navigation, consent, privacy, terms, email, admin labels, and upsells no longer promise prediction or virality scoring.
+- Brand remains **Surge**. No domain, logo, environment, package, or deployment setting changes are required.
+
+## Evaluation design for any future predictive model
+
+No predictive model is approved by this blueprint. Before considering one:
+
+1. Define a platform-specific target with a verified denominator and fixed maturity.
+2. Group every post from one creator into the same split to prevent creator leakage.
+3. Train on the past and evaluate on later chronological holdouts.
+4. Detect exact, perceptual, and audio near-duplicates across every split before fitting.
+5. Report missingness, provider provenance, maturity-window compliance, and suspected gaming.
+6. Compare against creator-history and simple non-LLM baselines.
+7. Report calibration and uncertainty, not only rank correlation.
+8. Keep prediction claims distinct from causal claims. Recommended edits require controlled experiments for causal evidence.
+
+No round minimum is specified. Sample size must be derived from a preregistered estimand, baseline variance/event rate, smallest effect worth detecting, alpha, desired power, repeated measures per creator, and expected attrition. For clustered creator data, inflate the independent-sample requirement by the design effect `1 + (m - 1) × ICC`, where `m` is average posts per creator and `ICC` is the measured intra-creator correlation. Without those inputs, a numeric threshold would be fiction.
+
+## Distortion and integrity risks
+
+Public counts may be distorted by purchased engagement, bots, engagement pods, giveaways, rage bait, spam, creator-authored comments, controversial content, deleted posts, edited captions, privacy changes, or platform enforcement. Integrity flags are therefore part of each observation. Surge must not silently “clean” ambiguous cases into causal evidence.
+
+Future duplicate controls must include:
+
+- exact SHA-256 for identical upload bytes;
+- perceptual video hashes for crops, re-encodes, overlays, and speed changes;
+- audio fingerprints for reused tracks/voiceovers; and
+- creator and provider post IDs.
+
+Current implementation captures exact hashes and identity slots. Perceptual/audio matching is a known prerequisite for evaluation, not a completed feature.
+
+## Provider risk register
+
+| Risk | TikWM | HikerAPI | Control |
 |---|---|---|---|
-| **Quick** | raw video only | everyone incl. guests | ~20s |
-| **Thinking** | video + global seed library (high + low buckets) | logged-in | ~30s |
-| **Deep Thinking** | video + seed library + creator channel profile | logged-in, ≥2 past analyses | ~35s |
+| Availability / reliability | third-party endpoint | third-party API | timeouts, visible errors, manual fallback |
+| Schema drift | undocumented payload changes | version/product changes | fail closed on required fields, keep optional fields NULL |
+| Rate and financial limits | availability may change | plan quota/pricing may change | usage telemetry, no automatic retry storms |
+| Legal / platform policy | scraping/ToS uncertainty | data-access/ToS uncertainty | counsel and contract review before scale |
+| Data accuracy | public counters may lag | public counters may lag | capture timestamp, source, integrity flags |
 
-### Effective-mode resolution (server-side, authoritative)
+Real provider payloads were not available for this local implementation. Optional provider fields are therefore **documented but not runtime-verified**. No external provider calls were made.
 
-```python
-def resolve_mode(requested, user, seeds, channel_profile):
-    # seeds = combined high+low list (falsy if empty)
-    # channel_profile = string, or None if <2 qualifying analyses
-    if user is None:
-        return "quick"                                   # guest forced
-    if requested == "deep_thinking" and channel_profile:
-        return "deep_thinking"                           # profile present
-    if requested in ("thinking", "deep_thinking") and seeds:
-        return "thinking"                                # seeds but no profile
-    return "quick"
-```
+## Economics and capacity model
 
-- `_build_channel_profile` returns `None` (never `""`) below threshold.
-- Store the **returned** value in `user_analyses.mode`.
-- API response returns effective `mode` (+ optional `requested_mode`) so the UI
-  badge reflects what actually ran — it can never overclaim "Personalized".
+The code records the inputs needed for an evidence-based estimate. The protected admin operations report exposes measured reliability, usage, row counts, and cost-coverage gaps. Do not fill absent measurements with guessed prices.
 
----
+For one analysis:
 
-## 4. Seed pipeline + seed-analysis prompt
+`analysis cost = Gemini media input + Gemini output + upload/storage transfer + database writes + allocated infrastructure`
 
-### Flow (`add_seed_video`, synchronous)
-1. Admin submits: platform, niche, view_count, like_count, notes?, posted_at?
-2. Save video to disk.
-3. Call `analyze_seed_video()` (reuses the proven upload→poll-ACTIVE→generate
-   pattern from `analyze_video`, and reuses `_PLATFORM_CONTEXT`).
-4. On success: store `gemini_analysis` JSON, extract+clamp `rating` (0–10).
-5. **Delete the video file.**
-6. Return the full analysis to the admin panel for inline review.
-7. **On bad JSON or missing `virality_rating`: do NOT persist the row** — return an
-   error so the admin retries. A seed with null rating must never be created.
+For one refresh:
 
-No regenerate endpoint. "Redo a seed" = delete + re-upload.
+`refresh cost = provider request fee + database write + allocated infrastructure`
 
-### Seed-analysis prompt (label is NOT written by the model — see §5)
+Monthly storage growth:
 
-```
-You are building a performance reference library for a video scoring AI.
-This analysis is NOT user-facing — it will be read by another AI instance when
-scoring new creator videos. Write everything with that reader in mind: specific,
-causal, pattern-focused. Never use vague descriptors.
+`new artifact metadata + outcome rows + usage rows + retained upload bytes (if enabled)`
 
-This is a {platform} video in the {niche} niche.
-It received {view_count} views and {like_count} likes.
+Gross margin:
 
-PLATFORM CONTEXT ({platform}):
-Distribution surface: {algorithm}
-Key engagement signals: {signals}
-{platform_tips}
+`(recognized revenue - model cost - provider cost - variable hosting/storage/egress - payment fees) / recognized revenue`
 
-Your job: explain exactly WHY it performed this way. What specific elements caused
-these results? What should a future AI look for — or warn against — when it sees
-similar patterns in a new video?
+Measure p50/p95/p99 end-to-end latency and provider/model error rates. Segment by platform, upload size, and success. The existing `usage_events` fields cover operation, provider/model, latency, bytes, tokens, success, error class, and nullable verified cost.
 
-SCORING RULES (0–10):
-- virality_rating: anchor directly to the view/like count as evidence. 2M views =
-  proof of 8–9. 800 views = proof of 1–3. Score what the data confirms.
-- hook_strength: did the first 1–3 seconds eliminate the viewer's reason to scroll?
-- pacing_score: do cuts and energy sustain watch time to the end?
-- audio_score: does the sound serve the content or fight it?
-- visual_score: framing, lighting, on-screen text, production quality.
-- trend_alignment: is this riding a current format, sound, or topic trend on {platform}?
+Current status:
 
-SEED SUMMARY RULES — most important field, target 150 words:
-- Written entirely for AI consumption — never for a human reader.
-- Lead with the single most causally important factor driving performance.
-- Be precise: not "good hook" but "creator displays the end result in frame 1
-  before any explanation, removing the viewer's reason to scroll".
-- Explain causality: not just what happened but why it produced this specific
-  outcome given {platform}'s algorithm.
-- Close with 1–2 sentences telling a future AI exactly what to look for or flag
-  when it sees similar patterns in a new video.
-- Do NOT write a "high/low performer" label — that is applied separately.
-
-Return ONLY valid JSON:
-{
-  "virality_rating": <0-10>,
-  "hook_strength": <0-10>,
-  "pacing_score": <0-10>,
-  "audio_score": <0-10>,
-  "visual_score": <0-10>,
-  "trend_alignment": <0-10>,
-  "what_happens": "<2-3 sentences: literal events start to finish, no evaluation>",
-  "performance_reason": "<3-4 sentences: causal explanation for exactly why this
-    got {view_count} views and {like_count} likes. Name the elements that drove
-    or killed distribution.>",
-  "patterns": {
-    "replicate": ["<pattern worth copying, as an instruction>", "<pattern 2>"],
-    "avoid":     ["<pattern to warn against, as a flag>", "<pattern 2>"]
-  },
-  "seed_summary": "<150 words, AI-consumption only, causal and self-contained.>"
-}
-```
-
----
-
-## 5. Seed selection / bucketing (kills the label-contradiction by construction)
-
-The HIGH/LOW label is **derived in code from `rating`**, never written by Gemini.
-Buckets use disjoint thresholds, so overlap is impossible.
-
-```python
-def select_seed_examples(pool_for_platform, niche):
-    niche_seeds = [s for s in pool_for_platform if s.niche == niche]
-    pool = niche_seeds if len(niche_seeds) >= 6 else pool_for_platform
-    high = [s for s in pool if s.rating is not None and s.rating >= 6]
-    low  = [s for s in pool if s.rating is not None and s.rating <= 4]
-    high.sort(key=lambda s: (s.rating, s.view_count * recency_mult(s)), reverse=True)
-    low.sort(key=lambda s:  (s.rating, s.view_count * recency_mult(s)))
-    return high[:10], low[:10]
-```
-
-- `rating == 5` or `None` → neither bucket (dormant; don't seed average videos).
-- Recency is **only** an intra-rating tiebreaker — it can never move a video
-  between buckets (that was the original bug).
-- Injection format (label computed from rating):
-  `[HIGH PERFORMER | Fitness | 1,800,000 views | 420,000 likes | Rating 9/10]` + summary.
-- Empty bucket → omit that section from the prompt.
-
----
-
-## 6. Creator channel profile (grounded in real data, framed honestly)
-
-Computed live from `user_analyses` for (user, platform). Returns `None` if
-<2 total analyses (→ Deep degrades to Thinking).
-
-Two clearly-separated tiers:
-
-**A. Verified performance** — only rows where `actual_views IS NOT NULL`.
-- Compute typical view range (median or min–max) + typical likes.
-- Only if ≥2 such rows. This is the **gold anchor** for predictions.
-
-**B. Self-assessment trends** — from `scores_json` (the system's own past opinions):
-- `avg_score` = mean of `overall_score`.
-- `score_trend` = mean(last 3) vs mean(prev 3) → improving / declining / flat
-  (only if ≥6 analyses).
-- recurring weakness: a dimension scoring ≤4 in >50% of analyses (min 3 samples).
-- recurring strength: a dimension scoring ≥7 in >50% of analyses (min 3 samples).
-- Dimensions: `hook_strength, pacing_score, audio_score, caption_score, trend_alignment`.
-
-**Degradation:**
-- ≥2 analyses but <2 with `actual_views`: trends only + explicit line:
-  *"No verified real-world results logged yet — calibrate conservatively against
-  global benchmarks, not a personal baseline."*
-
-**Guards:** every `scores_json` parse try/excepted; all divisions guarded.
-
-**`recent_history`** items: `niche · overall_score · actual_views (or "not logged")
-· top strength dim · top weakness dim`. **Excludes past predicted_views** so the AI
-never anchors to its own prior guesses.
-
-Injected block frames tier B explicitly as *the system's own prior scoring* — used
-to flag recurring patterns, NOT as external validation.
-
----
-
-## 7. Master user-analysis prompt (mode-conditional)
-
-Base identity (all modes):
-```
-You are an {analyst_title}. Give BRUTALLY HONEST, unfiltered feedback. Creators
-use Surge because they want the truth — not validation. Every score and prediction
-must be earned.
-```
-
-Thinking + Deep — global seed block:
-```
-GLOBAL PERFORMANCE REFERENCE ({platform} — {niche / all niches}):
-Real videos with verified performance data. When you identify a pattern in the
-user's video, ask: does this match HIGH PERFORMERS or LOW PERFORMERS? Name the
-connection explicitly in analysis_summary.
-
-── HIGH PERFORMERS — what made these succeed ──
-[HIGH PERFORMER | {niche} | {views} views | {likes} likes | Rating {rating}/10]
-{seed_summary}
-... (≤10)
-
-── LOW PERFORMERS — what caused these to fail ──
-[LOW PERFORMER | {niche} | {views} views | {likes} likes | Rating {rating}/10]
-{seed_summary}
-... (≤10)
-```
-
-Deep only — channel profile block: the string from §6.
-
-All modes — scoring rules (0–10) + calibration (unchanged from current):
-0–2 failing · 3–4 poor · 5 dead average · 6 slightly above · 7 solid · 8 strong ·
-9 near-viral (rare) · 10 never. First video=2–3 · regular poster=4–5 ·
-50k–200k=6–7 · 500k+=8–9 · when in doubt score LOWER.
-
-Thinking + Deep add — REFERENCE CALIBRATION: ground scores/predictions in the
-reference data; reward HIGH-PERFORMER patterns, penalize LOW; name the connection
-in analysis_summary; if it matches nothing, say so.
-
-Platform context + video details (caption/bio/profile blocks) — unchanged.
-
-Analysis instructions — unchanged (independent dimension scoring, no-caption=1,
-specific-to-THIS-video improvements, before→after examples, caption_rewrite,
-hook_rewrite, honest projected_*).
-
-`predicted_views` by mode:
-- **Quick:** use training knowledge; most videos <5k; err low.
-- **Thinking:** anchor to GLOBAL PERFORMANCE REFERENCE; most land near low-performer
-  territory; never exceed high-performer range unless exceptional; err low.
-- **Deep:** anchor to global benchmarks AND this creator's verified history; if their
-  typical video gets ~800 views, require clear breakout signals to predict higher;
-  err low.
-
-JSON output (unchanged shape):
-`overall_score, hook_strength, pacing_score, audio_score, caption_score,
-trend_alignment, predicted_views, strengths[], improvements[], verdict,
-analysis_summary, improvement_plan[], caption_rewrite, hook_rewrite,
-projected_verdict, projected_views`.
-
-> Note: `predicted_views` stays free text. Nothing in the system does arithmetic on
-> it (channel profile uses `actual_views`; sanity check uses raw ints), so no numeric
-> field is needed.
-
----
-
-## 8. Backend changes per file
-
-- **`models.py`** — `SeedVideo`: add `rating`, `gemini_analysis`; remove `performed`.
-  `UserAnalysis`: add `mode`.
-- **`schemas.py`** — `SeedVideoOut`: add `rating`, drop `performed`. `AnalysisOut`/
-  summary: add `mode`. (seed-analysis JSON is internal, not a response model.)
-- **`services/seed_analysis.py`** (new) — `analyze_seed_video(path, platform, niche,
-  view_count, like_count) -> dict`; seed prompt; reuse `_PLATFORM_CONTEXT` + the
-  upload/poll/generate/delete pattern; `_error_dict`-style guard.
-- **`services/gemini.py`** — `_build_system_prompt(..., mode, high_seeds, low_seeds,
-  channel_profile)`; conditional global/profile blocks; derive HIGH/LOW labels from
-  rating; mode-specific `predicted_views` text.
-- **`routers/admin.py`** — `add_seed_video` triggers `analyze_seed_video`, stores
-  result, deletes file, returns analysis; drop `performed` Form field + the
-  `from-url` `performed = view_count >= 10000` line; remove regenerate (none).
-- **`routers/analyze.py`** — accept `mode` Form (default `"quick"`); `resolve_mode`;
-  load seeds via `select_seed_examples`; build channel profile only for deep+auth+≥2;
-  store effective mode; return effective mode; hard-block feedback validation (§10).
-- **channel profile helper** — `_build_channel_profile(user_id, platform, db)` in
-  `analyze.py` or `utils.py`; returns `str | None`.
-
----
-
-## 9. Frontend changes per file
-
-- **`lib/api.ts`** — `analyzeVideo` adds `mode`; `SeedVideoOut` add `rating`, drop
-  `performed`; `AnalysisOut`/summary add `mode`; `addSeedVideo`/`seedFromUrl` drop
-  `performed`.
-- **`components/UploadZone.tsx`** — mode selector for logged-in users (remember last
-  choice in localStorage); **guests skip the modal** → default Quick with a single
-  inline "Sign in for Thinking / Deep Thinking" link (no lock-wall every upload);
-  pass selected `mode` to `analyzeVideo`. Time copy: "~20s once warmed".
-- **`app/results/[id]/page.tsx`** — badge from effective `mode`
-  ("Quick" / "Thinking" / "Deep Thinking — Personalized"); if degraded, optional
-  "ran as Thinking — needs 2+ analyses for Personalized".
-- **`app/admin/page.tsx`** — remove `performed` checkbox; add read-only `rating`
-  column; expandable row showing `seed_summary`; "Analyzing…" skeleton during the
-  sync upload.
-
----
-
-## 10. Feedback validation (hard blocks only — soft flag cut from v1)
-
-At `PATCH /api/analyses/{id}/feedback`, reject `400` on pure-int checks:
-- `actual_views < 0`
-- `actual_likes < 0`
-- `actual_likes > actual_views`
-- `actual_views > 500_000_000`
-
-No flag column, no login-time prompt machinery.
-
----
-
-## 11. Deploy runbook (ordered — no missing-column window)
-
-1. Run Neon migration SQL (§1). App stays up on old code.
-2. `services/seed_analysis.py`.
-3. `models.py` / `schemas.py` / `lib/api.ts` field changes.
-4. `routers/admin.py` + admin panel UI.
-5. `_build_channel_profile()` (+ unit test with mock rows).
-6. `services/gemini.py` three-mode builder.
-7. `routers/analyze.py` mode handling + feedback validation.
-8. Frontend mode selector + results badge.
-9. **Deploy backend + frontend together.**
-10. `DELETE FROM seed_videos;` then re-upload curated seeds via the new pipeline.
-11. End-to-end test (§12).
-
-(Between 9 and 10, old rating-less seeds are auto-ignored — no crash, modes just
-run shallow until reseeded.)
-
----
-
-## 12. Test matrix
-
-| Case | Expect |
+| Item | Status |
 |---|---|
-| Guest, requests Deep | runs Quick; badge "Quick" |
-| Logged-in, 0 seeds, requests Thinking | runs Quick (no seeds) |
-| Logged-in, seeds exist, requests Thinking | runs Thinking; seeds in prompt |
-| Logged-in, <2 analyses, requests Deep | runs Thinking; badge not "Personalized" |
-| Logged-in, ≥2 analyses + actual_views, Deep | runs Deep; verified range in profile |
-| Logged-in, ≥2 analyses, no actual_views, Deep | runs Deep; "no verified results" line |
-| Seed upload, good video | rating + summary stored, file deleted, shown inline |
-| Seed upload, Gemini returns bad JSON | no row created, admin sees error |
-| Pool has only 8 seeds | high/low buckets, no overlap, no crash |
-| All seeds rated ≥6 | LOW section omitted cleanly |
-| Feedback: likes > views | 400 rejected |
-| Feedback: views = 9e8 | 400 rejected |
+| Per-analysis cost | unverified; requires Gemini billing/token telemetry and hosting allocation |
+| Refresh cost | unverified; requires contracted provider pricing and request counts |
+| Latency | individual calls instrumented; distribution requires production observations |
+| Storage growth | schema measurable; real row/upload growth requires production observations |
+| Gross margin | cannot be calculated without price, conversion, and verified variable cost |
 
----
+## Rollout and rollback
 
-## 13. v1 non-goals / known constraints
+1. Run backend unit/compile checks and frontend typecheck/build.
+2. Verify new tables are created in a disposable database.
+3. Deploy schema and application in one batched backend release only after explicit approval.
+4. Smoke-test upload, anonymous lock, authenticated review, provider/manual capture, maturity labels, deletion, and error handling.
+5. Monitor success rate and latency before collecting enough observations for any research claim.
 
-- **Soft-flag / next-login correction prompt** — deferred (hard blocks only).
-- **Seed video durability** — none by design; durable artifact is `gemini_analysis`
-  in Postgres. Re-seeding requires the operator's local files.
-- **Sync seed analysis blocks the single Render worker** (~20–30s). Off-peak only;
-  multi-worker is a paid-tier concern.
-- **Gemini context caching** for the shared seed block — possible future cost
-  optimization, not in v1.
-- **Seed dims (`visual_score`) ≠ user dims (`caption_score`)** — intentional; summary
-  is prose, so no code assumes alignment.
-```
+Rollback is application rollback to the prior release. New tables are additive and can remain unused; do not destructively drop them during an incident. Legacy rows remain readable, while new output omits legacy prediction fields.
 
+## Explicit non-goals
+
+- predicting views, likes, reach, retention, or virality;
+- claiming an edit caused or will cause better performance;
+- treating likes/views or comment count as content quality;
+- learning from linked outcomes in the live Gemini review;
+- an in-process auto-refresh worker (the protected due-job endpoint still requires an external trusted scheduler); and
+- claiming near-duplicate protection before perceptual/audio matching exists.

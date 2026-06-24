@@ -25,6 +25,87 @@ body {
   color: var(--color-text-primary);
 }
 
+/* Shared interaction and loading language. Keep motion short and functional. */
+:where(button, [role="button"], .interactive-control, a[class~="rounded-lg"], a[class~="rounded-xl"], a[class~="rounded-2xl"]) {
+  -webkit-tap-highlight-color: transparent;
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:where(button, [role="button"], .interactive-control):focus-visible,
+:where(a, input, textarea, select):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-purple-to) 82%, white);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), .interactive-control:not([aria-disabled="true"]), a[class~="rounded-lg"], a[class~="rounded-xl"], a[class~="rounded-2xl"]):hover {
+    transform: translateY(-1px);
+  }
+}
+
+:where(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), .interactive-control:not([aria-disabled="true"]), a[class~="rounded-lg"], a[class~="rounded-xl"], a[class~="rounded-2xl"]):active {
+  transform: scale(0.985);
+}
+
+:where(button, [role="button"]):disabled,
+:where([role="button"], .interactive-control)[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-border) 72%, var(--color-card));
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.055), transparent);
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.pending-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: pending-spin 700ms linear infinite;
+}
+
+.motion-enter { animation: motion-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.motion-pop { animation: motion-pop 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.skeleton-delay { animation: skeleton-reveal 1ms 140ms both; }
+
+@keyframes skeleton-shimmer { to { transform: translateX(100%); } }
+@keyframes pending-spin { to { transform: rotate(360deg); } }
+@keyframes motion-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes skeleton-reveal { from { visibility: hidden; } to { visibility: visible; } }
+@keyframes motion-pop {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .skeleton::after { display: none; }
+  .skeleton-delay { animation-delay: 0ms !important; }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

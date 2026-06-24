@@ -6,7 +6,8 @@ from google.genai import types
 
 from database import AsyncSessionLocal
 from models import UserAnalysis
-from services.gemini import client
+from services.gemini import client, _GRADING_SYSTEM_INSTRUCTION
+from services.telemetry import tracked_generate_content
 
 log = logging.getLogger("seed_correction")
 
@@ -115,10 +116,15 @@ async def audit_prediction(analysis_id: int) -> None:
             cal_version = a.calibration_version or 0
 
         prompt = _build_correction_prompt(pred, views, likes, niche)
-        resp = await client.aio.models.generate_content(
+        resp = await tracked_generate_content(
+            client,
+            operation="legacy_correction_audit",
             model="gemini-2.5-flash",
             contents=[prompt],
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                system_instruction=_GRADING_SYSTEM_INSTRUCTION,
+            ),
         )
         # Only persist a well-formed correction — never store junk for the summarizer.
         try:

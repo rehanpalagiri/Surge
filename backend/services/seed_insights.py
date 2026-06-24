@@ -14,6 +14,8 @@ import os
 from google import genai
 from google.genai import types
 from google.genai.errors import ClientError as _GeminiClientError
+from services.gemini import _GRADING_SYSTEM_INSTRUCTION
+from services.telemetry import tracked_generate_content
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -247,11 +249,14 @@ loop_seamlessness → [CRITICAL|HIGH|STANDARD|LOW] (~X%): [data-grounded rationa
 
 Target 500 words per section for the pattern sections (~4,000 words total). Dense and specific. No padding. Each section must contain enough specific, causal observations that a future AI could apply them without needing to see a single individual seed example."""
 
-    response = await client.aio.models.generate_content(
+    response = await tracked_generate_content(
+        client,
+        operation="legacy_niche_insight",
         model="gemini-2.5-flash",
         contents=[prompt],
         config=types.GenerateContentConfig(
             response_mime_type="text/plain",
+            system_instruction=_GRADING_SYSTEM_INSTRUCTION,
         ),
     )
 

@@ -32,13 +32,16 @@ export default function ReportIssue() {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-background/80 backdrop-blur-sm motion-enter"
           onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-issue-title"
         >
-          <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-5 space-y-4 shadow-2xl">
+          <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-5 space-y-4 shadow-2xl motion-pop">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-text-primary font-semibold">Report an issue</h3>
+                <h3 id="report-issue-title" className="text-text-primary font-semibold">Report an issue</h3>
                 <p className="text-text-muted text-xs mt-0.5">
                   Something break? Tell us — every report helps.
                 </p>

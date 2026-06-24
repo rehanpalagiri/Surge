@@ -1,8 +1,10 @@
 import asyncio
 import os
+import time
 
 import boto3
 from botocore.config import Config
+from services.telemetry import record_usage_event
 
 
 def _client():
@@ -26,15 +28,42 @@ def presigned_upload_url(key: str, content_type: str, expires: int = 300) -> str
 
 
 async def download(key: str) -> bytes:
+    started = time.perf_counter()
     loop = asyncio.get_running_loop()
-    client = _client()
-    bucket = os.environ["R2_BUCKET_NAME"]
-    resp = await loop.run_in_executor(None, lambda: client.get_object(Bucket=bucket, Key=key))
-    return await loop.run_in_executor(None, resp["Body"].read)
+    try:
+        client = _client()
+        bucket = os.environ["R2_BUCKET_NAME"]
+        resp = await loop.run_in_executor(None, lambda: client.get_object(Bucket=bucket, Key=key))
+        body = await loop.run_in_executor(None, resp["Body"].read)
+        await record_usage_event(
+            operation="object_download", provider="cloudflare_r2", success=True,
+            latency_ms=(time.perf_counter() - started) * 1000, output_bytes=len(body),
+        )
+        return body
+    except Exception as exc:
+        await record_usage_event(
+            operation="object_download", provider="cloudflare_r2", success=False,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            error_code=type(exc).__name__,
+        )
+        raise
 
 
 async def delete(key: str) -> None:
+    started = time.perf_counter()
     loop = asyncio.get_running_loop()
-    client = _client()
-    bucket = os.environ["R2_BUCKET_NAME"]
-    await loop.run_in_executor(None, lambda: client.delete_object(Bucket=bucket, Key=key))
+    try:
+        client = _client()
+        bucket = os.environ["R2_BUCKET_NAME"]
+        await loop.run_in_executor(None, lambda: client.delete_object(Bucket=bucket, Key=key))
+        await record_usage_event(
+            operation="object_delete", provider="cloudflare_r2", success=True,
+            latency_ms=(time.perf_counter() - started) * 1000,
+        )
+    except Exception as exc:
+        await record_usage_event(
+            operation="object_delete", provider="cloudflare_r2", success=False,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            error_code=type(exc).__name__,
+        )
+        raise

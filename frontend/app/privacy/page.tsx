@@ -46,8 +46,7 @@ export default function PrivacyPage() {
             <li>Video captions and profile bios you type into the analyzer</li>
             <li>TikTok or Instagram post URLs you choose to link to an analysis</li>
             <li>
-              The public like/view counts of those linked posts, refreshed when you
-              view your results
+              Public metrics from linked posts, including observation time and post age
             </li>
           </ul>
         </Section>
@@ -81,19 +80,19 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="Benchmark data (seed pool)" id="seed-pool">
+        <Section title="Optional measurement research" id="measurement-research">
           <p>
             If you are <span className="text-text-primary font-medium">18 or older</span>{" "}
             <em>and</em> have opted in via your Settings, the public engagement data
-            from your linked social media posts — view count, like count, post URL,
-            and content niche — may be used as benchmark reference data to help
-            Surge score other creators&apos; videos.
+            from your linked social media posts — including counts, observation time,
+            post URL, and content niche — may be used for measurement research and
+            same-age comparisons. They are not treated as proof of causation.
           </p>
           <p className="text-text-primary font-medium">
             Your actual video is never used — only the numbers.
           </p>
           <p>
-            Users under 18 are permanently excluded from this feature. You can opt
+            Users under 18 are permanently excluded from measurement research. You can opt
             out or change your preference at any time in Settings → Data &amp;
             Privacy.
           </p>
@@ -112,8 +111,8 @@ export default function PrivacyPage() {
         <Section title="Children">
           <p>
             Surge is available to users 13 and older. Users under 13 may not create
-            an account. Users aged 13–17 have seed pool features automatically
-            disabled and cannot enable them.
+            an account. Public metrics from users aged 13–17 are excluded from
+            measurement research and cannot be opted in.
           </p>
         </Section>
 

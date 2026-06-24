@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getToken, clearToken } from "@/lib/auth";
+import { Skeleton } from "@/components/Skeleton";
 
 export default function Nav({ subtitle }: { subtitle?: string }) {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -58,10 +59,16 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
 
         {/* ── Desktop nav (md+) ── */}
         <div className="hidden md:flex items-center gap-5 text-sm">
-          {loggedIn ? (
+          {loggedIn === null ? (
+            <div className="flex items-center gap-4" aria-label="Checking account session" aria-busy="true">
+              <Skeleton className="h-4 w-16 rounded-md" />
+              <Skeleton className="h-4 w-20 rounded-md" />
+              <Skeleton className="h-8 w-20 rounded-lg" />
+            </div>
+          ) : loggedIn ? (
             <>
-              {pathname !== "/" && <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>}
-              {pathname !== "/projects" && <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">My Projects</Link>}
+              <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
+              <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">Experiments</Link>
               <Link href="/profile"  className="text-zinc-400 hover:text-white transition-colors">Profile</Link>
               <Link href="/settings" className="text-zinc-400 hover:text-white transition-colors">Settings</Link>
               <button onClick={logout} className="text-zinc-400 hover:text-white transition-colors">Log out</button>
@@ -78,6 +85,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
         <div className="md:hidden relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
+            disabled={loggedIn === null}
             aria-label="Toggle menu"
             className="flex flex-col justify-center items-center gap-[5px] w-9 h-9 rounded-lg hover:bg-zinc-800 transition-colors"
           >
@@ -90,8 +98,8 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             <div className="absolute right-0 top-12 w-52 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl py-2 flex flex-col text-sm z-50">
               {loggedIn ? (
                 <>
-                  {pathname !== "/" && <Link href="/" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Dashboard</Link>}
-                  {pathname !== "/projects" && <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">My Projects</Link>}
+                  <Link href="/" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Dashboard</Link>
+                  <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Experiments</Link>
                   <Link href="/profile"  className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Profile</Link>
                   <Link href="/settings" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Settings</Link>
                   <div className="border-t border-zinc-700 my-1" />

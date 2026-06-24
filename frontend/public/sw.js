@@ -3,7 +3,7 @@
 //   1. Cache-first for immutable Next.js static assets (/_next/static/)
 //   2. Network-first for everything else
 
-const STATIC_CACHE = 'surge-static-v1';
+const STATIC_CACHE = 'surge-static-v2';
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,10 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-same-origin requests (Render API, etc.)
   if (url.origin !== self.location.origin) return;
+
+  // Never cache local development chunks: Next dev uses stable filenames such
+  // as app/layout.js, so cache-first can strand the browser on stale code.
+  if (url.hostname === 'localhost' || url.hostname.startsWith('127.')) return;
 
   // Cache-first for Next.js static bundles (content-hashed, safe to cache forever)
   if (url.pathname.startsWith('/_next/static/')) {

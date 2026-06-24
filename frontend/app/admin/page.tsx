@@ -27,6 +27,7 @@ import {
   TrendRow,
   GenerateTrendsResult,
 } from "@/lib/api";
+import { AdminDataSkeleton, SkeletonButton, SkeletonCard, SkeletonInput, SkeletonTitle } from "@/components/Skeleton";
 
 // Must stay in sync with CANONICAL_NICHES in backend/services/niche_classifier.py —
 // seed matching is an exact string compare against the classified user niche.
@@ -126,9 +127,12 @@ function UsageBar({ used, limit, resetsAt }: { used: number; limit: number; rese
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authPending, setAuthPending] = useState(false);
   const [seeds, setSeeds] = useState<SeedVideoOut[]>([]);
+  const [seedsLoaded, setSeedsLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState<Tab>("url");
   const [activePlatform, setActivePlatform] = useState<Platform>("tiktok");
@@ -206,6 +210,8 @@ export default function AdminPage() {
       setLoadError("");
     } catch (err: unknown) {
       setLoadError(err instanceof Error ? err.message : "Failed to load seeds");
+    } finally {
+      setSeedsLoaded(true);
     }
   }, []);
 
@@ -234,6 +240,7 @@ export default function AdminPage() {
       loadTrends(saved, "tiktok");
       refreshTrendHarvestStatus(saved);
     }
+    setAuthChecked(true);
   }, [loadSeeds, refreshFetchStatus, refreshApiUsage, refreshHarvestStatus, loadInsights, loadTrends, refreshTrendHarvestStatus]);
 
   // Reload insights/trends when platform changes
@@ -247,6 +254,8 @@ export default function AdminPage() {
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
+    if (authPending) return;
+    setAuthPending(true);
     try {
       await getAdminSeeds(password);
       localStorage.setItem("viraliq_admin_pw", password);
@@ -260,6 +269,7 @@ export default function AdminPage() {
       loadTrends(password, activePlatform);
       refreshTrendHarvestStatus(password);
     } catch { setAuthError("Invalid password."); }
+    finally { setAuthPending(false); }
   }
 
   async function handleFetchFromUrl(e: React.FormEvent) {
@@ -420,6 +430,19 @@ export default function AdminPage() {
     setAuthed(false);
     setPassword("");
     setSeeds([]);
+    setSeedsLoaded(false);
+  }
+
+  if (!authChecked) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4 bg-background">
+        <SkeletonCard className="w-full max-w-sm space-y-5">
+          <SkeletonTitle width="42%" className="mx-auto" />
+          <SkeletonInput />
+          <SkeletonButton className="w-full" />
+        </SkeletonCard>
+      </main>
+    );
   }
 
   if (!authed) {
@@ -440,8 +463,9 @@ export default function AdminPage() {
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
             />
             {authError && <p className="text-danger text-sm">{authError}</p>}
-            <button type="submit" className="w-full gradient-btn text-white font-semibold py-3 rounded-xl">
-              Sign In
+            <button type="submit" disabled={authPending} aria-busy={authPending} className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50">
+              {authPending && <span className="pending-spinner mr-2 align-[-0.1em]" aria-hidden="true" />}
+              {authPending ? "Signing in…" : "Sign In"}
             </button>
           </form>
         </div>
@@ -672,8 +696,8 @@ export default function AdminPage() {
                       </div>
 
                       <div className="bg-surface/60 border border-border rounded-xl px-4 py-3 text-xs text-text-muted">
-                        Surge sends this video to Gemini and generates a causal performance writeup
-                        + a 0–10 virality rating (~20–30s). The video file is deleted afterward. If
+                        Legacy seed tool: Surge creates an observable craft record and attaches
+                        an internal outcome band. These records do not affect new live craft reviews. The video is deleted afterward. If
                         analysis fails, the seed is not saved — just retry.
                       </div>
 
@@ -714,7 +738,9 @@ export default function AdminPage() {
 
               {loadError && <p className="text-danger text-sm mb-4">{loadError}</p>}
 
-              {seeds.length === 0 ? (
+              {!seedsLoaded ? (
+                <AdminDataSkeleton />
+              ) : seeds.length === 0 ? (
                 <p className="text-text-muted text-sm text-center py-8">No seed videos yet. Add some above.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -725,7 +751,7 @@ export default function AdminPage() {
                         <th className="text-left py-2 pr-4">Niche</th>
                         <th className="text-right py-2 pr-4">Views</th>
                         <th className="text-right py-2 pr-4">Likes</th>
-                        <th className="text-center py-2 pr-4">Rating</th>
+                        <th className="text-center py-2 pr-4">Legacy band</th>
                         <th className="text-left py-2 pr-4">Summary</th>
                         <th className="text-left py-2 pr-4">Date</th>
                         <th className="text-right py-2">Action</th>
@@ -1069,7 +1095,7 @@ export default function AdminPage() {
                 <h2 className="text-text-primary font-semibold text-lg">Trend Feed Harvest</h2>
                 <p className="text-text-muted text-sm mt-1">
                   Pulls TikTok videos published in the last <strong>N days</strong> that are already accumulating
-                  views fast. Viral velocity (views/day) is the signal — a 500K view video in 7 days
+                  views fast. Views per day is shown descriptively — a 500K view video in 7 days
                   is a very different signal than one from 6 months ago.
                 </p>
               </div>

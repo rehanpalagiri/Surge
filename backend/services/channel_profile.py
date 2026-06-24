@@ -13,8 +13,8 @@ system's own past opinions for external validation:
      scoring). Explicitly labelled as internal opinion, used only to flag recurring
      patterns.
 
-`recent_history` deliberately EXCLUDES past `predicted_views` so the AI never
-anchors to its own earlier guesses.
+`recent_history` deliberately excludes any earlier forecast-like fields so the
+AI never anchors to its own guesses.
 """
 
 import json
@@ -97,8 +97,8 @@ def build_channel_profile(analyses: list) -> str | None:
         if verified_likes:
             line_a += f"\n  Typical likes: ~{int(median(verified_likes)):,}."
         line_a += (
-            "\n  → Anchor predicted_views to THIS real range. Predicting above it "
-            "requires clear breakout signals in the new video."
+            "\n  → Treat this only as historical context. Do not convert it into a "
+            "forecast or imply that the new video will land in this range."
         )
         verified_block = "VERIFIED PERFORMANCE (real posted results — the gold anchor):\n" + line_a
     else:

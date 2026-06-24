@@ -85,7 +85,7 @@ export default function LinkPromptModal() {
   /* ─── "Any questions?" toast — bottom-right, subtle ─── */
   if (state === "questions") {
     return (
-      <div className="fixed bottom-20 right-4 z-50 max-w-xs w-full sm:max-w-sm animate-fade-in">
+      <div className="fixed bottom-20 right-4 z-50 max-w-xs w-full sm:max-w-sm motion-pop">
         <div className="relative rounded-2xl p-[1.5px] bg-gradient-to-r from-purple-600 to-pink-500 shadow-2xl">
           <div className="rounded-2xl bg-card px-4 py-4">
             <button
@@ -110,13 +110,13 @@ export default function LinkPromptModal() {
   /* ─── Link-prompt modal ─── */
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm motion-enter"
       onClick={dismissLink}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-md rounded-2xl p-[1.5px] gradient-btn shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl p-[1.5px] gradient-btn shadow-2xl motion-pop"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="rounded-2xl bg-card px-7 py-8">
@@ -137,7 +137,7 @@ export default function LinkPromptModal() {
               How did your videos actually do?
             </h2>
             <p className="text-text-muted leading-relaxed text-sm">
-              You&apos;ve posted these — link them to pull in real views &amp; likes and see if Surge called it right.
+              Link posted videos to capture public metrics at comparable ages. Results stay separate from the pre-post craft review.
             </p>
           </div>
 
@@ -155,9 +155,9 @@ export default function LinkPromptModal() {
                   <div className="flex items-center gap-2 shrink-0">
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        a.verdict === "High potential"
+                        a.verdict === "Strong craft" || a.verdict === "High potential"
                           ? "bg-success/10 text-success"
-                          : a.verdict === "Average potential"
+                          : a.verdict === "Developing craft" || a.verdict === "Average potential"
                           ? "bg-warning/10 text-warning"
                           : "bg-danger/10 text-danger"
                       }`}

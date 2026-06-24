@@ -6,29 +6,34 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { getMyAnalyses, deleteAnalysis, linkTikTokVideo, apiErrorDetail, AnalysisSummary } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { ProjectsSkeleton } from "@/components/Skeleton";
 
 function verdictColor(verdict: string): string {
-  if (verdict === "High potential") return "text-success";
-  if (verdict === "Average potential") return "text-warning";
+  if (verdict === "Strong craft" || verdict === "High potential") return "text-success";
+  if (verdict === "Developing craft" || verdict === "Average potential") return "text-warning";
   return "text-danger";
 }
 
-function scoreColor(score: number | null): string {
-  if (score === null) return "text-text-muted";
-  if (score >= 7) return "text-success";
-  if (score >= 4) return "text-warning";
-  return "text-danger";
-}
-
-function ScoreDelta({ prev, curr }: { prev: number | null; curr: number | null }) {
-  if (prev === null || curr === null) return null;
-  const delta = curr - prev;
-  if (Math.abs(delta) < 0.05) return null;
-  const positive = delta > 0;
+// Collapsed CTA inviting the user to link a posted video/Reel. Same card for both
+// platforms — only the headline differs.
+function LinkCtaButton({ title, onClick }: { title: string; onClick: () => void }) {
   return (
-    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${positive ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
-      {positive ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-between gap-3 bg-purple-from/10 border border-purple-to/40 hover:border-purple-to rounded-xl px-4 py-3 text-left transition-colors group"
+    >
+      <span className="flex items-center gap-2.5 min-w-0">
+        <span className="text-lg flex-shrink-0">📊</span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-text-primary">{title}</span>
+          <span className="block text-[11px] text-text-muted">
+            Compare the review with real stats + earn 1 bonus analysis (up to 10)
+          </span>
+        </span>
+      </span>
+      <span className="text-purple-to font-bold flex-shrink-0 group-hover:translate-x-0.5 transition-transform">→</span>
+    </button>
   );
 }
 
@@ -120,22 +125,18 @@ function TikTokStatsRow({
   }
 
   return (
-    <div className="px-5 pb-4">
+    <div className="px-5 pb-4" aria-busy={busy}>
       {a.video_url ? (
         <button
           onClick={() => fetchStats()}
           disabled={busy}
           className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
         >
-          {busy ? "Refreshing…" : "↻ Refresh stats from TikTok"}
+          {busy && <span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />}
+          {busy ? "Refreshing…" : "↻ Capture current TikTok stats"}
         </button>
       ) : !expanded ? (
-        <button
-          onClick={() => setExpanded(true)}
-          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors"
-        >
-          🔗 Link posted video to auto-track stats
-        </button>
+        <LinkCtaButton title="Did you post this? Track real stats" onClick={() => setExpanded(true)} />
       ) : (
         <form
           onSubmit={(e) => {
@@ -168,6 +169,9 @@ function TikTokStatsRow({
           </button>
         </form>
       )}
+      <p className="text-[11px] text-text-muted mt-2">
+        Best captured near 24 hours, 7 days, and 30 days after posting.
+      </p>
       {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
     </div>
   );
@@ -182,14 +186,19 @@ function InstagramStatsRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [link, setLink] = useState("");
+  const [captureAge, setCaptureAge] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function fetchStats(url?: string) {
+    if (!captureAge) {
+      setError("Choose the Reel's age for this capture.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const updated = await linkTikTokVideo(a.id, url);
+      const updated = await linkTikTokVideo(a.id, url, Number(captureAge));
       onUpdated(a.id, {
         actual_likes: updated.actual_likes,
         video_url: updated.video_url,
@@ -205,22 +214,18 @@ function InstagramStatsRow({
   }
 
   return (
-    <div className="px-5 pb-4">
-      {a.video_url ? (
+    <div className="px-5 pb-4" aria-busy={busy}>
+      {a.video_url && !expanded ? (
         <button
-          onClick={() => fetchStats()}
+          onClick={() => { setLink(a.video_url || ""); setExpanded(true); }}
           disabled={busy}
           className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
         >
-          {busy ? "Refreshing…" : "↻ Refresh likes from Instagram"}
+          {busy && <span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />}
+          {busy ? "Refreshing…" : "↻ Capture current Instagram likes"}
         </button>
       ) : !expanded ? (
-        <button
-          onClick={() => setExpanded(true)}
-          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors"
-        >
-          🔗 Link posted Reel to auto-track likes
-        </button>
+        <LinkCtaButton title="Did you post this Reel? Track real likes" onClick={() => setExpanded(true)} />
       ) : (
         <form
           onSubmit={(e) => {
@@ -229,6 +234,17 @@ function InstagramStatsRow({
           }}
           className="flex gap-2"
         >
+          <select
+            value={captureAge}
+            onChange={(e) => setCaptureAge(e.target.value)}
+            className="min-w-0 bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-purple-to"
+            required
+          >
+            <option value="">Capture age</option>
+            <option value="24">24 hours</option>
+            <option value="168">7 days</option>
+            <option value="720">30 days</option>
+          </select>
           <input
             type="url"
             autoFocus
@@ -253,6 +269,9 @@ function InstagramStatsRow({
           </button>
         </form>
       )}
+      <p className="text-[11px] text-text-muted mt-2">
+        Instagram likes are recorded as observations; Surge does not infer reach from them.
+      </p>
       {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
     </div>
   );
@@ -260,12 +279,10 @@ function InstagramStatsRow({
 
 function ProjectCard({
   a,
-  parentScore,
   onDeleted,
   onUpdated,
 }: {
   a: AnalysisSummary;
-  parentScore: number | null;
   onDeleted: (id: number) => void;
   onUpdated: (id: number, patch: Partial<AnalysisSummary>) => void;
 }) {
@@ -304,23 +321,11 @@ function ProjectCard({
           <span className="text-text-primary font-semibold capitalize">
             {a.niche}
           </span>
-          {a.predicted_views && (
-            <span className="text-text-muted text-xs font-medium shrink-0">
-              ~{a.predicted_views}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-3 mb-1">
           <p className={`text-sm font-medium ${verdictColor(a.verdict)}`}>
             {a.verdict}
           </p>
-          {a.overall_score !== null && (
-            <span className={`text-xs font-bold ${scoreColor(a.overall_score)}`}>
-              {a.overall_score}/10
-            </span>
-          )}
-          {/* Score delta badge when this is an updated version */}
-          <ScoreDelta prev={parentScore} curr={a.overall_score} />
         </div>
         {a.caption_preview && (
           <p className="text-text-muted text-sm mt-2 line-clamp-2">
@@ -333,10 +338,11 @@ function ProjectCard({
             day: "numeric",
             year: "numeric",
           })}
+          {(a.actual_views !== null || a.actual_likes !== null) && " · latest capture:"}
           {a.actual_views !== null &&
-            ` · ${a.actual_views.toLocaleString()} views`}
+            ` ${a.actual_views.toLocaleString()} views`}
           {a.actual_likes !== null &&
-            ` · ${a.actual_likes.toLocaleString()} likes`}
+            ` ${a.actual_views !== null ? "· " : ""}${a.actual_likes.toLocaleString()} likes`}
           {a.parent_id != null && (
             <span className="ml-2 text-purple-to font-medium">↺ Re-analyzed</span>
           )}
@@ -428,11 +434,6 @@ export default function ProjectsPage() {
   );
   const filtered = allForPlatform?.filter((a) => !supersededIds.has(a.id)) ?? null;
 
-  // Build a score lookup for parent analyses so we can show deltas.
-  const scoreById = new Map<number, number | null>(
-    (allForPlatform ?? []).map((a) => [a.id, a.overall_score])
-  );
-
   const cfg = PLATFORM_TABS.find((p) => p.id === platform)!;
   const groups = filtered ? groupByDate(filtered) : null;
 
@@ -442,10 +443,10 @@ export default function ProjectsPage() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-extrabold">
-            Your <span className={cfg.textGradient}>Past Projects</span>
+            Your <span className={cfg.textGradient}>Video Experiments</span>
           </h1>
           <p className="text-text-muted mt-1">
-            Every video you&apos;ve analyzed, saved to your account.
+            Craft reviews and observed post results, kept separate so each post can teach you something.
           </p>
         </div>
 
@@ -486,7 +487,7 @@ export default function ProjectsPage() {
             </button>
           </div>
         ) : filtered === null ? (
-          <p className="text-text-muted">Loading…</p>
+          <ProjectsSkeleton />
         ) : filtered.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-10 text-center">
             <div className="text-4xl mb-3">🎬</div>
@@ -513,7 +514,6 @@ export default function ProjectsPage() {
                     <ProjectCard
                       key={a.id}
                       a={a}
-                      parentScore={a.parent_id != null ? (scoreById.get(a.parent_id) ?? null) : null}
                       onDeleted={handleDeleted}
                       onUpdated={handleUpdated}
                     />

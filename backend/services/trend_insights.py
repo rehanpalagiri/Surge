@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 
 from google import genai
 from google.genai import types
+from services.gemini import _GRADING_SYSTEM_INSTRUCTION
+from services.telemetry import tracked_generate_content
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -136,10 +138,15 @@ WHAT TO FLAG RIGHT NOW:
 - "FLAG NEGATIVE: if the creator uses [specific pattern] — this approach dominated 60+ days ago but is underrepresented in recent top performers"
 Only write flags grounded in the data above. Do not invent flags from general knowledge. Target 250 words."""
 
-    response = await client.aio.models.generate_content(
+    response = await tracked_generate_content(
+        client,
+        operation="legacy_trend_insight",
         model="gemini-2.5-flash",
         contents=[prompt],
-        config=types.GenerateContentConfig(response_mime_type="text/plain"),
+        config=types.GenerateContentConfig(
+            response_mime_type="text/plain",
+            system_instruction=_GRADING_SYSTEM_INSTRUCTION,
+        ),
     )
 
     text = (response.text or "").strip()

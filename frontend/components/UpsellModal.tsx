@@ -16,13 +16,13 @@ export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm motion-enter"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-md rounded-2xl p-[1.5px] gradient-btn"
+        className="relative w-full max-w-md rounded-2xl p-[1.5px] gradient-btn motion-pop"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="rounded-2xl bg-card p-7 text-center">
@@ -36,12 +36,11 @@ export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
           </button>
 
           <h2 className="text-2xl font-extrabold text-text-primary mb-3">
-            Your prediction is just the start 🚀
+            Your craft review is just the start 🚀
           </h2>
           <p className="text-text-muted leading-relaxed mb-6">
-            Sign up free to unlock personalized suggestions to actually improve
-            this video — exactly what to fix, rewritten hooks &amp; captions, and
-            your projected views if you apply them.
+            Sign up free to unlock timestamped craft observations, editing hypotheses,
+            hook and caption alternatives, and one clearly defined experiment to test next.
           </p>
 
           <div className="flex flex-col gap-3">
@@ -50,7 +49,7 @@ export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
               onClick={() => track("upsell_cta_clicked", { analysis_id: analysisId })}
               className="gradient-btn text-white font-bold py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
-              Get my improvement plan
+              Get my full craft review
             </Link>
             <button
               onClick={onClose}

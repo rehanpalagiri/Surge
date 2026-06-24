@@ -44,8 +44,8 @@ export default function Image() {
             lineHeight: 1.5,
           }}
         >
-          I got my video scored by Surge AI — hook strength, pacing, audio,
-          captions, and a full improvement plan.
+          I reviewed my video with Surge AI — hook, pacing, audio, and a
+          focused next experiment.
         </div>
 
         <div
@@ -60,7 +60,7 @@ export default function Image() {
             marginTop: 8,
           }}
         >
-          See your score free →
+          Review your video →
         </div>
       </div>
     ),

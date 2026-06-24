@@ -36,15 +36,13 @@ export interface AnalysisOut {
   caption: string | null;
   bio: string | null;
   scores_json: {
-    overall_score: number;
+    overall_score?: number; // legacy analyses only; never shown as a performance metric
     hook_velocity: number;
     cut_frequency: number;
     text_scannability: number;
     curiosity_gap: number;
     audio_visual_sync: number;
     loop_seamlessness: number;
-    predicted_views: string;
-    predicted_likes?: string;
     strengths: string[];
     improvements: string[];
     verdict: string;
@@ -52,11 +50,11 @@ export interface AnalysisOut {
     improvement_plan?: ImprovementItem[];
     caption_rewrite?: string;
     hook_rewrite?: string;
-    projected_verdict?: string;
-    projected_views?: string;
-    projected_likes?: string;
     first_improvement?: ImprovementItem | null;
     emotional_analysis?: EmotionalAnalysis;
+    recommended_experiment?: RecommendedExperiment;
+    craft_review_version?: number;
+    evidence_notice?: string;
     locked?: boolean;
     error?: string;
   };
@@ -76,8 +74,6 @@ export interface AnalysisSummary {
   platform: string;
   niche: string;
   verdict: string;
-  overall_score: number | null;
-  predicted_views: string | null;
   caption_preview: string | null;
   actual_views: number | null;
   actual_likes: number | null;
@@ -120,6 +116,31 @@ export interface ImprovementItem {
   fix: string;
   pattern?: string;  // technique name, e.g. "cold open", "text-first frame"
   example?: string;  // legacy field — present on older analyses only
+}
+
+export interface RecommendedExperiment {
+  change: string;
+  keep_constant: string;
+  observe: string;
+}
+
+export interface OutcomeSnapshot {
+  id: number;
+  analysis_id: number;
+  platform: string;
+  source: string;
+  observed_at: string;
+  posted_at?: string | null;
+  post_age_hours?: number | null;
+  horizon?: "24h" | "7d" | "30d" | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  saves?: number | null;
+  creator_followers?: number | null;
+  metric_version: string;
+  integrity_flags_json?: string | null;
 }
 
 export interface SeedVideoOut {
@@ -287,6 +308,16 @@ export async function getMyAnalyses(
   return handleResponse<AnalysisSummary[]>(res);
 }
 
+export async function getOutcomeSnapshots(
+  id: string | number,
+  token?: string | null,
+): Promise<OutcomeSnapshot[]> {
+  const res = await fetch(`${BASE}/api/analyses/${id}/outcomes`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse<OutcomeSnapshot[]>(res);
+}
+
 export async function claimAnalysis(
   id: string | number,
   token?: string | null
@@ -301,7 +332,8 @@ export async function claimAnalysis(
 export async function submitFeedback(
   id: string | number,
   actualViews: number | undefined,
-  actualLikes?: number
+  actualLikes?: number,
+  postAgeHours?: number
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/feedback`, {
     method: "PATCH",
@@ -309,6 +341,7 @@ export async function submitFeedback(
     body: JSON.stringify({
       ...(actualViews !== undefined ? { actual_views: actualViews } : {}),
       ...(actualLikes !== undefined ? { actual_likes: actualLikes } : {}),
+      ...(postAgeHours !== undefined ? { post_age_hours: postAgeHours } : {}),
     }),
   });
   return handleResponse<AnalysisOut>(res);
@@ -321,12 +354,16 @@ export async function submitFeedback(
  */
 export async function linkTikTokVideo(
   id: string | number,
-  url?: string
+  url?: string,
+  postAgeHours?: number
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/video-link`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ url: url ?? null }),
+    body: JSON.stringify({
+      url: url ?? null,
+      post_age_hours: postAgeHours ?? null,
+    }),
   });
   return handleResponse<AnalysisOut>(res);
 }

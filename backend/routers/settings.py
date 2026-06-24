@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete
 
 from database import get_db
-from models import User, UserProfile, UserAnalysis, PasswordResetToken
+from models import (
+    AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot, PasswordResetToken,
+    UsageEvent, User, UserAnalysis, UserProfile,
+)
 from schemas import ConsentIn
 from auth import require_user, hash_password, verify_password, is_minor
 
@@ -83,7 +86,7 @@ async def update_consent(
     if is_minor(user):
         raise HTTPException(
             status_code=403,
-            detail="Accounts under 18 are automatically excluded from platform benchmarks.",
+            detail="Accounts under 18 are automatically excluded from measurement research.",
         )
     if body.seed_consent not in ("yes", "no", "ask"):
         raise HTTPException(status_code=400, detail="Invalid consent value.")
@@ -105,12 +108,16 @@ async def delete_account(
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect password.")
 
-    # Delete in FK order; unlink analyses (keep anonymised data) then remove user.
+    # Delete in FK order. Account deletion removes analyses and their measurement
+    # artifacts; it does not silently retain them as anonymous research data.
+    analysis_ids = select(UserAnalysis.id).where(UserAnalysis.user_id == user.id)
     await db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    await db.execute(delete(UsageEvent).where(UsageEvent.analysis_id.in_(analysis_ids)))
+    await db.execute(delete(OutcomeCollectionJob).where(OutcomeCollectionJob.analysis_id.in_(analysis_ids)))
+    await db.execute(delete(OutcomeSnapshot).where(OutcomeSnapshot.analysis_id.in_(analysis_ids)))
+    await db.execute(delete(AnalysisArtifact).where(AnalysisArtifact.analysis_id.in_(analysis_ids)))
     await db.execute(delete(UserProfile).where(UserProfile.user_id == user.id))
-    await db.execute(
-        update(UserAnalysis).where(UserAnalysis.user_id == user.id).values(user_id=None)
-    )
+    await db.execute(delete(UserAnalysis).where(UserAnalysis.user_id == user.id))
     await db.delete(user)
     await db.commit()
     return {"ok": True}

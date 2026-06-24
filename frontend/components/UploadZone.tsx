@@ -3,11 +3,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { UploadCloud, CheckCircle2, Loader2 } from "lucide-react";
+import { UploadCloud, CheckCircle2 } from "lucide-react";
 import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUploadUrl, uploadFileToR2, analyzeFromR2, getAnalysisStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
+import { useFakeProgress } from "@/lib/useFakeProgress";
 import { track } from "@vercel/analytics";
+import { ReportSkeleton } from "@/components/Skeleton";
 import NichePicker from "@/components/NichePicker";
 
 
@@ -17,8 +19,8 @@ const TIPS = [
   "Reviewing pacing and cuts...",
   "Evaluating audio quality...",
   "Scanning caption effectiveness...",
-  "Comparing to viral benchmarks...",
-  "Generating your performance score...",
+  "Comparing observable craft patterns...",
+  "Generating your craft assessment...",
 ];
 
 const MAX_DURATION_SECS = 10 * 60;          // 10 minutes
@@ -176,6 +178,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   // Upload state
   const [uploadPhase, setUploadPhase] = useState<"idle" | "uploading" | "analyzing">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const analysisProgress = useFakeProgress(uploadPhase === "analyzing");
 
   useEffect(() => {
     const authed = !!getToken();
@@ -262,6 +265,15 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   }
 
   const handleFile = (f: File) => processFile(f);
+
+  const openFilePicker = () => inputRef.current?.click();
+
+  const handleFilePickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openFilePicker();
+    }
+  };
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -364,48 +376,64 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
     <>
       {/* ── Analysis loading overlay ── */}
       {loading && (
-        <div className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-sm flex flex-col items-center justify-center gap-6 px-4">
+        <div
+          className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
+          role="dialog"
+          aria-modal="true"
+          aria-busy="true"
+          aria-label={uploadPhase === "uploading" ? "Uploading your video" : "Preparing your craft review"}
+        >
+          <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
           {uploadPhase === "uploading" ? (
             <>
-              <div className="w-20 h-20 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
-              <div className="text-center">
+              <div className="text-4xl">📤</div>
+              <div className="text-center space-y-1">
                 <p className="text-xl font-bold text-white">Uploading your video...</p>
-                <p className="text-zinc-400 text-sm mt-1">Going straight to the cloud — no server in the way</p>
+                <p className="text-zinc-500 text-sm">Going straight to the cloud — no server in the way</p>
               </div>
-              <div className="w-full max-w-xs">
-                <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
-                  <span>Uploading</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full max-w-xs space-y-2.5">
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-purple-500 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
+                <p className="text-zinc-400 text-sm text-center">{uploadProgress}% uploaded</p>
               </div>
             </>
           ) : (
             <>
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center text-2xl">🎬</div>
-              </div>
-              <div className="text-center">
-                <p className="text-xl font-bold text-white animate-pulse">
+              <div className="text-4xl">🎬</div>
+              <div className="text-center space-y-1">
+                <p className="text-xl font-bold text-white">
                   {waking ? "Waking up the server…" : "Surge is analyzing your video..."}
                 </p>
-                <p className="text-zinc-400 text-sm mt-1">
+                <p className="text-zinc-500 text-sm">
                   {waking
-                    ? "First request after a quiet period can take up to 20 seconds — hang tight"
-                    : "Analyzing your hook, pacing, structure, and content quality..."}
+                    ? "First request after a quiet period can take up to 20 seconds"
+                    : "Hang tight while the video is processed and reviewed"}
                 </p>
               </div>
-              <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-6 py-3 text-zinc-400 text-sm animate-pulse">
-                {waking ? "Connecting to Surge's analysis engine…" : TIPS[tipIndex]}
+              <div className="w-full max-w-xs space-y-2.5">
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full"
+                    style={{
+                      width: `${waking ? 5 : analysisProgress}%`,
+                      transition: "width 600ms cubic-bezier(0.25, 1, 0.5, 1)",
+                    }}
+                  />
+                </div>
+                <p className="text-zinc-400 text-sm text-center animate-pulse">
+                  {waking ? "Connecting to Surge's analysis engine…" : TIPS[tipIndex]}
+                </p>
               </div>
             </>
           )}
+          <div className="w-full pt-2">
+            <ReportSkeleton compact />
+          </div>
+          </div>
         </div>
       )}
 
@@ -416,7 +444,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
           <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-xl px-4 py-3">
             <span className="text-purple-400 text-sm">🔄</span>
             <p className="text-purple-300 text-sm font-medium">
-              Re-analyzing project — upload a new version to compare scores
+              Reviewing a new version — compare the same craft dimensions
             </p>
           </div>
         )}
@@ -424,22 +452,19 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         {/* ── Upload / Compression Zone ── */}
         {compressing ? (
           <div className="rounded-2xl border-2 border-purple-500 bg-purple-500/5 p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
-            <Loader2 className="w-10 h-10 text-purple-400 animate-spin" strokeWidth={1.5} />
+            <div className="text-3xl">⚙️</div>
             <div className="space-y-1">
-              <p className="text-white font-semibold text-sm">{compressPhase}</p>
+              <p className="text-white font-semibold text-sm">Compressing your video...</p>
               <p className="text-zinc-500 text-xs">This may take 30–90 seconds — please keep this tab open</p>
             </div>
-            <div className="w-full max-w-xs">
-              <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
-                <span>Compressing</span>
-                <span>{compressProgress}%</span>
-              </div>
+            <div className="w-full max-w-xs space-y-2.5">
               <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-purple-500 rounded-full transition-all duration-300"
                   style={{ width: `${compressProgress}%` }}
                 />
               </div>
+              <p className="text-zinc-400 text-xs text-center">{compressPhase}</p>
             </div>
           </div>
         ) : (
@@ -447,7 +472,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            onClick={() => inputRef.current?.click()}
+            onClick={openFilePicker}
+            onKeyDown={handleFilePickerKeyDown}
+            role="button"
+            tabIndex={0}
+            aria-label={file ? `Change selected video: ${file.name}` : "Choose a video to analyze"}
             className={`cursor-pointer rounded-2xl border-2 transition-all duration-200
               p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-3 text-center
               ${dragging
@@ -462,7 +491,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
               type="file"
               accept="video/*"
               className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              onChange={(e) => {
+                const selected = e.currentTarget.files?.[0];
+                e.currentTarget.value = "";
+                if (selected) void handleFile(selected);
+              }}
             />
             {file ? (
               <>

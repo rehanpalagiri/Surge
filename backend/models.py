@@ -125,35 +125,27 @@ class UserAnalysis(Base):
     platform = Column(String, nullable=True, default="tiktok")  # "tiktok" | "instagram"
     filename = Column(String, nullable=False)
     niche = Column(String, nullable=False)  # the user's own words (display, shown in My Projects)
-    # The canonical niche the classifier resolved (or "Uncategorized"). Drives all
-    # niche-keyed lookups so they don't fragment on free-text — notably calibration
-    # grouping/loading, which both key on the canonical label. Nullable for pre-existing rows.
+    # The canonical niche the classifier resolved (or "Uncategorized"). It provides
+    # craft context without exposing the prompt to arbitrary free-text labels.
     canonical_niche = Column(String, nullable=True)
     caption = Column(Text, nullable=True)
     bio = Column(Text, nullable=True)
     scores_json = Column(Text, nullable=False)
     correction_json = Column(Text, nullable=True)
-    # Build #3: the calibration version that nudged this prediction. 0 = no nudge applied
-    # (the safe default). audit_prediction copies this into the correction as
-    # audited_calibration_version so the next calibration generation can exclude
-    # already-nudged predictions (no runaway self-reinforcement).
+    # Legacy calibration compatibility. New craft reviews always store 0.
     calibration_version = Column(Integer, nullable=True, default=0)
     verdict = Column(String, nullable=False)
     actual_views = Column(Integer, nullable=True)
     actual_likes = Column(Integer, nullable=True)
-    # Link to the user's posted TikTok video (v1.19). When set, actual_views /
-    # actual_likes were auto-fetched from the platform and can be refreshed.
+    # Link plus latest-count cache for list views. Immutable observations live in
+    # outcome_snapshots and are the only source for maturity-window comparisons.
     video_url = Column(String, nullable=True)
     counts_fetched_at = Column(DateTime, nullable=True)
-    # Set once this analysis's verified video has been auto-promoted into the seed
-    # library (v1.20). Idempotency guard — a non-NULL value means "already a seed".
+    # Legacy seed-promotion fields. New craft reviews are never promoted into the
+    # live evaluator and outcomes never calibrate its response.
     promoted_seed_id = Column(Integer, nullable=True)
-    # v1.24: the owner's seed_consent was "ask" when this verified link came in —
-    # promotion is parked until they answer the consent banner on the results page.
     pending_seed_consent = Column(Boolean, nullable=True, default=False)
-    # The EFFECTIVE mode that actually ran ("quick" | "thinking" | "deep_thinking").
-    # May differ from what the user requested if the run degraded (e.g. Deep with
-    # no channel profile → Thinking). The results badge reads this.
+    # New rows use "craft_review". Historical quick/thinking/deep values remain readable.
     mode = Column(String, nullable=True, default="quick")
     # Async analysis lifecycle: "pending" → "processing" → "complete" | "error".
     # Defaults to "complete" so all pre-existing rows are treated as finished.
@@ -161,6 +153,99 @@ class UserAnalysis(Base):
     # Re-analysis lineage: points to the analysis this one was created to improve.
     # NULL = original upload; non-NULL = user clicked "Re-analyze" on an old result.
     parent_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AnalysisArtifact(Base):
+    """Stable dataset identity for an analyzed upload.
+
+    Exact hashes are populated now; perceptual/audio fingerprints are reserved for
+    the near-duplicate detector so future dataset splits can keep related assets
+    together without changing the analysis table again.
+    """
+
+    __tablename__ = "analysis_artifacts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    analysis_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=False, unique=True)
+    content_sha256 = Column(String, nullable=True, index=True)
+    platform_post_id = Column(String, nullable=True, index=True)
+    creator_key = Column(String, nullable=True, index=True)
+    perceptual_hash = Column(String, nullable=True, index=True)
+    audio_fingerprint = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OutcomeSnapshot(Base):
+    """Immutable observation of a posted video's public metrics.
+
+    `horizon` is set only when post age can be calculated and the observation is
+    close enough to a supported maturity window. Raw snapshots remain useful even
+    when they miss a target window, but must not be mixed across ages in evaluation.
+    """
+
+    __tablename__ = "outcome_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    analysis_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=False, index=True)
+    platform = Column(String, nullable=False)
+    source = Column(String, nullable=False)
+    observed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    posted_at = Column(DateTime, nullable=True)
+    post_age_hours = Column(Integer, nullable=True)
+    horizon = Column(String, nullable=True, index=True)  # "24h" | "7d" | "30d" | NULL
+    views = Column(Integer, nullable=True)
+    likes = Column(Integer, nullable=True)
+    comments = Column(Integer, nullable=True)
+    shares = Column(Integer, nullable=True)
+    saves = Column(Integer, nullable=True)
+    creator_followers = Column(Integer, nullable=True)
+    metric_version = Column(String, nullable=False, default="observed_response_v1")
+    provider_payload_hash = Column(String, nullable=True)
+    integrity_flags_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class OutcomeCollectionJob(Base):
+    """Durable request for one fixed-maturity public-metric observation."""
+
+    __tablename__ = "outcome_collection_jobs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    analysis_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=False, index=True)
+    horizon = Column(String, nullable=False)  # "24h" | "7d" | "30d"
+    due_at = Column(DateTime, nullable=False, index=True)
+    tolerance_hours = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, default="pending", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("analysis_id", "horizon", name="uq_analysis_outcome_horizon"),
+    )
+
+
+class UsageEvent(Base):
+    """Provider/model usage ledger for latency, unit economics, and reliability."""
+
+    __tablename__ = "usage_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    analysis_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=True, index=True)
+    operation = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False, index=True)
+    model = Column(String, nullable=True)
+    success = Column(Boolean, nullable=False)
+    latency_ms = Column(Integer, nullable=False)
+    input_bytes = Column(Integer, nullable=True)
+    output_bytes = Column(Integer, nullable=True)
+    input_tokens = Column(Integer, nullable=True)
+    output_tokens = Column(Integer, nullable=True)
+    estimated_cost_micros = Column(Integer, nullable=True)
+    error_code = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

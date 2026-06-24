@@ -1,11 +1,10 @@
 interface VerdictBannerProps {
   verdict: string;
-  overallScore: number;
 }
 
-export default function VerdictBanner({ verdict, overallScore }: VerdictBannerProps) {
-  const isHigh = verdict === "High potential";
-  const isAvg  = verdict === "Average potential";
+export default function VerdictBanner({ verdict }: VerdictBannerProps) {
+  const isHigh = verdict === "Strong craft" || verdict === "High potential";
+  const isAvg = verdict === "Developing craft" || verdict === "Average potential";
 
   const bgClass = isHigh
     ? "from-green-900/60 to-green-800/40 border-success/30"
@@ -20,9 +19,7 @@ export default function VerdictBanner({ verdict, overallScore }: VerdictBannerPr
     <div className={`w-full rounded-2xl border bg-gradient-to-br ${bgClass} p-6 md:p-8 text-center`}>
       <div className="text-5xl mb-3">{icon}</div>
       <h1 className={`text-3xl md:text-4xl font-bold mb-2 ${textClass}`}>{verdict}</h1>
-      {overallScore > 0 && (
-        <p className={`text-2xl font-semibold ${textClass}`}>{overallScore}/10</p>
-      )}
+      <p className="text-text-muted text-sm">AI-assessed observable craft—not a performance forecast</p>
     </div>
   );
 }

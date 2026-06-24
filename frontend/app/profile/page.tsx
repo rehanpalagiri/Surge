@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { getProfile, upsertProfile, UserProfileIn } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { ProfileSkeleton } from "@/components/Skeleton";
 
 const NICHE_SUGGESTIONS = [
   "Fitness", "Comedy", "Food", "Beauty", "Gaming",
@@ -136,9 +137,9 @@ export default function ProfilePage() {
         </div>
 
         {loading ? (
-          <div className="text-text-muted text-sm">Loading profiles…</div>
+          <ProfileSkeleton />
         ) : (
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-5 motion-enter">
             <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
               {meta.icon} {meta.label} Profile
             </h2>
@@ -235,8 +236,10 @@ export default function ProfilePage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
+                aria-busy={saving}
                 className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl disabled:opacity-50"
               >
+                {saving && <span className="pending-spinner mr-2 align-[-0.1em]" aria-hidden="true" />}
                 {saving ? "Saving…" : `Save ${meta.label} Profile`}
               </button>
               {saved && (

@@ -10,9 +10,10 @@ import { Analytics } from "@vercel/analytics/next";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Surge — AI Video Performance Predictor",
+  metadataBase: new URL("https://surge-chi-khaki.vercel.app"),
+  title: "Surge — AI Video Craft Review",
   description:
-    "Find out if your TikTok or Instagram Reel will go viral before you post it.",
+    "Get an AI-assisted craft review of your TikTok or Instagram Reel before you post it.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -23,18 +24,18 @@ export const metadata: Metadata = {
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
-    title: "Surge — Will your video go viral?",
+    title: "Surge — Review your video before you post",
     description:
-      "Upload your TikTok or Instagram Reel and get an AI breakdown in seconds — hook strength, pacing, audio, captions, trend alignment, and a full improvement plan.",
+      "Review observable video craft before posting, then track verified results at comparable post ages.",
     url: "https://surge-chi-khaki.vercel.app",
     siteName: "Surge",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Surge — Will your video go viral?",
+    title: "Surge — Review your video before you post",
     description:
-      "Upload your TikTok or Instagram Reel and get an AI breakdown in seconds — hook strength, pacing, audio, captions, trend alignment, and a full improvement plan.",
+      "Review observable video craft before posting, then track verified results at comparable post ages.",
   },
 };
 

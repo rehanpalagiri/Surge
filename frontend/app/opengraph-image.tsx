@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Surge — Will your video go viral?";
+export const alt = "Surge — AI-assisted video craft review";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -47,10 +47,10 @@ export default function Image() {
             lineHeight: 1.4,
           }}
         >
-          Will your video go viral? Find out before you post.
+          Review your video craft before you post.
         </div>
 
-        {/* Score pills */}
+        {/* Review pills */}
         <div
           style={{
             display: "flex",
@@ -58,7 +58,7 @@ export default function Image() {
             marginTop: 8,
           }}
         >
-          {["Hook", "Pacing", "Audio", "Captions", "Trend"].map((label) => (
+          {["Hook", "Pacing", "Audio", "Captions", "Experiment"].map((label) => (
             <div
               key={label}
               style={{

@@ -8,12 +8,15 @@ import VerdictBanner from "@/components/VerdictBanner";
 import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
-import { getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus, AnalysisOut } from "@/lib/api";
+import { ReportSkeleton } from "@/components/Skeleton";
+import {
+  getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus,
+  getOutcomeSnapshots, AnalysisOut, OutcomeSnapshot,
+} from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { track } from "@vercel/analytics";
 
 const SCORE_DIMENSIONS = [
-  { key: "overall_score",      label: "Overall Score" },
   { key: "hook_velocity",      label: "Hook Velocity" },
   { key: "cut_frequency",      label: "Cut Frequency" },
   { key: "text_scannability",  label: "Text Scannability" },
@@ -31,7 +34,7 @@ function ScoreComparison({ current, parent }: { current: AnalysisOut; parent: An
   return (
     <div className="bg-card border border-border rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-text-primary font-semibold text-lg">Score Comparison</h2>
+        <h2 className="text-text-primary font-semibold text-lg">Craft Comparison</h2>
         <Link
           href={`/results/${parent.id}`}
           className="text-text-muted text-xs hover:text-text-primary underline"
@@ -83,6 +86,60 @@ function ScoreComparison({ current, parent }: { current: AnalysisOut; parent: An
   );
 }
 
+function OutcomeTimeline({ snapshots }: { snapshots: OutcomeSnapshot[] }) {
+  const latestByHorizon = new Map<string, OutcomeSnapshot>();
+  for (const row of snapshots) {
+    if (row.horizon) latestByHorizon.set(row.horizon, row);
+  }
+  const horizons = ["24h", "7d", "30d"] as const;
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <div>
+        <h2 className="text-text-primary font-semibold text-lg">Observed Results</h2>
+        <p className="text-text-muted text-sm mt-1">
+          Public metrics are comparable only at the same post age. They do not prove which edit caused the result.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {horizons.map((horizon) => {
+          const row = latestByHorizon.get(horizon);
+          const likeRate = row?.views && row.likes != null ? (row.likes / row.views) * 100 : null;
+          let flags: string[] = [];
+          try {
+            const parsed = JSON.parse(row?.integrity_flags_json || "[]");
+            if (Array.isArray(parsed)) flags = parsed.filter((flag: unknown): flag is string => typeof flag === "string");
+          } catch {
+            flags = ["integrity_flags_unreadable"];
+          }
+          return (
+            <div key={horizon} className="bg-surface border border-border rounded-xl p-4">
+              <p className="text-text-muted text-xs uppercase tracking-wider">{horizon} snapshot</p>
+              {row ? (
+                <div className="mt-2 space-y-1 text-sm">
+                  {row.views != null && <p className="text-text-primary">{row.views.toLocaleString()} views</p>}
+                  {row.likes != null && <p className="text-text-primary">{row.likes.toLocaleString()} likes</p>}
+                  {likeRate != null && <p className="text-purple-to">{likeRate.toFixed(2)}% observed like rate</p>}
+                  {row.source === "manual_unverified" && <p className="text-warning text-xs">Manually entered · unverified</p>}
+                  {flags.includes("third_party_metrics") && <p className="text-text-muted text-xs">Third-party public count</p>}
+                  {(flags.includes("paid_status_unknown") || flags.includes("automated_activity_unknown")) && (
+                    <p className="text-warning text-xs">Paid or automated activity unknown</p>
+                  )}
+                  {flags.includes("user_asserted_post_age") && <p className="text-text-muted text-xs">Post age supplied by you</p>}
+                </div>
+              ) : (
+                <p className="text-text-muted text-sm mt-2">No on-time snapshot yet</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {snapshots.length > 0 && snapshots.every((row) => !row.horizon) && (
+        <p className="text-warning text-xs">Metrics were captured, but not close enough to a supported maturity window for comparison.</p>
+      )}
+    </div>
+  );
+}
+
 
 function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
   const [dismissed, setDismissed] = useState(false);
@@ -103,8 +160,8 @@ function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
       <div>
         <p className="text-text-primary font-semibold">🎯 Help other creators?</p>
         <p className="text-text-muted text-sm mt-1">
-          Your post got {views} — Surge could use these stats as a benchmark to help
-          score other creators&apos; videos. Your video is never stored.
+          Your post got {views}. With your permission, Surge can retain the public metrics
+          as research data. They are not treated as proof that a specific edit caused the result.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -159,6 +216,7 @@ export default function ResultsPage() {
   const [status, setStatus] = useState<"loading" | "ok" | "notfound" | "timeout">("loading");
   const [loadingText, setLoadingText] = useState("Loading your results…");
   const [showUpsell, setShowUpsell] = useState(false);
+  const [snapshots, setSnapshots] = useState<OutcomeSnapshot[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,13 +228,13 @@ export default function ResultsPage() {
       // If scores are absent, the analysis is still processing — poll until done.
       const isPending = (scores: AnalysisOut["scores_json"]) =>
         Object.keys(scores).length === 0 ||
-        (scores.overall_score == null && !scores.error && !scores.locked);
+        (scores.hook_velocity == null && !scores.error && !scores.locked);
 
       if (isPending(a.scores_json)) {
         if (!cancelled) setLoadingText("Still analyzing your video — this can take up to 60 seconds…");
 
         let timedOut = true;
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 20; i++) {
           await new Promise((r) => setTimeout(r, 3000));
           if (cancelled) return;
 
@@ -209,6 +267,9 @@ export default function ResultsPage() {
       if (!cancelled) {
         setAnalysis(a);
         setStatus("ok");
+        if (token && !a.scores_json.locked) {
+          getOutcomeSnapshots(a.id, token).then(setSnapshots).catch(() => {});
+        }
         // Fetch the parent analysis for score comparison (best-effort, no error shown).
         if (a.parent_id && token) {
           getAnalysis(a.parent_id, token).then(setParentAnalysis).catch(() => {});
@@ -243,8 +304,17 @@ export default function ResultsPage() {
     return (
       <main className="min-h-screen bg-background">
         <Nav />
-        <div className="max-w-3xl mx-auto px-4 py-16 text-center text-text-muted">
-          {loadingText}
+        <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+          <div className="rounded-2xl border border-purple-to/20 bg-purple-from/5 px-5 py-4" role="status">
+            <div className="flex items-center gap-3">
+              <span className="pending-spinner shrink-0 text-purple-to" aria-hidden="true" />
+              <div>
+                <p className="text-text-primary text-sm font-semibold">Preparing your craft review</p>
+                <p className="text-text-muted text-sm mt-0.5">{loadingText}</p>
+              </div>
+            </div>
+          </div>
+          <ReportSkeleton />
         </div>
       </main>
     );
@@ -277,7 +347,6 @@ export default function ResultsPage() {
   }
 
   const scores = [
-    { label: "Overall Score",       score: s.overall_score },
     { label: "Hook Velocity",       score: s.hook_velocity },
     { label: "Cut Frequency",       score: s.cut_frequency },
     { label: "Text Scannability",   score: s.text_scannability },
@@ -287,9 +356,10 @@ export default function ResultsPage() {
   ];
 
   const MODE_LABEL: Record<string, string> = {
-    quick: "Lite",
-    thinking: "Thinking",
-    deep_thinking: "Deep — Personalized",
+    quick: "Legacy craft review",
+    thinking: "Legacy contextual review",
+    deep_thinking: "Legacy personalized review",
+    craft_review: "Outcome-blind craft review",
   };
   const modeLabel = MODE_LABEL[analysis.mode ?? "quick"] ?? MODE_LABEL.quick;
 
@@ -317,36 +387,31 @@ export default function ResultsPage() {
         </div>
 
         {/* Verdict banner — always shown */}
-        <VerdictBanner verdict={analysis.verdict} overallScore={s.overall_score ?? 0} />
+        <VerdictBanner verdict={analysis.verdict} />
 
         {locked ? (
           /* ---------- FREE TIER (anonymous): locked teaser ---------- */
           <>
-            {/* Viral score callout */}
-            {s.overall_score != null && (
-              <div className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-1">
-                    Viral Score
-                  </p>
-                  <p className="text-text-primary text-4xl font-extrabold tabular-nums">
-                    {Math.round(s.overall_score * 10)}
-                    <span className="text-text-muted text-xl font-normal">/100</span>
-                  </p>
-                </div>
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-extrabold border-4 ${
-                    s.overall_score >= 7
-                      ? "border-success text-success bg-success/10"
-                      : s.overall_score >= 4
-                      ? "border-warning text-warning bg-warning/10"
-                      : "border-danger text-danger bg-danger/10"
-                  }`}
-                >
-                  {s.overall_score >= 7 ? "🔥" : s.overall_score >= 4 ? "⚡" : "⚠️"}
-                </div>
+            {/* Scores grid — visible to guests (numbers only, no critique) */}
+            <div className="bg-card border border-border rounded-2xl p-6">
+              <h2 className="text-text-primary font-semibold text-lg mb-5">
+                AI-Assessed Craft Dimensions
+              </h2>
+              <p className="text-text-muted text-xs -mt-3 mb-5">
+                Subjective assessments of observable execution. They are not retention, engagement, or performance measurements.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {scores.map((sc, i) => (
+                  <ScoreBar
+                    key={sc.label}
+                    label={sc.label}
+                    score={sc.score}
+                    animate={true}
+                    delay={i * 100}
+                  />
+                ))}
               </div>
-            )}
+            </div>
 
             {/* First improvement — visible teaser */}
             {s.first_improvement && (
@@ -374,12 +439,11 @@ export default function ResultsPage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-b from-background/30 to-background/95 text-center px-6 py-10">
                 <div className="text-3xl">🔒</div>
                 <p className="text-text-primary font-bold text-lg max-w-xs">
-                  Your video has {s.overall_score != null && s.overall_score < 5 ? "3" : "multiple"} critical flaws.
-                  Create an account to unlock your full analysis report and see the exact timestamps.
+                  See why each dimension scored that way, plus timestamped evidence and one experiment to test in your next version.
                 </p>
                 <Link
                   href={`/signup?next=/results/${analysis.id}`}
-                  onClick={() => track("signup_cta_clicked", { analysis_id: analysis.id, score: Math.round((s.overall_score ?? 0) * 10) })}
+                  onClick={() => track("signup_cta_clicked", { analysis_id: analysis.id })}
                   className="gradient-btn text-white font-bold px-8 py-3.5 rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform text-base"
                 >
                   Create free account
@@ -413,8 +477,11 @@ export default function ResultsPage() {
             {/* Scores grid */}
             <div className="bg-card border border-border rounded-2xl p-6">
               <h2 className="text-text-primary font-semibold text-lg mb-5">
-                Performance Scores
+                AI-Assessed Craft Dimensions
               </h2>
+              <p className="text-text-muted text-xs -mt-3 mb-5">
+                Subjective assessments of observable execution. They are not retention, engagement, or performance measurements.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {scores.map((sc, i) => (
                   <ScoreBar
@@ -427,6 +494,18 @@ export default function ResultsPage() {
                 ))}
               </div>
             </div>
+
+            <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-6">
+              <h3 className="text-text-primary font-semibold">Recommended experiment</h3>
+              <p className="text-text-muted text-xs mt-1 mb-4">A hypothesis for the next version—not a promised outcome.</p>
+              <div className="space-y-3 text-sm">
+                <p><span className="text-purple-to font-semibold">Change: </span><span className="text-text-primary">{s.recommended_experiment?.change ?? "Change one editing variable."}</span></p>
+                <p><span className="text-text-muted font-semibold">Keep constant: </span><span className="text-text-primary">{s.recommended_experiment?.keep_constant ?? "Keep the remaining major variables similar."}</span></p>
+                <p><span className="text-text-muted font-semibold">Observe: </span><span className="text-text-primary">{s.recommended_experiment?.observe ?? "Compare verified results at the same post age."}</span></p>
+              </div>
+            </div>
+
+            <OutcomeTimeline snapshots={snapshots} />
 
             {/* Score comparison vs previous version */}
             {parentAnalysis && !parentAnalysis.scores_json.locked && (
@@ -503,8 +582,7 @@ export default function ResultsPage() {
                     Get your full improvement plan →
                   </p>
                   <p className="text-text-muted text-sm">
-                    Prioritized fixes, hook &amp; caption rewrites, and your
-                    projected score.
+                    Prioritized editing hypotheses plus hook and caption rewrites.
                   </p>
                 </div>
                 <span className="text-2xl flex-shrink-0">🚀</span>
@@ -547,7 +625,14 @@ export default function ResultsPage() {
             )}
 
             {/* Feedback */}
-            <FeedbackModal analysisId={analysis.id} platform={analysis.platform} />
+            <FeedbackModal
+              analysisId={analysis.id}
+              platform={analysis.platform}
+              onSubmitted={async () => {
+                const token = getToken();
+                if (token) setSnapshots(await getOutcomeSnapshots(analysis.id, token));
+              }}
+            />
 
             {/* CTA */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pb-4">

@@ -34,8 +34,8 @@ export default function TermsPage() {
           <p>
             Surge is a tool that helps you analyze your own short-form video content
             before you post it. It is <span className="text-text-primary font-medium">not
-            a guarantee of viral performance</span> — predictions are estimates based
-            on patterns, not promises.
+            a prediction or guarantee of performance</span>. Its dimension assessments are
+            AI-assisted craft opinions and editing hypotheses, not measured retention or reach forecasts.
           </p>
         </Section>
 
@@ -47,10 +47,10 @@ export default function TermsPage() {
             post&apos;s public engagement metrics.
           </p>
           <p>
-            If you opt into the seed pool (available to users 18+ only), you grant
+            If you opt into measurement research (available to users 18+ only), you grant
             Surge a non-exclusive license to use your post&apos;s public engagement
-            data — never the video itself — as benchmark reference data for scoring
-            other creators&apos; videos. You can revoke this at any time in Settings.
+            data — never the video itself — for measurement research. Observed metrics
+            are not treated as proof that an edit caused an outcome. You can revoke this at any time in Settings.
           </p>
         </Section>
 
@@ -64,8 +64,8 @@ export default function TermsPage() {
 
         <Section title="No warranty">
           <p>
-            Surge is provided &quot;as is&quot;. Predictions, scores, and
-            recommendations are estimates for informational purposes and come with no
+            Surge is provided &quot;as is&quot;. Craft assessments, observed metrics, and
+            recommendations are informational and come with no
             warranty of accuracy or fitness for a particular purpose.
           </p>
         </Section>

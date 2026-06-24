@@ -6,6 +6,7 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import { getAnalysis, AnalysisOut, ImprovementItem } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { ImproveSkeleton } from "@/components/Skeleton";
 
 function scoreColor(score: number): string {
   if (score >= 7) return "text-success";
@@ -54,18 +55,18 @@ export default function ImprovePage() {
     };
   }, [id, router]);
 
-  if (status === "loading" || !analysis) {
+  if (status === "loading") {
     return (
       <main className="min-h-screen bg-background">
         <Nav />
-        <div className="max-w-3xl mx-auto px-4 py-16 text-center text-text-muted">
-          {status === "notfound" ? "Analysis not found." : "Loading…"}
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <ImproveSkeleton />
         </div>
       </main>
     );
   }
 
-  if (status === "notfound") {
+  if (status === "notfound" || !analysis) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-4 text-center gap-6">
         <div className="text-5xl">😕</div>
@@ -103,7 +104,6 @@ export default function ImprovePage() {
     ? [...s.improvement_plan].sort((a, b) => a.priority - b.priority).slice(0, 3)
     : [];
   const hasPlan = plan.length > 0;
-  const hasProjection = !!s.projected_verdict;
 
   // Emotional impact. Gemini is told emotional_analysis is required, but the type marks it
   // optional and the model can omit/malform fields — so guard achieved_score (a missing or
@@ -124,31 +124,23 @@ export default function ImprovePage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-extrabold">
-            Your <span className="gradient-text">Improvement Plan</span>
+            Your <span className="gradient-text">Next Experiment</span>
           </h1>
           <p className="text-text-muted">
-            Current score{" "}
-            <span className={`font-bold ${scoreColor(s.overall_score)}`}>
-              {s.overall_score}/10
-            </span>{" "}
-            · Verdict{" "}
-            <span className="text-text-primary font-semibold">{s.verdict}</span>
+            Editing hypotheses based on observable craft—not a forecast or causal guarantee.
           </p>
         </div>
 
-        {/* Projected callout */}
-        {hasProjection && (
-          <div className="rounded-2xl p-[1px] gradient-btn">
-            <div className="rounded-2xl bg-card px-6 py-5 text-center">
-              <p className="text-text-muted text-sm uppercase tracking-widest font-semibold mb-1">
-                Apply this plan →
-              </p>
-              <p className="text-xl font-bold">
-                <span className="gradient-text">{s.projected_verdict}</span>
-              </p>
+        <div className="rounded-2xl p-[1px] gradient-btn">
+          <div className="rounded-2xl bg-card px-6 py-5 space-y-3">
+            <div>
+              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold">Change one variable</p>
+              <p className="text-text-primary font-semibold mt-1">{s.recommended_experiment?.change ?? "Change one clearly defined editing variable."}</p>
             </div>
+            <p className="text-text-muted text-sm"><span className="font-semibold">Keep constant:</span> {s.recommended_experiment?.keep_constant ?? "Keep the remaining major variables similar."}</p>
+            <p className="text-text-muted text-sm"><span className="font-semibold">Observe:</span> {s.recommended_experiment?.observe ?? "Compare verified results at the same post age."}</p>
           </div>
-        )}
+        </div>
 
         {/* Prioritized action list */}
         {hasPlan ? (

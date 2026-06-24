@@ -2,17 +2,17 @@ import os
 import json
 import uuid
 import hmac
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update, func
+from sqlalchemy import select, delete, update, func, case
 
 from database import get_db
-from models import SeedVideo, FetchStatus, NicheInsight, TrendSummary, CalibrationNote, UserAnalysis
+from models import SeedVideo, FetchStatus, NicheInsight, TrendSummary, CalibrationNote, UsageEvent, UserAnalysis
 from schemas import SeedVideoOut
 from services.seed_analysis import analyze_seed_video
 from services.seed_insights import generate_niche_insight
@@ -22,6 +22,8 @@ from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
 from services.instagram_harvest import harvest_instagram_all, get_last_instagram_harvest
 from services.trend_harvest import harvest_trending, get_last_trend_harvest
 from services.trend_insights import generate_trend_insight
+from services.outcome_collection import collect_due_outcomes, collection_status
+from services.economics import build_operations_report
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -33,6 +35,32 @@ def check_admin(x_admin_password: Optional[str] = Header(None)):
     expected = os.getenv("ADMIN_PASSWORD", "viraliq-admin")
     if not x_admin_password or not hmac.compare_digest(x_admin_password, expected):
         raise HTTPException(status_code=401, detail="Invalid or missing admin password")
+
+
+@router.post("/outcomes/collect-due")
+async def collect_due_outcome_jobs(
+    limit: int = 25,
+    _: None = Depends(check_admin),
+):
+    """Run due maturity jobs. Intended for a trusted external scheduler."""
+    return await collect_due_outcomes(limit)
+
+
+@router.get("/outcomes/status")
+async def get_outcome_collection_status(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    return await collection_status(db)
+
+
+@router.get("/operations/report")
+async def get_operations_report(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Measured reliability/economics inputs with explicit missing-cost coverage."""
+    return await build_operations_report(db)
 
 
 # ---------------------------------------------------------------------------
@@ -773,10 +801,41 @@ async def get_api_usage(
     )
     used = result.scalar() or 0
 
+    usage_rows = (await db.execute(
+        select(
+            UsageEvent.provider,
+            UsageEvent.operation,
+            func.count(UsageEvent.id),
+            func.sum(case((UsageEvent.success.is_(True), 1), else_=0)),
+            func.avg(UsageEvent.latency_ms),
+            func.sum(UsageEvent.input_tokens),
+            func.sum(UsageEvent.output_tokens),
+            func.sum(UsageEvent.estimated_cost_micros),
+        )
+        .where(UsageEvent.created_at >= now - timedelta(days=30))
+        .group_by(UsageEvent.provider, UsageEvent.operation)
+        .order_by(UsageEvent.provider, UsageEvent.operation)
+    )).all()
+
     return {
         "instagram": {
             "used": used,
             "limit": 20,
             "resets_at": resets_at.strftime("%Y-%m-%d"),
-        }
+        },
+        "metered_operations_30d": [
+            {
+                "provider": provider,
+                "operation": operation,
+                "calls": calls,
+                "successful_calls": successes or 0,
+                "average_latency_ms": round(avg_latency or 0),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "verified_cost_micros": verified_cost,
+            }
+            for provider, operation, calls, successes, avg_latency,
+            input_tokens, output_tokens, verified_cost in usage_rows
+        ],
+        "cost_status": "unknown_until_verified_pricing_is_configured",
     }

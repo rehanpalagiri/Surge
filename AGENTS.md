@@ -1,12 +1,12 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file mirrors `AGENTS.md`. Keep both synchronized when repository guidance changes.
+Guidance for Codex when working in this repository. Keep this file and `CLAUDE.md` synchronized and keep this file under 200 lines.
 
 ## General behavior
 
 - Reach 95% confidence before changing code. Ask focused follow-up questions only when repository context cannot resolve a material ambiguity.
 - Preserve unrelated local changes. Never deploy, push, or trigger Railway without explicit user instruction.
-- Update this file and `AGENTS.md` whenever architecture or product contracts change.
+- Update this file and `CLAUDE.md` whenever architecture or product contracts change.
 
 ## Product contract
 

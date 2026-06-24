@@ -2,25 +2,30 @@ import os
 import uuid
 import json
 from datetime import datetime, timedelta
-from statistics import median
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, delete, update
 
 from database import get_db, AsyncSessionLocal
-from models import SeedVideo, UserAnalysis, UserProfile, User, NicheInsight, TrendSummary, CalibrationNote
-from schemas import AnalysisOut, FeedbackIn, AnalysisSummaryOut, VideoLinkIn, SeedConsentDecisionIn
-from services.gemini import analyze_video, select_seed_examples
-from services.calibration import load_calibration_note
+from models import (
+    AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot, UsageEvent,
+    User, UserAnalysis, UserProfile,
+)
+from schemas import (
+    AnalysisOut, AnalysisSummaryOut, FeedbackIn, OutcomeSnapshotOut,
+    SeedConsentDecisionIn, VideoLinkIn,
+)
+from services.gemini import analyze_video
 from google.genai.errors import ClientError as _GeminiClientError
-from services.channel_profile import build_channel_profile
 from services.niche_classifier import classify_niche, _match_canonical
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
 from services.instagram_fetch import fetch_instagram_likes, is_instagram_url
-from services.seed_promote import promote_analysis_to_seed
-from services.seed_correction import audit_prediction
 from services.rate_limit import get_rate_limit
+from services.outcomes import (
+    add_outcome_snapshot, post_id_from_url, schedule_outcome_jobs, sha256_file,
+    upsert_artifact, utc_now_naive,
+)
 from services.throttle import check_rate
 from auth import optional_user, require_user, is_minor
 import services.r2 as r2
@@ -34,19 +39,12 @@ router = APIRouter(prefix="/api", tags=["analyze"])
 
 
 def resolve_mode(user, has_usable_seeds: bool, channel_profile) -> str:
-    """Auto-escalate to the best mode available — users never choose.
-    Guests always get Quick. Auth users get the best mode the data supports:
-      Deep  → needs a channel profile (>= 2 prior analyses)
-      Thinking → needs usable seed buckets
-      Quick → fallback when no enrichment data exists yet
+    """All new analyses use the same outcome-blind craft-review contract.
+
+    Historical mode values remain readable, but prior AI opinions and
+    likes/views-derived seed labels no longer change live craft assessments.
     """
-    if user is None:
-        return "quick"
-    if channel_profile:
-        return "deep_thinking"
-    if has_usable_seeds:
-        return "thinking"
-    return "quick"
+    return "craft_review"
 
 
 @router.post("/upload/presigned-url")
@@ -89,127 +87,20 @@ async def _run_r2_analysis(
         video_bytes = await r2.download(r2_key)
         with open(file_path, "wb") as fh:
             fh.write(video_bytes)
+        content_sha256 = sha256_file(file_path)
 
-        # Re-query context with a fresh session so we get up-to-date data.
-        async with AsyncSessionLocal() as db:
-            user = None
-            if user_id is not None:
-                user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-
-            high_seeds: list = []
-            low_seeds: list = []
-            niche_insight: str | None = None
-            trend_context: str | None = None
-            calibration_note: dict | None = None
-            if user:
-                from datetime import timezone
-                insight_row = (await db.execute(
-                    select(NicheInsight).where(
-                        NicheInsight.platform == platform,
-                        NicheInsight.niche == canonical_niche,
-                    )
-                )).scalar_one_or_none()
-                if insight_row and (insight_row.insight or "").strip():
-                    niche_insight = insight_row.insight
-                else:
-                    seeds = (await db.execute(select(SeedVideo).where(SeedVideo.platform == platform))).scalars().all()
-                    high_seeds, low_seeds = select_seed_examples(seeds, canonical_niche)
-
-                trend_row = (await db.execute(
-                    select(TrendSummary).where(
-                        TrendSummary.platform == platform,
-                        TrendSummary.niche == canonical_niche,
-                    )
-                )).scalar_one_or_none()
-                if trend_row and (trend_row.trend_text or "").strip():
-                    ref = trend_row.generated_at
-                    if ref.tzinfo is None:
-                        ref = ref.replace(tzinfo=timezone.utc)
-                    if ref >= datetime.now(timezone.utc) - timedelta(days=7):
-                        trend_context = trend_row.trend_text
-
-                # Build #3: calibration nudge (applied only in Thinking/Deep + when
-                # high-confidence — gemini.analyze_video makes the final call).
-                calibration_note = await load_calibration_note(db, platform, canonical_niche)
-
-            has_usable_seeds = bool(niche_insight or high_seeds or low_seeds)
-
-            channel_profile = None
-            if user:
-                hist = (await db.execute(
-                    select(UserAnalysis).where(
-                        UserAnalysis.user_id == user.id,
-                        UserAnalysis.platform == platform,
-                    )
-                )).scalars().all()
-                channel_profile = build_channel_profile(hist)
-
-            effective_mode = resolve_mode(user, has_usable_seeds, channel_profile)
-
-            creator_like_baseline: dict | None = None
-            if user:
-                past_likes = [
-                    r for r in (await db.execute(
-                        select(UserAnalysis.actual_likes).where(
-                            UserAnalysis.user_id == user.id,
-                            UserAnalysis.platform == platform,
-                            UserAnalysis.actual_likes.is_not(None),
-                        ).order_by(UserAnalysis.created_at.desc()).limit(10)
-                    )).scalars().all()
-                    if r is not None and r >= 0
-                ]
-                if len(past_likes) >= 2:
-                    med = int(median(past_likes))
-                    creator_like_baseline = {
-                        "median_likes": med,
-                        "sample_count": len(past_likes),
-                        "min_likes": min(past_likes),
-                        "max_likes": max(past_likes),
-                    }
-
-            profile_context = ""
-            if user and effective_mode in ("thinking", "deep_thinking"):
-                prof = (await db.execute(
-                    select(UserProfile).where(
-                        UserProfile.user_id == user.id,
-                        UserProfile.platform == platform,
-                    )
-                )).scalar_one_or_none()
-                if prof:
-                    parts = []
-                    if prof.display_name:
-                        parts.append(f"Creator name: {prof.display_name}")
-                    if prof.handle:
-                        parts.append(f"Handle: @{prof.handle.lstrip('@')}")
-                    if prof.niche:
-                        parts.append(f"Primary niche: {prof.niche}")
-                    if prof.bio:
-                        parts.append(f"Profile bio: {prof.bio}")
-                    if prof.target_audience:
-                        parts.append(f"Target audience: {prof.target_audience}")
-                    profile_context = "\n".join(parts)
-
-        seeds_high = high_seeds if effective_mode in ("thinking", "deep_thinking") else []
-        seeds_low = low_seeds if effective_mode in ("thinking", "deep_thinking") else []
-        profile_arg = channel_profile if effective_mode == "deep_thinking" else None
+        # The live review is deliberately blind to prior outcomes, seed labels,
+        # channel history, trends, and calibration notes.
+        effective_mode = "craft_review"
 
         result = await analyze_video(
             file_path,
             canonical_niche,
-            seeds_high,
-            seeds_low,
-            caption,
-            bio,
-            platform,
-            profile_context,
-            profile_arg,
-            effective_mode,
+            caption=caption,
+            platform=platform,
             niche_raw=raw_niche,
-            creator_like_baseline=creator_like_baseline,
-            niche_insight=niche_insight if effective_mode in ("thinking", "deep_thinking") else None,
-            trend_context=trend_context if effective_mode in ("thinking", "deep_thinking") else None,
-            calibration_note=calibration_note if effective_mode in ("thinking", "deep_thinking") else None,
             secondary_niche=secondary_niche or "",
+            analysis_id=analysis_id,
         )
 
         async with AsyncSessionLocal() as db:
@@ -217,12 +108,11 @@ async def _run_r2_analysis(
             if row:
                 result["niche_needs_confirmation"] = niche_needs_confirmation
                 row.scores_json = json.dumps(result)
-                row.verdict = result.get("verdict", "Needs work")
+                row.verdict = result.get("verdict", "Needs revision")
                 row.mode = effective_mode
                 row.status = "complete"
-                # Build #3: record which calibration version nudged this prediction
-                # (0 / absent = un-nudged) so audit_prediction can exclude it later.
-                row.calibration_version = int(result.get("calibration_version") or 0)
+                row.calibration_version = 0
+                await upsert_artifact(db, row.id, content_sha256=content_sha256)
                 await db.commit()
 
     except Exception as exc:
@@ -416,134 +306,20 @@ async def analyze(
         with open(file_path, "wb") as fh:
             fh.write(content)
 
-    # --- Niche intelligence + seed reference (auth users always get enrichment) ---
-    high_seeds: list = []
-    low_seeds: list = []
-    niche_insight: str | None = None
-    trend_context: str | None = None
-    calibration_note: dict | None = None
-    if user:
-        # Prefer the synthesized niche insight block; fall back to raw seed lists.
-        insight_result = await db.execute(
-            select(NicheInsight).where(
-                NicheInsight.platform == platform,
-                NicheInsight.niche == canonical_niche,
-            )
-        )
-        insight_row = insight_result.scalar_one_or_none()
-        if insight_row and (insight_row.insight or "").strip():
-            niche_insight = insight_row.insight
-        else:
-            seeds_result = await db.execute(
-                select(SeedVideo).where(SeedVideo.platform == platform)
-            )
-            seeds = seeds_result.scalars().all()
-            high_seeds, low_seeds = select_seed_examples(seeds, canonical_niche)
+    content_sha256 = sha256_file(file_path)
 
-        # Trend intelligence: inject if generated within the last 7 days.
-        from datetime import timezone
-        trend_result = await db.execute(
-            select(TrendSummary).where(
-                TrendSummary.platform == platform,
-                TrendSummary.niche == canonical_niche,
-            )
-        )
-        trend_row = trend_result.scalar_one_or_none()
-        if trend_row and (trend_row.trend_text or "").strip():
-            ref = trend_row.generated_at
-            if ref.tzinfo is None:
-                ref = ref.replace(tzinfo=timezone.utc)
-            if ref >= datetime.now(timezone.utc) - timedelta(days=7):
-                trend_context = trend_row.trend_text
-
-        # Build #3: calibration nudge (applied only in Thinking/Deep + when
-        # high-confidence — gemini.analyze_video makes the final call).
-        calibration_note = await load_calibration_note(db, platform, canonical_niche)
-
-    has_usable_seeds = bool(niche_insight or high_seeds or low_seeds)
-
-    # --- Creator channel profile (needs >= 2 prior analyses — always attempt for auth users) ---
-    channel_profile = None
-    if user:
-        hist_result = await db.execute(
-            select(UserAnalysis).where(
-                UserAnalysis.user_id == user.id,
-                UserAnalysis.platform == platform,
-            )
-        )
-        channel_profile = build_channel_profile(hist_result.scalars().all())
-
-    effective_mode = resolve_mode(user, has_usable_seeds, channel_profile)
-
-    # --- Per-creator like baseline (all modes — personalises the 1–10 calibration) ---
-    # Uses verified actual_likes from this user's past analyses on this platform.
-    # Needs >= 2 data points; falls back to generic calibration otherwise.
-    creator_like_baseline: dict | None = None
-    if user:
-        likes_result = await db.execute(
-            select(UserAnalysis.actual_likes).where(
-                UserAnalysis.user_id == user.id,
-                UserAnalysis.platform == platform,
-                UserAnalysis.actual_likes.is_not(None),
-            ).order_by(UserAnalysis.created_at.desc()).limit(10)
-        )
-        past_likes = [r for r in likes_result.scalars().all() if r is not None and r >= 0]
-        if len(past_likes) >= 2:
-            med = int(median(past_likes))
-            creator_like_baseline = {
-                "median_likes": med,
-                "sample_count": len(past_likes),
-                "min_likes": min(past_likes),
-                "max_likes": max(past_likes),
-            }
-
-    # Build saved-profile context (name/handle/niche/bio/audience). The prompt builder
-    # only injects it for Thinking/Deep, so Quick stays a pure video assessment.
-    profile_context = ""
-    if user and effective_mode in ("thinking", "deep_thinking"):
-        prof_result = await db.execute(
-            select(UserProfile).where(
-                UserProfile.user_id == user.id,
-                UserProfile.platform == platform,
-            )
-        )
-        prof = prof_result.scalar_one_or_none()
-        if prof:
-            parts = []
-            if prof.display_name:
-                parts.append(f"Creator name: {prof.display_name}")
-            if prof.handle:
-                parts.append(f"Handle: @{prof.handle.lstrip('@')}")
-            if prof.niche:
-                parts.append(f"Primary niche: {prof.niche}")
-            if prof.bio:
-                parts.append(f"Profile bio: {prof.bio}")
-            if prof.target_audience:
-                parts.append(f"Target audience: {prof.target_audience}")
-            profile_context = "\n".join(parts)
-
-    # Scope the heavy context to the effective mode.
-    seeds_high = high_seeds if effective_mode in ("thinking", "deep_thinking") else []
-    seeds_low = low_seeds if effective_mode in ("thinking", "deep_thinking") else []
-    profile_arg = channel_profile if effective_mode == "deep_thinking" else None
+    # New reviews are intentionally blind to seed outcomes, creator history,
+    # trends, and calibration data. Those legacy sources would confound a craft
+    # critique with public performance.
+    effective_mode = "craft_review"
 
     try:
         result = await analyze_video(
             file_path,
             canonical_niche,
-            seeds_high,
-            seeds_low,
-            caption,
-            bio,
-            platform,
-            profile_context,
-            profile_arg,
-            effective_mode,
+            caption=caption,
+            platform=platform,
             niche_raw=raw_niche,
-            creator_like_baseline=creator_like_baseline,
-            niche_insight=niche_insight if effective_mode in ("thinking", "deep_thinking") else None,
-            trend_context=trend_context if effective_mode in ("thinking", "deep_thinking") else None,
-            calibration_note=calibration_note if effective_mode in ("thinking", "deep_thinking") else None,
             secondary_niche=secondary_niche or "",
         )
     except _GeminiClientError as e:
@@ -569,19 +345,20 @@ async def analyze(
         platform=platform,
         filename=safe_name,
         niche=raw_niche,  # the user's own words — shown in My Projects
-        canonical_niche=canonical_niche,  # classifier label — calibration keys on this
+        canonical_niche=canonical_niche,
         caption=caption or None,
         bio=bio or None,
         scores_json=json.dumps(result),
-        verdict=result.get("verdict", "Needs work"),
+        verdict=result.get("verdict", "Needs revision"),
         mode=effective_mode,
-        # Build #3: 0 / absent = un-nudged (the safe default).
-        calibration_version=int(result.get("calibration_version") or 0),
+        calibration_version=0,
         parent_id=resolved_parent_id,
     )
     db.add(analysis)
     await db.commit()
     await db.refresh(analysis)
+    await upsert_artifact(db, analysis.id, content_sha256=content_sha256)
+    await db.commit()
 
     return _to_out(analysis)
 
@@ -616,6 +393,26 @@ async def my_rate_limit(
     return await get_rate_limit(user.id, db)
 
 
+@router.get("/analyses/{analysis_id}/outcomes", response_model=list[OutcomeSnapshotOut])
+async def analysis_outcomes(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    analysis = (await db.execute(
+        select(UserAnalysis).where(UserAnalysis.id == analysis_id)
+    )).scalar_one_or_none()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if analysis.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view these outcomes")
+    return (await db.execute(
+        select(OutcomeSnapshot)
+        .where(OutcomeSnapshot.analysis_id == analysis_id)
+        .order_by(OutcomeSnapshot.observed_at.asc(), OutcomeSnapshot.id.asc())
+    )).scalars().all()
+
+
 @router.get("/me/analyses", response_model=list[AnalysisSummaryOut])
 async def my_analyses(
     db: AsyncSession = Depends(get_db),
@@ -642,7 +439,6 @@ async def my_analyses(
                 "platform": a.platform,
                 "niche": a.niche,
                 "verdict": a.verdict,
-                "overall_score": scores.get("overall_score"),
                 "caption_preview": caption_preview,
                 "actual_views": a.actual_views,
                 "actual_likes": a.actual_likes,
@@ -685,7 +481,6 @@ def _normalize_handle(h: str) -> str:
 async def link_video(
     analysis_id: int,
     payload: VideoLinkIn,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -706,6 +501,22 @@ async def link_video(
 
     is_ig = (analysis.platform or "tiktok") == "instagram"
     new_url = (payload.url or "").strip() or None
+    if payload.post_age_hours is not None and payload.post_age_hours not in (24, 168, 720):
+        raise HTTPException(status_code=400, detail="Capture age must be 24 hours, 7 days, or 30 days.")
+    if analysis.video_url and new_url and new_url.rstrip("/") != analysis.video_url.rstrip("/"):
+        raise HTTPException(
+            status_code=409,
+            detail="This experiment is already linked to a different post. Use a separate analysis for each post.",
+        )
+    # Supplying the same URL again is still a refresh; it must not bypass the
+    # provider cooldown or create a burst of duplicate snapshots.
+    if analysis.video_url and analysis.counts_fetched_at:
+        elapsed = utc_now_naive() - analysis.counts_fetched_at
+        if elapsed < REFRESH_COOLDOWN:
+            raise HTTPException(
+                status_code=429,
+                detail="Stats were captured less than 24 hours ago — check back tomorrow.",
+            )
 
     # ── Instagram branch ────────────────────────────────────────────────────
     if is_ig:
@@ -718,14 +529,6 @@ async def link_video(
         if not url:
             raise HTTPException(status_code=400, detail="Paste the link to your posted Reel first.")
 
-        if not new_url and analysis.counts_fetched_at:
-            elapsed = datetime.utcnow() - analysis.counts_fetched_at
-            if elapsed < REFRESH_COOLDOWN:
-                raise HTTPException(
-                    status_code=429,
-                    detail="Stats were refreshed less than 24 hours ago — check back tomorrow.",
-                )
-
         try:
             likes = await fetch_instagram_likes(url)
         except Exception as e:
@@ -733,11 +536,44 @@ async def link_video(
 
         analysis.video_url = url
         analysis.actual_likes = likes
-        analysis.counts_fetched_at = datetime.utcnow()
+        analysis.counts_fetched_at = utc_now_naive()
+        asserted_posted_at = (
+            utc_now_naive() - timedelta(hours=payload.post_age_hours)
+            if payload.post_age_hours in (24, 168, 720)
+            else None
+        )
+        snapshot = add_outcome_snapshot(
+            db,
+            analysis_id=analysis.id,
+            platform="instagram",
+            source="rapidapi",
+            views=None,
+            likes=likes,
+            posted_at=asserted_posted_at,
+            integrity_flags_json=(
+                json.dumps([
+                    "third_party_metrics",
+                    "paid_status_unknown",
+                    "automated_activity_unknown",
+                    "user_asserted_post_age",
+                ])
+                if asserted_posted_at else None
+            ),
+        )
+        await upsert_artifact(
+            db,
+            analysis.id,
+            platform_post_id=post_id_from_url(url, "instagram"),
+        )
+        await schedule_outcome_jobs(
+            db,
+            analysis_id=analysis.id,
+            posted_at=asserted_posted_at,
+            captured_horizon=snapshot.horizon,
+        )
         await db.commit()
         await db.refresh(analysis)
 
-        background_tasks.add_task(audit_prediction, analysis.id)
         return _to_out(analysis)
 
     # ── TikTok branch ───────────────────────────────────────────────────────
@@ -749,14 +585,6 @@ async def link_video(
     url = new_url or analysis.video_url
     if not url:
         raise HTTPException(status_code=400, detail="Paste the link to your posted TikTok first.")
-
-    if not new_url and analysis.counts_fetched_at:
-        elapsed = datetime.utcnow() - analysis.counts_fetched_at
-        if elapsed < REFRESH_COOLDOWN:
-            raise HTTPException(
-                status_code=429,
-                detail="Stats were refreshed less than 24 hours ago — check back tomorrow.",
-            )
 
     try:
         meta = await fetch_tiktok(url)
@@ -788,14 +616,35 @@ async def link_video(
     analysis.video_url = url
     analysis.actual_views = meta["view_count"]
     analysis.actual_likes = meta["like_count"]
-    analysis.counts_fetched_at = datetime.utcnow()
+    analysis.counts_fetched_at = utc_now_naive()
+    snapshot = add_outcome_snapshot(
+        db,
+        analysis_id=analysis.id,
+        platform="tiktok",
+        source="tikwm",
+        views=meta["view_count"],
+        likes=meta["like_count"],
+        posted_at=meta.get("posted_at"),
+        comments=meta.get("comment_count"),
+        shares=meta.get("share_count"),
+        saves=meta.get("save_count"),
+        creator_followers=meta.get("creator_followers"),
+        provider_payload_hash=meta.get("provider_payload_hash"),
+    )
+    await upsert_artifact(
+        db,
+        analysis.id,
+        platform_post_id=meta.get("video_id") or post_id_from_url(url, "tiktok"),
+        creator_key=meta.get("author_handle"),
+    )
+    await schedule_outcome_jobs(
+        db,
+        analysis_id=analysis.id,
+        posted_at=meta.get("posted_at"),
+        captured_horizon=snapshot.horizon,
+    )
     await db.commit()
     await db.refresh(analysis)
-
-    background_tasks.add_task(audit_prediction, analysis.id)
-
-    if analysis.promoted_seed_id is None:
-        background_tasks.add_task(promote_analysis_to_seed, analysis.id, meta)
 
     return _to_out(analysis)
 
@@ -804,14 +653,10 @@ async def link_video(
 async def seed_consent_decision(
     analysis_id: int,
     payload: SeedConsentDecisionIn,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
-    """The user answered the results-page consent banner (their account-wide
-    setting is "ask"). allow=True promotes this analysis now; allow=False just
-    dismisses. ``remember`` ("yes"/"no") additionally updates the account setting.
-    """
+    """Record the user's research-retention choice for a legacy consent banner."""
     result = await db.execute(
         select(UserAnalysis).where(UserAnalysis.id == analysis_id)
     )
@@ -829,9 +674,6 @@ async def seed_consent_decision(
         user.seed_consent = payload.remember
     await db.commit()
     await db.refresh(analysis)
-
-    if payload.allow and not minor and analysis.promoted_seed_id is None:
-        background_tasks.add_task(promote_analysis_to_seed, analysis.id, None, True)
 
     return _to_out(analysis)
 
@@ -865,11 +707,38 @@ async def submit_feedback(
         # Only compare likes vs views when both are supplied (not meaningful for Instagram).
         if feedback.actual_views is not None and feedback.actual_likes > feedback.actual_views:
             raise HTTPException(status_code=400, detail="Likes can't exceed views.")
+    if feedback.post_age_hours is not None and feedback.post_age_hours not in (24, 168, 720):
+        raise HTTPException(status_code=400, detail="Capture age must be 24 hours, 7 days, or 30 days.")
 
     if feedback.actual_views is not None:
         analysis.actual_views = feedback.actual_views
     if feedback.actual_likes is not None:
         analysis.actual_likes = feedback.actual_likes
+    asserted_posted_at = (
+        utc_now_naive() - timedelta(hours=feedback.post_age_hours)
+        if feedback.post_age_hours in (24, 168, 720)
+        else None
+    )
+    snapshot = add_outcome_snapshot(
+        db,
+        analysis_id=analysis.id,
+        platform=analysis.platform or "tiktok",
+        source="manual_unverified",
+        views=feedback.actual_views,
+        likes=feedback.actual_likes,
+        posted_at=asserted_posted_at,
+        integrity_flags_json=json.dumps(
+            ["manual_unverified", "user_asserted_post_age"]
+            if feedback.post_age_hours is not None else ["manual_unverified"]
+        ),
+    )
+    if analysis.video_url:
+        await schedule_outcome_jobs(
+            db,
+            analysis_id=analysis.id,
+            posted_at=asserted_posted_at,
+            captured_horizon=snapshot.horizon,
+        )
     await db.commit()
     await db.refresh(analysis)
     return _to_out(analysis)
@@ -889,6 +758,17 @@ async def delete_analysis(
         raise HTTPException(status_code=404, detail="Analysis not found")
     if analysis.user_id != user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this analysis")
+    await db.execute(delete(UsageEvent).where(UsageEvent.analysis_id == analysis_id))
+    await db.execute(delete(OutcomeCollectionJob).where(OutcomeCollectionJob.analysis_id == analysis_id))
+    await db.execute(delete(OutcomeSnapshot).where(OutcomeSnapshot.analysis_id == analysis_id))
+    await db.execute(delete(AnalysisArtifact).where(AnalysisArtifact.analysis_id == analysis_id))
+    # Re-analysis children reference this row via parent_id (a self-FK). Detach
+    # them first so the delete can't orphan a dangling reference or trip the FK
+    # constraint on a fresh DB (where create_all built it). The child survives as
+    # a standalone analysis the user can still open.
+    await db.execute(
+        update(UserAnalysis).where(UserAnalysis.parent_id == analysis_id).values(parent_id=None)
+    )
     await db.delete(analysis)
     await db.commit()
 
@@ -920,14 +800,28 @@ def _to_out(analysis: UserAnalysis) -> dict:
 
 
 def _to_locked(analysis: UserAnalysis) -> dict:
-    """Anonymous (free-tier) view: overall score, verdict, and the single highest-priority
-    improvement are exposed as a teaser. Full plan, rewrites, and all detail are locked."""
+    """Anonymous view: the six craft dimension scores plus one issue. The
+    per-dimension critique, recommended experiment, strengths, full improvement
+    plan, and outcome timeline stay gated behind signup — guests see the numbers
+    ("what"), not the qualitative detail ("why/how")."""
     try:
         scores = json.loads(analysis.scores_json)
     except (ValueError, TypeError):
         scores = {}
     plan = scores.get("improvement_plan") or []
     first_improvement = plan[0] if plan else None
+    # Only the six numeric dimensions — never critique/experiment/plan/strengths.
+    dimension_scores = {
+        key: scores.get(key)
+        for key in (
+            "hook_velocity",
+            "cut_frequency",
+            "text_scannability",
+            "curiosity_gap",
+            "audio_visual_sync",
+            "loop_seamlessness",
+        )
+    }
     return {
         "id": analysis.id,
         "platform": analysis.platform or "tiktok",
@@ -936,8 +830,8 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "caption": None,
         "bio": None,
         "scores_json": {
+            **dimension_scores,
             "verdict": scores.get("verdict", analysis.verdict),
-            "overall_score": scores.get("overall_score"),
             "first_improvement": first_improvement,
             "locked": True,
         },

@@ -22,11 +22,14 @@ generate→delete pattern from `services.gemini` so there is one source of truth
 
 import json
 import asyncio
+import os
+import time
 from typing import Optional
 
 from google.genai import types
 
-from services.gemini import client, _PLATFORM_CONTEXT
+from services.gemini import client, _PLATFORM_CONTEXT, _GRADING_SYSTEM_INSTRUCTION
+from services.telemetry import record_usage_event, response_token_usage
 
 # Below this view count, like-rate is statistical noise (a 40-view / 9-like video is
 # a 22% like-rate but proves nothing). Such seeds get the dormant band (5) — which
@@ -180,6 +183,8 @@ async def analyze_seed_video(
     "error" key on any failure. The caller MUST treat a missing/invalid "virality_rating" as a
     failure and not persist the seed.
     """
+    started = time.perf_counter()
+    input_bytes = os.path.getsize(video_path) if os.path.exists(video_path) else None
     try:
         prompt = _build_seed_prompt(platform, niche)
 
@@ -203,6 +208,7 @@ async def analyze_seed_video(
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0,  # craft scores stay stable run-to-run
+                system_instruction=_GRADING_SYSTEM_INSTRUCTION,
             ),
         )
 
@@ -222,9 +228,33 @@ async def analyze_seed_video(
         data["virality_rating"] = rating
         data["performance_driver"] = driver
         data["driver_confidence"] = confidence
+        input_tokens, output_tokens = response_token_usage(response)
+        await record_usage_event(
+            operation="seed_craft_analysis",
+            provider="google_gemini",
+            model="gemini-2.5-flash",
+            success=True,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            input_bytes=input_bytes,
+            output_bytes=len((response.text or "").encode("utf-8")),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
         return data
 
     except json.JSONDecodeError as e:
+        await record_usage_event(
+            operation="seed_craft_analysis", provider="google_gemini",
+            model="gemini-2.5-flash", success=False,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            input_bytes=input_bytes, error_code="invalid_json",
+        )
         return {"error": f"Failed to parse seed analysis as JSON: {e}"}
     except Exception as e:  # noqa: BLE001
+        await record_usage_event(
+            operation="seed_craft_analysis", provider="google_gemini",
+            model="gemini-2.5-flash", success=False,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            input_bytes=input_bytes, error_code=type(e).__name__,
+        )
         return {"error": str(e)}

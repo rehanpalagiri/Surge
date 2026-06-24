@@ -8,11 +8,8 @@ import ScoreBar from "@/components/ScoreBar";
 const SAMPLE = {
   niche: "Fitness",
   platform: "tiktok" as const,
-  mode: "Thinking",
-  verdict: "High potential" as const,
-  predicted_views: "180K–350K",
-  predicted_likes: "12K–28K",
-  overall_score: 8,
+  mode: "Outcome-blind craft review",
+  verdict: "Strong craft" as const,
   hook_velocity: 9,
   cut_frequency: 7,
   text_scannability: 6,
@@ -25,18 +22,18 @@ const SAMPLE = {
     "Audio-visual sync is tight throughout — every major cut lands on a beat drop or audio transient, making the pacing feel intentional and professional.",
   ],
   improvements: [
-    "Loop seamlessness fails at the end — the sign-off 'hope this helped, follow for more' explicitly tells the viewer the video is over and triggers the scroll reflex. The rewatch multiplier is being thrown away.",
+    "The ending clearly signals completion. Testing a callback to the opening could make the structure feel more cohesive.",
     "Text scannability drops at 0:08–0:14 — caption overlay appears in the bottom 20% of frame and will be covered by TikTok's description UI on most devices.",
     "Cut frequency sags at 0:12–0:18 — a 4.2-second static talking-head shot after the hook loses the attention the opening earned.",
   ],
   analysis_summary:
-    "Strong hook and curiosity gap give this video a real shot at FYP distribution — the first 3 seconds do their job. The loop ending is the single biggest missed opportunity: replacing the sign-off with a callback to the opening hook could push rewatches up significantly, which is the metric TikTok weighs most. Fix the caption position and mid-video pacing drag and this is a legitimate Explore candidate.",
+    "The opening communicates its premise quickly and creates a clear unanswered question. The ending does not connect back to that opening, and the middle contains a long static section. Test a callback ending and a tighter middle, then compare real viewer response after posting.",
   improvement_plan: [
     {
       priority: "High",
       action: "Fix the loop ending",
       detail:
-        "Delete 'hope this helped, follow for more.' Replace the final line with an open-ended callback to the hook: 'So the next time you think you're training hard enough...' — this pulls viewers back to the start and triggers the rewatch signal the algorithm responds to most.",
+        "Test removing the generic sign-off and ending with a visual or thematic callback to the opening. Treat this as an editing hypothesis, then compare fixed-age outcomes.",
     },
     {
       priority: "High",
@@ -48,13 +45,12 @@ const SAMPLE = {
       priority: "Medium",
       action: "Cut the 0:12–0:18 static hold",
       detail:
-        "You hold a talking-head shot for 4.2 seconds with no cut, zoom, or B-roll. Insert a 1.2× digital zoom at the 3-second mark or cut to a B-roll clip to reset the viewer's attention clock before retention drops.",
+        "You hold a talking-head shot for 4.2 seconds with no visual change. Test a subtle zoom or relevant B-roll and compare viewer response.",
     },
   ],
 };
 
 const SCORES = [
-  { label: "Overall Score",     score: SAMPLE.overall_score },
   { label: "Hook Velocity",     score: SAMPLE.hook_velocity },
   { label: "Cut Frequency",     score: SAMPLE.cut_frequency },
   { label: "Text Scannability", score: SAMPLE.text_scannability },
@@ -91,14 +87,12 @@ export default function SamplePage() {
         </div>
 
         {/* Verdict */}
-        <VerdictBanner
-          verdict={SAMPLE.verdict}
-          overallScore={SAMPLE.overall_score}
-        />
+        <VerdictBanner verdict={SAMPLE.verdict} />
 
         {/* Scores */}
         <div className="bg-card border border-border rounded-2xl p-6">
-          <h2 className="text-text-primary font-semibold text-lg mb-5">Performance Scores</h2>
+          <h2 className="text-text-primary font-semibold text-lg mb-1">AI-Assessed Craft Dimensions</h2>
+          <p className="text-text-muted text-xs mb-5">These are subjective craft assessments, not measured audience behavior.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {SCORES.map((sc, i) => (
               <ScoreBar key={sc.label} label={sc.label} score={sc.score} animate delay={i * 100} />
@@ -139,7 +133,7 @@ export default function SamplePage() {
 
         {/* Improvement plan */}
         <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-          <h3 className="text-text-primary font-semibold text-lg">Full Improvement Plan</h3>
+          <h3 className="text-text-primary font-semibold text-lg">Editing hypotheses</h3>
           <div className="space-y-3">
             {SAMPLE.improvement_plan.map((item, i) => (
               <div key={i} className={`border rounded-xl p-4 ${PRIORITY_COLOR[item.priority]}`}>
@@ -153,6 +147,19 @@ export default function SamplePage() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+          <div>
+            <h3 className="text-text-primary font-semibold text-lg">Observed results after posting</h3>
+            <p className="text-text-muted text-sm mt-1">Example 24-hour snapshot. This is separate from the pre-post craft review.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-surface rounded-xl p-3"><p className="text-text-primary font-bold">18,420</p><p className="text-text-muted text-xs">views</p></div>
+            <div className="bg-surface rounded-xl p-3"><p className="text-text-primary font-bold">1,326</p><p className="text-text-muted text-xs">likes</p></div>
+            <div className="bg-surface rounded-xl p-3"><p className="text-purple-to font-bold">7.20%</p><p className="text-text-muted text-xs">observed like rate</p></div>
+          </div>
+          <p className="text-text-muted text-xs">This difference is observational. It does not prove that a recommended edit caused the result.</p>
         </div>
 
         {/* Analysis summary */}

@@ -60,7 +60,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
   };
 
   // Reorder which niche is primary. Order is meaningful: selected[0] is the spine that
-  // drives the score; selected[1] only nudges the weighting.
+  // sets the review context; selected[1] only nudges the weighting.
   const swap = () => {
     if (selected.length === 2) onChange([selected[1], selected[0]]);
   };
@@ -180,14 +180,14 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
       {selected.length === 1 && (
         <p className="text-[11px] text-zinc-500">
           <span className="text-purple-300 font-medium">{selected[0]}</span> is your{" "}
-          <span className="text-zinc-400">primary</span> niche — it drives the score. Add a 2nd for a blend.
+          <span className="text-zinc-400">primary</span> niche — it sets the craft context. Add a 2nd for a blend.
         </p>
       )}
 
       {selected.length === 2 && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-zinc-500">
-            <span className="text-purple-300 font-medium">{selected[0]}</span> drives the score ·{" "}
+            <span className="text-purple-300 font-medium">{selected[0]}</span> leads the review ·{" "}
             <span className="text-zinc-400 font-medium">{selected[1]}</span> adds nuance
           </p>
           <button

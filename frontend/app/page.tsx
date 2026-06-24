@@ -10,6 +10,8 @@ import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
 import { isAllowedVideoFile } from "@/lib/videoValidation";
+import { useFakeProgress } from "@/lib/useFakeProgress";
+import { ReportSkeleton, Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
 import { track } from "@vercel/analytics";
 
 type Platform = "tiktok" | "instagram";
@@ -23,38 +25,45 @@ const PROCESSING_STEPS = [
   "Analyzing first 3-second hook...",
   "Scanning for UI text collisions...",
   "Calculating pacing fatigue...",
-  "Generating final retention report...",
+  "Generating your craft review...",
 ];
 
 // ─── Processing overlay ────────────────────────────────────────────────────────
 
 function ProcessingOverlay({ step }: { step: number }) {
+  const progress = useFakeProgress(true, 22);
+
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-sm flex flex-col items-center justify-center gap-8 px-6">
-      {/* Spinner */}
-      <div className="relative">
-        <div className="w-20 h-20 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center text-2xl">🎬</div>
+    <div
+      className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
+      role="dialog"
+      aria-modal="true"
+      aria-busy="true"
+      aria-labelledby="analysis-progress-title"
+      aria-describedby="analysis-progress-detail"
+    >
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
+      <div className="text-4xl">🎬</div>
+
+      <div className="text-center space-y-1.5">
+        <p id="analysis-progress-title" className="text-white text-xl font-bold">Analyzing your video...</p>
+        <p id="analysis-progress-detail" className="text-zinc-500 text-sm">Hang tight while the video is processed and reviewed</p>
       </div>
 
-      {/* Step text */}
-      <div className="text-center space-y-2">
-        <p className="text-white text-xl font-bold animate-pulse">
+      <div className="w-full max-w-xs space-y-3">
+        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-purple-500 rounded-full"
+            style={{ width: `${progress}%`, transition: "width 600ms cubic-bezier(0.25, 1, 0.5, 1)" }}
+          />
+        </div>
+        <p className="text-zinc-400 text-sm text-center animate-pulse">
           {PROCESSING_STEPS[step] ?? PROCESSING_STEPS[PROCESSING_STEPS.length - 1]}
         </p>
-        <p className="text-zinc-500 text-sm">Hang tight — this usually takes 15–60 seconds</p>
       </div>
-
-      {/* Step indicator dots */}
-      <div className="flex gap-2">
-        {PROCESSING_STEPS.map((_, i) => (
-          <div
-            key={i}
-            className={`h-1.5 rounded-full transition-all duration-500 ${
-              i === step ? "w-8 bg-purple-500" : i < step ? "w-3 bg-purple-500/40" : "w-3 bg-zinc-700"
-            }`}
-          />
-        ))}
+      <div className="w-full pt-2">
+        <ReportSkeleton compact />
+      </div>
       </div>
     </div>
   );
@@ -124,6 +133,15 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
     }
 
     setFile(f);
+  };
+
+  const openFilePicker = () => fileInputRef.current?.click();
+
+  const handleFilePickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openFilePicker();
+    }
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -208,18 +226,18 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold px-4 py-1.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-              AI-powered · Free · Results in under 60 seconds
+              AI-assisted · Free · Pre-post craft review
             </div>
 
             {/* Headline */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
-                Find Out Exactly Where Your{" "}
-                <span className="text-purple-400">Viewers Are Scrolling Away.</span>
+                Make Each Post{" "}
+                <span className="text-purple-400">Teach You Something.</span>
               </h1>
               <p className="text-zinc-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
-                Upload your video before you post it. Our AI engine analyzes your pacing, hook
-                velocity, and UI collisions to predict your viral potential.
+                Review observable craft before posting, then track verified results at the
+                same post ages and choose one clear experiment for the next version.
               </p>
             </div>
 
@@ -231,7 +249,11 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 onDrop={onDrop}
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openFilePicker}
+                onKeyDown={handleFilePickerKeyDown}
+                role="button"
+                tabIndex={0}
+                aria-label={file ? `Change selected video: ${file.name}` : "Choose a video to analyze"}
                 className={`cursor-pointer rounded-2xl border-2 transition-all duration-200 p-6 sm:p-10 flex flex-col items-center justify-center gap-3 text-center min-h-[160px] sm:min-h-[180px]
                   ${dragging
                     ? "border-purple-500 bg-purple-500/10"
@@ -245,7 +267,11 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                   type="file"
                   accept="video/*"
                   className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                  onChange={(e) => {
+                    const selected = e.currentTarget.files?.[0];
+                    e.currentTarget.value = "";
+                    if (selected) void handleFile(selected);
+                  }}
                 />
                 {file ? (
                   <>
@@ -354,7 +380,29 @@ export default function Home() {
     }
   }, []);
 
-  if (showSplash === null) return null;
+  if (showSplash === null) {
+    return (
+      <main className="min-h-screen bg-zinc-950" aria-busy="true" aria-label="Checking account session">
+        <header className="border-b border-zinc-900 px-6 py-4">
+          <div className="mx-auto flex max-w-5xl items-center justify-between">
+            <Skeleton className="h-6 w-20 rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-lg" />
+          </div>
+        </header>
+        <div className="skeleton-delay mx-auto max-w-2xl space-y-6 px-4 py-10">
+          <div className="space-y-3 text-center">
+            <SkeletonTitle width="62%" className="mx-auto h-9" />
+            <Skeleton className="mx-auto h-4 rounded-md" width="78%" />
+          </div>
+          <SkeletonCard className="space-y-5">
+            <SkeletonMedia className="border border-dashed border-border" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </SkeletonCard>
+        </div>
+      </main>
+    );
+  }
 
   if (showSplash) {
     return <LandingHero deleted={deleted} onDismissDeleted={() => setDeleted(false)} />;
@@ -389,7 +437,7 @@ export default function Home() {
           Analyze your next {PLATFORM_LABEL[platform]} video
         </h1>
         <p className="text-zinc-400 text-sm mt-2">
-          Drop your video and get an AI score in seconds.
+          Get an outcome-blind craft review and one experiment to test next.
         </p>
       </section>
 

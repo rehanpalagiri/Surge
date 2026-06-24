@@ -1,28 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import PasswordInput from "@/components/PasswordInput";
 import { getToken, clearToken } from "@/lib/auth";
 import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
+import { SettingsPrivacySkeleton, SettingsSkeleton } from "@/components/Skeleton";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    if (!getToken()) router.push("/login?next=/settings");
+    if (!getToken()) {
+      router.replace("/login?next=/settings");
+      return;
+    }
+    setAuthReady(true);
   }, [router]);
 
   return (
     <main className="min-h-screen flex flex-col bg-background">
       <Nav subtitle="Settings" />
       <div className="max-w-2xl mx-auto w-full px-4 py-10 space-y-6">
-        <ChangeUsernameCard />
-        <ChangePasswordCard />
-        <DataPrivacyCard />
-        <DeleteAccountCard />
+        {!authReady ? <SettingsSkeleton /> : (
+          <>
+            <ChangeUsernameCard />
+            <ChangePasswordCard />
+            <DataPrivacyCard />
+            <DeleteAccountCard />
+          </>
+        )}
         <p className="text-center text-text-muted/60 text-xs pt-2">
           <Link href="/privacy" className="hover:text-text-muted transition-colors">Privacy Policy</Link>
           <span className="mx-2">·</span>
@@ -34,19 +44,28 @@ export default function SettingsPage() {
 }
 
 const CONSENT_OPTIONS: { value: "yes" | "ask" | "no"; label: string }[] = [
-  { value: "yes", label: "Yes — my linked post stats can be used as benchmark examples" },
+  { value: "yes", label: "Yes — my linked public metrics can be retained for measurement research" },
   { value: "ask", label: "Ask me each time — I'll decide when I link a video" },
-  { value: "no", label: "No — never use my data as a benchmark" },
+  { value: "no", label: "No — do not retain my metrics for research" },
 ];
 
 function DataPrivacyCard() {
   const [consent, setConsent] = useState<ConsentStatus | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    getConsent().then(setConsent).catch(() => {});
+  const loadConsent = useCallback(async () => {
+    setConsent(null);
+    setLoadFailed(false);
+    try {
+      setConsent(await getConsent());
+    } catch {
+      setLoadFailed(true);
+    }
   }, []);
+
+  useEffect(() => { void loadConsent(); }, [loadConsent]);
 
   async function pick(value: "yes" | "no" | "ask") {
     if (!consent || consent.is_minor || saving) return;
@@ -65,17 +84,30 @@ function DataPrivacyCard() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4" aria-busy={saving}>
       <div>
         <h2 className="text-text-primary font-semibold text-lg">Data &amp; Privacy</h2>
-        <p className="text-text-muted text-sm mt-0.5">Help improve Surge for other creators</p>
+        <p className="text-text-muted text-sm mt-0.5">Choose whether linked public metrics may support measurement research</p>
       </div>
 
-      {!consent ? (
-        <p className="text-text-muted text-sm">Loading…</p>
+      {!consent && loadFailed ? (
+        <div className="rounded-xl border border-danger/30 bg-danger/5 p-4 space-y-3">
+          <p className="text-danger text-sm" role="alert">
+            Couldn&apos;t load your privacy preference. Your existing choice has not changed.
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadConsent()}
+            className="border border-border text-text-primary text-sm font-semibold px-4 py-2 rounded-lg hover:border-purple-to/60"
+          >
+            Try again
+          </button>
+        </div>
+      ) : !consent ? (
+        <SettingsPrivacySkeleton />
       ) : consent.is_minor ? (
         <p className="text-text-muted text-sm">
-          Your data is not used for platform benchmarks (accounts under 18 are
+          Your data is not used for measurement research (accounts under 18 are
           automatically excluded).
         </p>
       ) : (
@@ -102,9 +134,10 @@ function DataPrivacyCard() {
             ))}
           </div>
           {error && <p className="text-danger text-sm">{error}</p>}
+          {saving && <p className="text-text-muted text-xs" role="status"><span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />Saving preference…</p>}
           <p className="text-text-muted/60 text-xs">
-            Only your public like/view counts and content niche are ever used — never
-            your video file.{" "}
+            Research data may include public counts, observation time, post URL, and content niche—never
+            your uploaded video. Metrics are not treated as proof that an edit caused an outcome.{" "}
             <Link href="/privacy#seed-pool" className="text-purple-to hover:underline">
               Learn more
             </Link>

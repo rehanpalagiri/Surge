@@ -360,7 +360,7 @@ async def _send_welcome_email(to_email: str, username: str) -> None:
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Welcome to Surge, {username}!</h2>
-      <p>You're all set. Upload your first video and get an AI-powered virality score in seconds.</p>
+      <p>You're all set. Upload your first video for an AI-assisted craft review and a clear experiment to test.</p>
       <p style="margin:24px 0">
         <a href="{_FRONTEND_URL}"
            style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
@@ -377,7 +377,7 @@ async def _send_welcome_email(to_email: str, username: str) -> None:
     plain = (
         f"Welcome to Surge, {username}!\n\n"
         f"You're all set. Upload your first video at {_FRONTEND_URL} "
-        f"and get an AI-powered virality score in seconds.\n\n"
+        f"for an AI-assisted craft review and a clear experiment to test.\n\n"
         f"— The Surge team"
     )
     await _send_email(to_email, "Welcome to Surge 🎬", html, plain)
