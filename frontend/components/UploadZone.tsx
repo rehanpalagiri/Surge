@@ -11,6 +11,7 @@ import { useFakeProgress } from "@/lib/useFakeProgress";
 import { track } from "@vercel/analytics";
 import { ReportSkeleton } from "@/components/Skeleton";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
+import ProjectNameField from "@/components/ProjectNameField";
 import NichePicker from "@/components/NichePicker";
 
 
@@ -152,13 +153,14 @@ interface Props {
   initialFile?: File | null;
   parentId?: number;
   initialNiches?: string[];
+  initialProjectName?: string;
 }
 
-export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches }: Props) {
+export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches, initialProjectName }: Props) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [originalSize, setOriginalSize] = useState<number | null>(null);
   const [niches, setNiches] = useState<string[]>(initialNiches ?? []);  // up to 2; first = primary, second = blend
+  const [projectName, setProjectName] = useState(initialProjectName ?? "");
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -224,12 +226,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
     // 2. Under 100MB — accept immediately
     if (f.size <= MAX_BYTES) {
       setFile(f);
-      setOriginalSize(null);
       return;
     }
 
     // 3. Over 100MB — compress client-side
-    const orig = f.size;
     setCompressing(true);
     setCompressProgress(0);
     setCompressPhase("Starting…");
@@ -250,7 +250,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       }
 
       setFile(compressed);
-      setOriginalSize(orig);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       setError(
@@ -269,6 +268,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!projectName.trim()) {
+      setError("Give your project a name so you can find it later.");
+      return;
+    }
     if (!file) return;
     if (niches.length === 0) {
       setError("Pick a content niche above — choose up to two.");
@@ -301,7 +304,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       setUploadPhase("analyzing");
       tipInterval = setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 4000);
 
-      const { id } = await analyzeFromR2(key, niches[0], caption, bio, platform, niches[1] ?? "", parentId);
+      const { id } = await analyzeFromR2(
+        key,
+        niches[0],
+        caption,
+        bio,
+        platform,
+        niches[1] ?? "",
+        parentId,
+        projectName.trim(),
+      );
 
       // Track guest usage immediately after analysis is accepted
       if (!loggedIn) {
@@ -431,12 +443,12 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
       <form onSubmit={handleSubmit} className="w-full max-w-xl mx-auto space-y-5">
 
-        {/* ── Re-analysis banner ── */}
+        {/* ── Update banner ── */}
         {parentId != null && (
           <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-xl px-4 py-3">
             <span className="text-purple-400 text-sm">🔄</span>
             <p className="text-purple-300 text-sm font-medium">
-              Reviewing a new version — compare the same craft dimensions
+              Updating this project — compare the same craft dimensions
             </p>
           </div>
         )}
@@ -466,12 +478,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             selectedDetail={file ? (
               <>
                 {fmtSize(file.size)}
-                {originalSize && <span className="ml-1.5 text-purple-400">compressed from {fmtSize(originalSize)}</span>}
               </>
             ) : undefined}
-            idleNote="Large videos are compressed automatically in your browser"
           />
         )}
+
+        <ProjectNameField
+          value={projectName}
+          onChange={setProjectName}
+          isUpdate={parentId != null}
+        />
 
         {/* ── Niche — searchable multi-select (up to 2) ── */}
         <div className="mb-6">
@@ -553,12 +569,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         <button
           type="submit"
           disabled={!file || loading || compressing || guestLimitReached || (rateLimit?.remaining === 0)}
-          className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl text-lg transition-all
-            hover:shadow-[0_0_15px_rgba(168,85,247,0.5)]
-            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none
-            active:scale-[0.99]"
+          className="gradient-btn w-full text-white font-bold py-4 rounded-xl text-lg
+            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none"
         >
-          {loading ? "Analyzing..." : compressing ? "Compressing video…" : "Analyze My Video"}
+          {loading ? "Analyzing..." : compressing ? "Compressing video…" : parentId != null ? "Update Project" : "Analyze My Video"}
         </button>
 
         {/* ── Guest counter ── */}
@@ -570,7 +584,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
               </p>
               <Link
                 href="/signup"
-                className="inline-block bg-purple-600 hover:bg-purple-500 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors hover:shadow-[0_0_10px_rgba(168,85,247,0.4)]"
+                className="gradient-btn inline-block text-white font-semibold px-6 py-2.5 rounded-xl text-sm"
               >
                 Sign up free for more
               </Link>

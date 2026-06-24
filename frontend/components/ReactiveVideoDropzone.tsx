@@ -1,13 +1,12 @@
 "use client";
 
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { CheckCircle2, FileVideo2, Sparkles, UploadCloud } from "lucide-react";
+import { CheckCircle2, FileVideo2, UploadCloud } from "lucide-react";
 
 interface ReactiveVideoDropzoneProps {
   file: File | null;
   onFileSelected: (file: File) => void | Promise<void>;
   selectedDetail?: ReactNode;
-  idleNote?: string;
   disabled?: boolean;
 }
 
@@ -20,7 +19,6 @@ export default function ReactiveVideoDropzone({
   file,
   onFileSelected,
   selectedDetail,
-  idleNote = "Your video stays private and is deleted after review",
   disabled = false,
 }: ReactiveVideoDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -149,12 +147,9 @@ export default function ReactiveVideoDropzone({
             <span className="hidden sm:inline">Drop your video here</span>
           </p>
           <p className="mt-1.5 text-sm text-zinc-400">
-            <span className="hidden sm:inline">or click to browse · </span>MP4 or MOV · up to 10 min
+            <span className="hidden sm:inline">or click to browse</span>
+            <span className="sm:hidden">Choose a video from your device</span>
           </p>
-          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-black/20 px-3 py-1.5 text-[11px] text-zinc-500">
-            <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-            {idleNote}
-          </div>
         </div>
       )}
     </div>

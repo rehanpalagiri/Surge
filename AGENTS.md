@@ -58,7 +58,7 @@ Browser → Next.js (Vercel) → FastAPI (Railway) → Neon Postgres
 Key models in `models.py`:
 
 - `users`, `user_profiles`, `password_reset_tokens`: identity, settings, age gate, and reset flow.
-- `user_analyses`: uploaded review and full Gemini response. New reviews use `mode="craft_review"`; prediction/calibration columns are legacy compatibility fields.
+- `user_analyses`: uploaded review, creator-facing `project_name`, update lineage, and full Gemini response. New reviews use `mode="craft_review"`; prediction/calibration columns are legacy compatibility fields.
 - `analysis_artifacts`: exact SHA-256, creator/post identity, and future perceptual/audio fingerprint slots.
 - `outcome_snapshots`: immutable public-metric observations with capture time, post age, maturity horizon, provenance, integrity flags, metric version, and payload hash.
 - `outcome_collection_jobs`: durable maturity-window jobs; protected admin collection endpoint exists, but no external scheduler is active yet.
@@ -86,7 +86,7 @@ New tables are created by `create_all`. Existing-column additions require model 
 - `app/page.tsx`: positions Surge as craft review plus learn-from-each-post experimentation.
 - `app/results/[id]/page.tsx`: AI craft dimensions, explicit evidence notice, recommended experiment, and a separate 24h/7d/30d outcome timeline.
 - `app/results/[id]/improve/page.tsx`: editing hypotheses and next experiment; no projected performance.
-- `app/projects/page.tsx`: experiment history and latest captures; mixed-age latest counts are not comparisons.
+- `app/projects/page.tsx`: named project history, with unlinked posts sorted first and then newest-first; mixed-age latest counts are not comparisons.
 - `app/sample/page.tsx`: static example showing critique and observed results as separate evidence.
 - `components/VerdictBanner.tsx`: qualitative craft verdict only.
 - `components/FeedbackModal.tsx`: manual unverified observations; provider fetches are preferred where available.

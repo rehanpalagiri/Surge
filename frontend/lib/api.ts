@@ -32,6 +32,7 @@ export interface AnalysisOut {
   id: number;
   platform: string;
   filename: string;
+  project_name?: string | null;
   niche: string;
   caption: string | null;
   bio: string | null;
@@ -65,13 +66,14 @@ export interface AnalysisOut {
   counts_fetched_at?: string | null;
   pending_seed_consent?: boolean;     // owner's consent is "ask" — show the banner
   mode?: string;
-  parent_id?: number | null;          // ID of the analysis this re-analyzes
+  parent_id?: number | null;          // ID of the analysis this updates
   created_at: string;
 }
 
 export interface AnalysisSummary {
   id: number;
   platform: string;
+  project_name?: string | null;
   niche: string;
   verdict: string;
   caption_preview: string | null;
@@ -218,7 +220,8 @@ export async function analyzeVideo(
   bio: string = "",
   platform: string = "tiktok",
   videoUrl: string = "",
-  secondary: string = ""
+  secondary: string = "",
+  projectName: string = ""
 ): Promise<{ id: number }> {
   const form = new FormData();
   if (file) form.append("file", file);
@@ -228,6 +231,7 @@ export async function analyzeVideo(
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
+  form.append("project_name", projectName);
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",
     headers: authHeaders(),
@@ -687,7 +691,8 @@ export async function analyzeFromR2(
   bio: string = "",
   platform: string = "tiktok",
   secondary: string = "",
-  parentId?: number
+  parentId?: number,
+  projectName: string = ""
 ): Promise<{ id: number; status: string }> {
   const form = new FormData();
   form.append("r2_key", r2Key);
@@ -696,6 +701,7 @@ export async function analyzeFromR2(
   form.append("caption", caption);
   form.append("bio", bio);
   form.append("platform", platform);
+  form.append("project_name", projectName);
   if (parentId != null) form.append("parent_id", String(parentId));
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",

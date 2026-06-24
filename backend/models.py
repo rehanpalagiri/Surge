@@ -124,6 +124,9 @@ class UserAnalysis(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     platform = Column(String, nullable=True, default="tiktok")  # "tiktok" | "instagram"
     filename = Column(String, nullable=False)
+    # Creator-facing label for grouping an upload and its later updates.
+    # Nullable for analyses created before project naming existed.
+    project_name = Column(String, nullable=True)
     niche = Column(String, nullable=False)  # the user's own words (display, shown in My Projects)
     # The canonical niche the classifier resolved (or "Uncategorized"). It provides
     # craft context without exposing the prompt to arbitrary free-text labels.
@@ -150,8 +153,8 @@ class UserAnalysis(Base):
     # Async analysis lifecycle: "pending" → "processing" → "complete" | "error".
     # Defaults to "complete" so all pre-existing rows are treated as finished.
     status = Column(String, nullable=True, default="complete")
-    # Re-analysis lineage: points to the analysis this one was created to improve.
-    # NULL = original upload; non-NULL = user clicked "Re-analyze" on an old result.
+    # Update lineage: points to the analysis this version was created to improve.
+    # NULL = original upload; non-NULL = user clicked "Update" on an old result.
     parent_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

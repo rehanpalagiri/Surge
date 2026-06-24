@@ -68,7 +68,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
           ) : loggedIn ? (
             <>
               <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
-              <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">Experiments</Link>
+              <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">Projects</Link>
               <Link href="/profile"  className="text-zinc-400 hover:text-white transition-colors">Profile</Link>
               <Link href="/settings" className="text-zinc-400 hover:text-white transition-colors">Settings</Link>
               <button onClick={logout} className="text-zinc-400 hover:text-white transition-colors">Log out</button>
@@ -76,7 +76,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
           ) : (
             <>
               <Link href="/login"  className="text-zinc-400 hover:text-white transition-colors">Log in</Link>
-              <Link href="/signup" className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-4 py-1.5 rounded-lg transition-colors">Sign up</Link>
+              <Link href="/signup" className="gradient-btn text-white font-semibold px-4 py-1.5 rounded-lg">Sign up</Link>
             </>
           )}
         </div>
@@ -99,7 +99,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
               {loggedIn ? (
                 <>
                   <Link href="/" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Dashboard</Link>
-                  <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Experiments</Link>
+                  <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Projects</Link>
                   <Link href="/profile"  className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Profile</Link>
                   <Link href="/settings" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Settings</Link>
                   <div className="border-t border-zinc-700 my-1" />

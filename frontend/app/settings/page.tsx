@@ -206,7 +206,7 @@ function ChangeUsernameCard() {
         <button
           type="submit"
           disabled={loading}
-          className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl disabled:opacity-50"
+          className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           {loading ? "Saving…" : "Save username"}
         </button>
@@ -348,7 +348,7 @@ function ChangePasswordCard() {
         <button
           type="submit"
           disabled={loading}
-          className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl disabled:opacity-50"
+          className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           {loading ? "Saving…" : "Save password"}
         </button>

@@ -57,6 +57,7 @@ class AnalysisOut(BaseModel):
     id: int
     platform: Optional[str] = "tiktok"
     filename: str
+    project_name: Optional[str] = None
     niche: str
     caption: Optional[str]
     bio: Optional[str]
@@ -72,7 +73,7 @@ class AnalysisOut(BaseModel):
     # frontend can prompt the user to confirm/correct it. Mirrors scores_json.
     niche_needs_confirmation: bool = False
     mode: Optional[str] = "quick"  # effective mode that ran
-    # Re-analysis lineage: None = original upload; int = improved version of parent.
+    # Update lineage: None = original upload; int = newer version of parent.
     parent_id: Optional[int] = None
     created_at: datetime
 
@@ -177,6 +178,7 @@ class TokenOut(BaseModel):
 class AnalysisSummaryOut(BaseModel):
     id: int
     platform: str
+    project_name: Optional[str] = None
     niche: str
     verdict: str
     caption_preview: Optional[str] = None

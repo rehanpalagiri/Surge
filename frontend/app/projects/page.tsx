@@ -7,6 +7,7 @@ import Nav from "@/components/Nav";
 import { getMyAnalyses, deleteAnalysis, linkTikTokVideo, apiErrorDetail, AnalysisSummary } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ProjectsSkeleton } from "@/components/Skeleton";
+import { ArrowUpRight, CalendarDays, Link2, RefreshCw, Trash2, Video } from "lucide-react";
 
 function verdictColor(verdict: string): string {
   if (verdict === "Strong craft" || verdict === "High potential") return "text-success";
@@ -21,50 +22,25 @@ function LinkCtaButton({ title, onClick }: { title: string; onClick: () => void 
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center justify-between gap-3 bg-purple-from/10 border border-purple-to/40 hover:border-purple-to rounded-xl px-4 py-3 text-left transition-colors group"
+      className="project-link-cta group w-full text-left"
     >
-      <span className="flex items-center gap-2.5 min-w-0">
-        <span className="text-lg flex-shrink-0">📊</span>
+      <span className="relative z-10 flex min-w-0 items-center gap-3">
+        <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-purple-to/25 bg-purple-from/15 text-purple-300 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+          <Link2 className="h-5 w-5" strokeWidth={1.8} />
+        </span>
         <span className="min-w-0">
-          <span className="block text-sm font-semibold text-text-primary">{title}</span>
-          <span className="block text-[11px] text-text-muted">
-            Compare the review with real stats + earn 1 bonus analysis (up to 10)
+          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300">Posted it?</span>
+          <span className="block text-sm font-bold text-white">{title}</span>
+          <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-400">
+            Connect the post, start tracking results, and earn +1 analysis
           </span>
         </span>
       </span>
-      <span className="text-purple-to font-bold flex-shrink-0 group-hover:translate-x-0.5 transition-transform">→</span>
+      <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-purple-500 text-white shadow-lg shadow-purple-950/40 transition-transform group-hover:translate-x-1">
+        <ArrowUpRight className="h-4 w-4" />
+      </span>
     </button>
   );
-}
-
-function groupByDate(analyses: AnalysisSummary[]): { label: string; items: AnalysisSummary[] }[] {
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfYesterday = new Date(startOfToday);
-  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-  const startOfWeek = new Date(startOfToday);
-  startOfWeek.setDate(startOfWeek.getDate() - 7);
-  const startOfMonth = new Date(startOfToday);
-  startOfMonth.setDate(startOfMonth.getDate() - 30);
-
-  const groups: { label: string; items: AnalysisSummary[] }[] = [
-    { label: "Today", items: [] },
-    { label: "Yesterday", items: [] },
-    { label: "This Week", items: [] },
-    { label: "This Month", items: [] },
-    { label: "Older", items: [] },
-  ];
-
-  for (const a of analyses) {
-    const d = new Date(a.created_at);
-    if (d >= startOfToday) groups[0].items.push(a);
-    else if (d >= startOfYesterday) groups[1].items.push(a);
-    else if (d >= startOfWeek) groups[2].items.push(a);
-    else if (d >= startOfMonth) groups[3].items.push(a);
-    else groups[4].items.push(a);
-  }
-
-  return groups.filter((g) => g.items.length > 0);
 }
 
 type Platform = "tiktok" | "instagram";
@@ -143,7 +119,7 @@ function TikTokStatsRow({
             e.preventDefault();
             if (link.trim()) fetchStats(link.trim());
           }}
-          className="flex gap-2"
+          className="motion-pop flex flex-col gap-2 sm:flex-row"
         >
           <input
             type="url"
@@ -169,9 +145,6 @@ function TikTokStatsRow({
           </button>
         </form>
       )}
-      <p className="text-[11px] text-text-muted mt-2">
-        Best captured near 24 hours, 7 days, and 30 days after posting.
-      </p>
       {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
     </div>
   );
@@ -232,7 +205,7 @@ function InstagramStatsRow({
             e.preventDefault();
             if (link.trim()) fetchStats(link.trim());
           }}
-          className="flex gap-2"
+          className="motion-pop flex flex-col gap-2 sm:flex-row"
         >
           <select
             value={captureAge}
@@ -312,51 +285,60 @@ function ProjectCard({
     setConfirmDelete(false);
   }
 
-  const reanalyzeUrl = `/?parent=${a.id}&niche=${encodeURIComponent(a.niche)}&platform=${a.platform}`;
+  const projectName = a.project_name?.trim() || `${a.niche || "Untitled"} project`;
+  const updateUrl = `/?parent=${a.id}&niche=${encodeURIComponent(a.niche)}&platform=${a.platform}&project=${encodeURIComponent(projectName)}`;
+  const needsLink = !a.video_url;
 
   return (
-    <div className="relative group bg-card border border-border rounded-2xl hover:border-purple-to transition-colors">
-      <Link href={`/results/${a.id}`} className="block p-5 pb-3">
-        <div className="flex items-start justify-between mb-2 gap-2">
-          <span className="text-text-primary font-semibold capitalize">
-            {a.niche}
-          </span>
+    <article className={`project-card-reactive group ${needsLink ? "needs-link" : ""}`}>
+      <Link href={`/results/${a.id}`} className="relative z-10 block p-5 pb-4">
+        <div className="mb-4 flex items-start justify-between gap-3 pr-10">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-white/5 bg-white/[0.035] text-purple-300">
+              <Video className="h-5 w-5" strokeWidth={1.6} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold text-white">{projectName}</h2>
+              <p className="mt-0.5 truncate text-xs capitalize text-zinc-500">{a.niche || "General"}</p>
+            </div>
+          </div>
+          {needsLink && (
+            <span className="rounded-full border border-purple-to/25 bg-purple-from/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-300">
+              Needs link
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-3 mb-1">
+        <div className="mb-1 flex items-center gap-3">
           <p className={`text-sm font-medium ${verdictColor(a.verdict)}`}>
             {a.verdict}
           </p>
+          {a.parent_id != null && (
+            <span className="rounded-full bg-purple-from/10 px-2 py-0.5 text-[10px] font-semibold text-purple-300">Updated</span>
+          )}
         </div>
         {a.caption_preview && (
-          <p className="text-text-muted text-sm mt-2 line-clamp-2">
+          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-zinc-400">
             {a.caption_preview}
           </p>
         )}
-        <p className="text-text-muted text-xs mt-3">
-          {new Date(a.created_at).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-          {(a.actual_views !== null || a.actual_likes !== null) && " · latest capture:"}
-          {a.actual_views !== null &&
-            ` ${a.actual_views.toLocaleString()} views`}
-          {a.actual_likes !== null &&
-            ` ${a.actual_views !== null ? "· " : ""}${a.actual_likes.toLocaleString()} likes`}
-          {a.parent_id != null && (
-            <span className="ml-2 text-purple-to font-medium">↺ Re-analyzed</span>
-          )}
-        </p>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/5 pt-3 text-xs text-zinc-500">
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            {new Date(a.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+          </span>
+          {a.actual_views !== null && <span>{a.actual_views.toLocaleString()} views</span>}
+          {a.actual_likes !== null && <span>{a.actual_likes.toLocaleString()} likes</span>}
+        </div>
       </Link>
 
-      {/* Re-analyze button */}
-      <div className="px-5 pb-4">
+      <div className="relative z-10 px-5 pb-4">
         <Link
-          href={reanalyzeUrl}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-to/50 rounded-lg px-3 py-1.5 transition-colors"
+          href={updateUrl}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:border-purple-to/50 hover:text-text-primary"
           onClick={(e) => e.stopPropagation()}
         >
-          🔄 Re-analyze
+          <RefreshCw className="h-3.5 w-3.5" /> Update
         </Link>
       </div>
 
@@ -367,9 +349,10 @@ function ProjectCard({
       {!confirmDelete ? (
         <button
           onClick={handleDelete}
-          className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-card border border-border text-text-muted hover:text-danger hover:border-danger rounded-lg px-2 py-1 text-xs"
+          aria-label={`Delete ${projectName}`}
+          className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-lg border border-border bg-card text-text-muted opacity-100 hover:border-danger hover:text-danger sm:opacity-0 sm:group-hover:opacity-100"
         >
-          Delete
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       ) : (
         <div className="absolute top-3 right-3 flex items-center gap-1 bg-card border border-danger rounded-lg px-2 py-1 shadow-lg">
@@ -390,7 +373,7 @@ function ProjectCard({
           </button>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -432,10 +415,15 @@ export default function ProjectsPage() {
   const supersededIds = new Set(
     (allForPlatform ?? []).map((a) => a.parent_id).filter((id): id is number => id != null)
   );
-  const filtered = allForPlatform?.filter((a) => !supersededIds.has(a.id)) ?? null;
+  const filtered = allForPlatform
+    ?.filter((a) => !supersededIds.has(a.id))
+    .sort((a, b) => {
+      const linkPriority = Number(Boolean(a.video_url)) - Number(Boolean(b.video_url));
+      if (linkPriority !== 0) return linkPriority;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }) ?? null;
 
   const cfg = PLATFORM_TABS.find((p) => p.id === platform)!;
-  const groups = filtered ? groupByDate(filtered) : null;
 
   return (
     <main className="min-h-screen bg-background">
@@ -443,10 +431,10 @@ export default function ProjectsPage() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-extrabold">
-            Your <span className={cfg.textGradient}>Video Experiments</span>
+            Your <span className={cfg.textGradient}>Video Projects</span>
           </h1>
           <p className="text-text-muted mt-1">
-            Craft reviews and observed post results, kept separate so each post can teach you something.
+            Projects waiting for a post link appear first, followed by your newest work.
           </p>
         </div>
 
@@ -503,23 +491,14 @@ export default function ProjectsPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-8">
-            {groups!.map((group) => (
-              <div key={group.label}>
-                <h2 className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-3">
-                  {group.label}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {group.items.map((a) => (
-                    <ProjectCard
-                      key={a.id}
-                      a={a}
-                      onDeleted={handleDeleted}
-                      onUpdated={handleUpdated}
-                    />
-                  ))}
-                </div>
-              </div>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            {filtered.map((a) => (
+              <ProjectCard
+                key={a.id}
+                a={a}
+                onDeleted={handleDeleted}
+                onUpdated={handleUpdated}
+              />
             ))}
           </div>
         )}

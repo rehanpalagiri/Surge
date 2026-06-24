@@ -27,6 +27,10 @@ async def _ensure_columns(conn):
             await conn.exec_driver_sql(
                 f"ALTER TABLE user_analyses ADD COLUMN {col} TEXT"
             )
+    if "project_name" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN project_name TEXT"
+        )
     if "user_id" not in existing:
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN user_id INTEGER"
@@ -184,6 +188,7 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS platform VARCHAR DEFAULT 'tiktok'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS caption TEXT",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS project_name VARCHAR",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS actual_likes INTEGER",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS mode VARCHAR DEFAULT 'quick'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS video_url VARCHAR",

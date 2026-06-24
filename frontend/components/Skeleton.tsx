@@ -166,7 +166,7 @@ export function ImproveSkeleton() {
 
 export function ProjectsSkeleton() {
   return (
-    <LoadingRegion label="Loading experiment history" className="space-y-4">
+    <LoadingRegion label="Loading project history" className="space-y-4">
       <Skeleton className="h-3 w-20 rounded-md" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {[0, 1, 2, 3].map((item) => <SkeletonProjectRow key={item} />)}

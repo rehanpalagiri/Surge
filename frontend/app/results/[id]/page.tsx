@@ -461,7 +461,7 @@ export default function ResultsPage() {
             <div className="flex justify-center pb-4">
               <Link
                 href="/"
-                className="inline-block bg-card border border-border text-text-primary font-semibold px-8 py-3 rounded-xl hover:border-purple-to transition-colors"
+                className="inline-block btn-soft text-text-primary font-semibold px-8 py-3 rounded-xl transition-colors"
               >
                 Analyze another video →
               </Link>
@@ -640,11 +640,11 @@ export default function ResultsPage() {
                 href={`/?parent=${analysis.id}&niche=${encodeURIComponent(analysis.niche)}&platform=${analysis.platform}`}
                 className="inline-block gradient-btn text-white font-semibold px-8 py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-transform"
               >
-                🔄 Re-analyze this project
+                🔄 Update this project
               </Link>
               <Link
                 href="/"
-                className="inline-block bg-card border border-border text-text-primary font-semibold px-8 py-3 rounded-xl hover:border-purple-to transition-colors"
+                className="inline-block btn-soft text-text-primary font-semibold px-8 py-3 rounded-xl transition-colors"
               >
                 Analyze a new video →
               </Link>

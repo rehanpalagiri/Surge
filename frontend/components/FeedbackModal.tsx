@@ -101,7 +101,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
         )}
         <p className="text-text-muted text-sm mt-1">
           This helps Surge evaluate whether its craft assessments are useful.
-          {fetchedStats && " You can refresh these stats from Experiments as your video grows."}
+          {fetchedStats && " You can refresh these stats from Projects as your video grows."}
         </p>
       </div>
     );

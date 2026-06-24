@@ -285,6 +285,78 @@ body {
   transition: width 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+.project-card-reactive {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(340px circle at 12% 0%, rgb(168 85 247 / 0.07), transparent 62%),
+    var(--color-card);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025), 0 16px 45px rgb(0 0 0 / 0.15);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.project-card-reactive::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+  pointer-events: none;
+}
+
+.project-card-reactive:hover {
+  border-color: rgb(168 85 247 / 0.48);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 22px 60px rgb(88 28 135 / 0.18);
+  transform: translateY(-2px);
+}
+
+.project-card-reactive.needs-link {
+  border-color: rgb(168 85 247 / 0.28);
+}
+
+.project-link-cta {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgb(168 85 247 / 0.34);
+  border-radius: 1rem;
+  padding: 0.9rem;
+  background:
+    radial-gradient(220px circle at 12% 10%, rgb(168 85 247 / 0.2), transparent 64%),
+    linear-gradient(135deg, rgb(88 28 135 / 0.2), rgb(24 24 27 / 0.88));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 12px 34px rgb(0 0 0 / 0.18);
+}
+
+.project-link-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transform: translateX(-110%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.045), transparent);
+  transition: transform 520ms ease;
+  pointer-events: none;
+}
+
+.project-link-cta:hover {
+  border-color: rgb(192 132 252 / 0.68);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 16px 42px rgb(88 28 135 / 0.25);
+}
+
+.project-link-cta:hover::after { transform: translateX(110%); }
+
 @keyframes skeleton-shimmer { to { transform: translateX(100%); } }
 @keyframes pending-spin { to { transform: rotate(360deg); } }
 @keyframes motion-enter { from { opacity: 0; } to { opacity: 1; } }
@@ -332,11 +404,53 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  /* ── Tier 1: high-intent conversion CTAs (Analyze, link video, signup) ──
+     Dramatic signature flair — bold purple glow + a bright, quick light sweep.
+     Reserve for buttons we actively want clicked, not everyday navigation. */
   .gradient-btn {
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(135deg, #7c3aed, #2563eb);
+    box-shadow: 0 6px 22px -4px rgba(124, 58, 237, 0.65);
   }
   .gradient-btn:hover {
     background: linear-gradient(135deg, #a855f7, #3b82f6);
+    box-shadow:
+      0 16px 42px -6px rgba(168, 85, 247, 0.8),
+      0 0 0 1px rgba(168, 85, 247, 0.28);
+    transform: translateY(-2px);
+  }
+  /* Bright diagonal sweep, faster than the everyday motion for extra punch.
+     Covered by the prefers-reduced-motion guard (it disables *::before). */
+  .gradient-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.45) 50%,
+      transparent 68%
+    );
+    transform: translateX(-140%);
+    transition: transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .gradient-btn:hover::before {
+    transform: translateX(140%);
+  }
+
+  /* ── Tier 2: everyday navigation buttons (projects, dashboard) ──
+     Soft complementary flair — purple-tinted border + gentle glow on hover.
+     No sweep, no gradient. Stays clearly secondary to the Tier-1 CTAs.
+     (Settings buttons stay plain — do NOT apply this there.) */
+  .btn-soft {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+  }
+  .btn-soft:hover {
+    border-color: color-mix(in srgb, var(--color-purple-to) 55%, transparent);
+    box-shadow: 0 6px 20px -8px rgba(168, 85, 247, 0.45);
   }
 
   /* ── TikTok duo-tone: cyan → pink/red ── */

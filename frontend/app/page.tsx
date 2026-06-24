@@ -13,6 +13,7 @@ import { isAllowedVideoFile } from "@/lib/videoValidation";
 import { useFakeProgress } from "@/lib/useFakeProgress";
 import { ReportSkeleton, Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
+import ProjectNameField from "@/components/ProjectNameField";
 import { track } from "@vercel/analytics";
 
 type Platform = "tiktok" | "instagram";
@@ -89,6 +90,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
   const router = useRouter();
 
   const [file, setFile] = useState<File | null>(null);
+  const [projectName, setProjectName] = useState("");
   const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -136,8 +138,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!projectName.trim()) {
+      setError("Give your project a name so you can find it later.");
+      return;
+    }
     if (!file) {
-      setError("Upload an MP4 or .MOV to get started.");
+      setError("Upload a video to get started — MP4 or MOV.");
       return;
     }
     setError("");
@@ -151,6 +157,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         niches[0] || "Lifestyle",
         "", "", "tiktok", "",
         niches[1] ?? "",
+        projectName.trim(),
       );
       track("analysis_complete", { platform: "tiktok", mode: "direct" });
       router.push(`/results/${id}`);
@@ -182,7 +189,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             </Link>
             <Link
               href="/signup"
-              className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors"
+              className="gradient-btn text-white text-sm font-semibold px-4 py-1.5 rounded-lg"
             >
               Sign up free
             </Link>
@@ -232,8 +239,9 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 file={file}
                 onFileSelected={handleFile}
                 selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}
-                idleNote="Private upload · maximum file size 100 MB"
               />
+
+              <ProjectNameField value={projectName} onChange={setProjectName} />
 
               {/* Niche — searchable multi-select (up to 2) */}
               <NichePicker selected={niches} onChange={setNiches} />
@@ -249,10 +257,8 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               <button
                 type="submit"
                 disabled={processing}
-                className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-2xl text-lg transition-all
-                  hover:shadow-[0_0_20px_rgba(168,85,247,0.5)]
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  active:scale-[0.99]"
+                className="gradient-btn w-full text-white font-bold py-4 rounded-2xl text-lg
+                  disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Analyze My Video →
               </button>
@@ -297,6 +303,7 @@ export default function Home() {
   const [deleted, setDeleted] = useState(false);
   const [reanalyzeParentId, setReanalyzeParentId] = useState<number | undefined>(undefined);
   const [reanalyzeNiches, setReanalyzeNiches] = useState<string[] | undefined>(undefined);
+  const [updateProjectName, setUpdateProjectName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const token = getToken();
@@ -308,13 +315,15 @@ export default function Home() {
       const timer = setTimeout(() => setDeleted(false), 5000);
       return () => clearTimeout(timer);
     }
-    // Re-analyze flow: ?parent=ID&niche=Fitness&platform=tiktok
+    // Update flow: ?parent=ID&niche=Fitness&platform=tiktok&project=Name
     const parentParam = params.get("parent");
     const nicheParam = params.get("niche");
+    const projectParam = params.get("project");
     const platformParam = params.get("platform") as Platform | null;
     if (parentParam && /^\d+$/.test(parentParam)) {
       setReanalyzeParentId(Number(parentParam));
       if (nicheParam) setReanalyzeNiches([nicheParam]);
+      if (projectParam) setUpdateProjectName(projectParam);
       if (platformParam && (platformParam === "tiktok" || platformParam === "instagram")) {
         setPlatform(platformParam);
       }
@@ -385,7 +394,12 @@ export default function Home() {
 
       {/* ── Upload form ── */}
       <section className="flex-1 px-4 pb-16">
-        <UploadZone platform={platform} parentId={reanalyzeParentId} initialNiches={reanalyzeNiches} />
+        <UploadZone
+          platform={platform}
+          parentId={reanalyzeParentId}
+          initialNiches={reanalyzeNiches}
+          initialProjectName={updateProjectName}
+        />
         <p className="text-zinc-600 text-xs text-center mt-5 max-w-xl mx-auto">
           Your video is analyzed privately and not stored permanently.
         </p>

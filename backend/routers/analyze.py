@@ -31,7 +31,20 @@ from auth import optional_user, require_user, is_minor
 import services.r2 as r2
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
-ALLOWED_CONTENT_TYPES = {"video/mp4", "video/quicktime"}
+# Formats Gemini's File API accepts natively — no server-side transcoding needed.
+# MKV (video/x-matroska) is the one common format Gemini does NOT support, so it
+# stays excluded. Browsers report several MIME spellings per format, so include
+# the common variants (e.g. AVI is usually reported as video/x-msvideo).
+ALLOWED_CONTENT_TYPES = {
+    "video/mp4",
+    "video/quicktime",                  # .mov
+    "video/webm",
+    "video/avi", "video/x-msvideo",     # .avi
+    "video/mpeg", "video/mpg", "video/x-mpeg",  # .mpeg / .mpg
+    "video/wmv", "video/x-ms-wmv",      # .wmv
+    "video/x-flv",                      # .flv
+    "video/3gpp",                       # .3gp
+}
 MAX_ACTUAL_VIEWS = 500_000_000  # sanity ceiling for feedback (no real video tops this)
 REFRESH_COOLDOWN = timedelta(hours=24)  # min gap between video-link count refreshes
 
@@ -56,7 +69,7 @@ async def get_upload_presigned_url(
         raise HTTPException(status_code=503, detail="File upload service not configured.")
     ct = (content_type or "").lower()
     if ct not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
+        raise HTTPException(status_code=400, detail="Unsupported video format. Try MP4, MOV, WEBM, AVI, WMV, MPEG, or 3GP (MKV isn't supported yet).")
     key = f"uploads/{uuid.uuid4()}_{os.path.basename(filename or 'upload')}"
     upload_url = r2.presigned_upload_url(key, ct)
     return {"upload_url": upload_url, "key": key}
@@ -162,7 +175,8 @@ async def analyze(
     caption: str = Form(""),
     bio: str = Form(""),
     platform: str = Form("tiktok"),
-    parent_id: str = Form(""),  # optional: ID of the analysis this re-analyzes
+    project_name: str = Form(""),
+    parent_id: str = Form(""),  # optional: ID of the analysis this updates
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(optional_user),
 ):
@@ -224,6 +238,7 @@ async def analyze(
 
     # Resolve parent_id — must belong to the current user (ownership check).
     resolved_parent_id: Optional[int] = None
+    parent_analysis: Optional[UserAnalysis] = None
     if parent_id.strip().isdigit() and user:
         _pid = int(parent_id.strip())
         _parent = (await db.execute(
@@ -231,6 +246,13 @@ async def analyze(
         )).scalar_one_or_none()
         if _parent:
             resolved_parent_id = _pid
+            parent_analysis = _parent
+
+    resolved_project_name = project_name.strip()[:80]
+    if not resolved_project_name and parent_analysis and parent_analysis.project_name:
+        resolved_project_name = parent_analysis.project_name
+    if not resolved_project_name:
+        resolved_project_name = "Untitled project"
 
     # --- R2 async path: file already in cloud storage, process in background ---
     if has_r2:
@@ -238,6 +260,7 @@ async def analyze(
             user_id=user.id if user else None,
             platform=platform,
             filename=os.path.basename(r2_key),
+            project_name=resolved_project_name,
             niche=raw_niche,  # the user's own words — shown in My Projects
             canonical_niche=canonical_niche,  # classifier label — calibration keys on this
             caption=caption or None,
@@ -274,12 +297,12 @@ async def analyze(
         if "instagram.com" in url_stripped:
             raise HTTPException(
                 status_code=400,
-                detail="Instagram URL analysis is not yet supported. Please upload an MP4 file.",
+                detail="Instagram URL analysis is not yet supported. Please upload a video file instead.",
             )
         if not is_tiktok_url(url_stripped):
             raise HTTPException(
                 status_code=400,
-                detail="Only TikTok URLs are supported for direct link analysis. Please upload an MP4 or .MOV file.",
+                detail="Only TikTok URLs are supported for direct link analysis. Please upload a video file instead.",
             )
         platform = "tiktok"
         try:
@@ -295,7 +318,7 @@ async def analyze(
     else:
         # File upload path
         if file.content_type and file.content_type not in ALLOWED_CONTENT_TYPES:
-            raise HTTPException(status_code=400, detail="Only MP4 and MOV video files are supported.")
+            raise HTTPException(status_code=400, detail="Unsupported video format. Try MP4, MOV, WEBM, AVI, WMV, MPEG, or 3GP (MKV isn't supported yet).")
         original_name = os.path.basename(file.filename or "upload")
         safe_name = f"{uuid.uuid4()}_{original_name}"
         file_path = os.path.join(uploads_dir, safe_name)
@@ -344,6 +367,7 @@ async def analyze(
         user_id=user.id if user else None,
         platform=platform,
         filename=safe_name,
+        project_name=resolved_project_name,
         niche=raw_niche,  # the user's own words — shown in My Projects
         canonical_niche=canonical_niche,
         caption=caption or None,
@@ -437,6 +461,7 @@ async def my_analyses(
             {
                 "id": a.id,
                 "platform": a.platform,
+                "project_name": a.project_name,
                 "niche": a.niche,
                 "verdict": a.verdict,
                 "caption_preview": caption_preview,
@@ -782,6 +807,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "id": analysis.id,
         "platform": analysis.platform or "tiktok",
         "filename": analysis.filename,
+        "project_name": analysis.project_name,
         "niche": analysis.niche,
         "caption": analysis.caption,
         "bio": analysis.bio,
@@ -826,6 +852,7 @@ def _to_locked(analysis: UserAnalysis) -> dict:
         "id": analysis.id,
         "platform": analysis.platform or "tiktok",
         "filename": analysis.filename,
+        "project_name": analysis.project_name,
         "niche": analysis.niche,
         "caption": None,
         "bio": None,
