@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 import InstallBanner from "@/components/InstallBanner";
-import ReportIssue from "@/components/ReportIssue";
 import LinkPromptModal from "@/components/LinkPromptModal";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -59,7 +58,6 @@ export default function RootLayout({
         {children}
         <LinkPromptModal />
         <InstallBanner />
-        <ReportIssue />
         <Analytics />
       </body>
     </html>
