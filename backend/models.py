@@ -67,6 +67,10 @@ class User(Base):
     # and can never change it; adults default to "ask" (decide per linked video).
     seed_consent = Column(String, nullable=True, default="ask")
     password_hash = Column(Text, nullable=False)
+    # Email ownership confirmation. New signups start False and verify via a
+    # 6-digit code; the migration backfills existing accounts to True so they
+    # are never locked out by this feature.
+    email_verified = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -258,6 +262,19 @@ class PasswordResetToken(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     token = Column(String, unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EmailVerificationToken(Base):
+    """6-digit code emailed at signup to confirm the account's email address.
+    Same shape as PasswordResetToken; matched per-user on the verify endpoint."""
+    __tablename__ = "email_verification_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

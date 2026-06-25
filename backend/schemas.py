@@ -137,6 +137,7 @@ class UserOut(BaseModel):
     birth_date: Optional[str] = None
     seed_consent: Optional[str] = "ask"
     is_minor: bool = False
+    email_verified: bool = True
     created_at: datetime
 
     class Config:
@@ -164,6 +165,15 @@ class ResetPasswordIn(BaseModel):
 
 class VerifyResetCodeIn(BaseModel):
     token: str
+
+
+class VerifyEmailIn(BaseModel):
+    code: str
+
+
+class GoogleAuthIn(BaseModel):
+    credential: str  # Google ID token (JWT) from Google Identity Services
+    birth_date: Optional[str] = None  # ISO YYYY-MM-DD, only used when creating a new account
 
 
 class DeleteAccountIn(BaseModel):

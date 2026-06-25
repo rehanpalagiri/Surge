@@ -99,6 +99,7 @@ export interface UserOut {
   birth_date?: string | null;
   seed_consent?: "yes" | "no" | "ask";
   is_minor?: boolean;
+  email_verified?: boolean;
   created_at: string;
 }
 
@@ -296,11 +297,37 @@ export async function login(
   return handleResponse<TokenOut>(res);
 }
 
+export async function googleAuth(credential: string, birthDate?: string | null): Promise<TokenOut> {
+  const res = await fetch(`${BASE}/api/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential, birth_date: birthDate ?? null }),
+  });
+  return handleResponse<TokenOut>(res);
+}
+
 export async function getMe(token?: string | null): Promise<UserOut> {
   const res = await fetch(`${BASE}/api/auth/me`, {
     headers: authHeaders(token),
   });
   return handleResponse<UserOut>(res);
+}
+
+export async function verifyEmail(code: string, token?: string | null): Promise<UserOut> {
+  const res = await fetch(`${BASE}/api/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ code }),
+  });
+  return handleResponse<UserOut>(res);
+}
+
+export async function resendVerification(token?: string | null): Promise<void> {
+  const res = await fetch(`${BASE}/api/auth/resend-verification`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  await handleResponse(res);
 }
 
 export async function getMyAnalyses(

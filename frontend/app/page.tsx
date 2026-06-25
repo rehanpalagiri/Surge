@@ -10,8 +10,8 @@ import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
 import { isAllowedVideoFile } from "@/lib/videoValidation";
-import { useFakeProgress } from "@/lib/useFakeProgress";
-import { ReportSkeleton, Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
+import { AnalysisOverlay } from "@/components/AnalysisProgress";
+import { Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import PlatformTabs from "@/components/PlatformTabs";
 import { track } from "@vercel/analytics";
@@ -24,71 +24,12 @@ const PLATFORM_LABEL: Record<Platform, string> = {
 };
 
 const PROCESSING_STEPS = [
-  "Analyzing first 3-second hook...",
-  "Scanning for UI text collisions...",
-  "Calculating pacing fatigue...",
-  "Generating your craft review...",
+  "Analyzing the first-3-second hook…",
+  "Scanning for on-screen text collisions…",
+  "Measuring cut rhythm and pacing…",
+  "Checking audio-visual sync and loop…",
+  "Writing your craft review…",
 ];
-
-// ─── Processing overlay ────────────────────────────────────────────────────────
-
-function ProcessingOverlay({ step }: { step: number }) {
-  const progress = useFakeProgress(true, 22);
-  // First ~4s: a full-screen "analyzing" state with a centered bar. After that,
-  // the bar shrinks to a thin loader pinned to the top and the report skeleton
-  // fills the screen, so the report feels like it's already materializing.
-  const [preview, setPreview] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setPreview(true), 4000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const stepText = PROCESSING_STEPS[step] ?? PROCESSING_STEPS[PROCESSING_STEPS.length - 1];
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-sm overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
-      aria-busy="true"
-      aria-labelledby="analysis-progress-title"
-      aria-describedby="analysis-progress-detail"
-    >
-      {preview ? (
-        <>
-          {/* Thin top loader — the only progress affordance once the skeleton shows */}
-          <div className="fixed top-0 left-0 right-0 h-1 bg-zinc-800 z-[60]">
-            <div
-              className="h-full bg-purple-500"
-              style={{ width: `${progress}%`, transition: "width 500ms cubic-bezier(0.25, 1, 0.5, 1)" }}
-            />
-          </div>
-          <div className="mx-auto w-full max-w-3xl px-4 py-10">
-            <p id="analysis-progress-title" className="text-center text-white text-lg font-bold mb-1">Building your review…</p>
-            <p id="analysis-progress-detail" className="text-center text-zinc-500 text-sm mb-6 animate-pulse">{stepText}</p>
-            <ReportSkeleton />
-          </div>
-        </>
-      ) : (
-        <div className="min-h-full flex flex-col items-center justify-center gap-5 px-4 py-10">
-          <div className="text-center space-y-1.5">
-            <p id="analysis-progress-title" className="text-white text-xl font-bold">Analyzing your video...</p>
-            <p id="analysis-progress-detail" className="text-zinc-500 text-sm">Hang tight while the video is processed and reviewed</p>
-          </div>
-          <div className="w-full max-w-xs space-y-3">
-            <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-purple-500 rounded-full"
-                style={{ width: `${progress}%`, transition: "width 600ms cubic-bezier(0.25, 1, 0.5, 1)" }}
-              />
-            </div>
-            <p className="text-zinc-400 text-sm text-center animate-pulse">{stepText}</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Landing hero (anonymous users) ───────────────────────────────────────────
 
@@ -112,17 +53,6 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
   const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [processingStep, setProcessingStep] = useState(0);
-
-  // Cycle through processing steps every 4 seconds
-  useEffect(() => {
-    if (!processing) return;
-    setProcessingStep(0);
-    const interval = setInterval(() => {
-      setProcessingStep((s) => Math.min(s + 1, PROCESSING_STEPS.length - 1));
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [processing]);
 
   const handleFile = async (f: File) => {
     setError("");
@@ -190,7 +120,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
   return (
     <>
-      {processing && <ProcessingOverlay step={processingStep} />}
+      {processing && <AnalysisOverlay active={processing} steps={PROCESSING_STEPS} />}
 
       <main className="min-h-screen flex flex-col bg-zinc-950">
         {/* ── Minimal nav ── */}

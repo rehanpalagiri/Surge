@@ -1,6 +1,9 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+// No `runtime = "edge"`: edge runtime disables static generation, which forced
+// this identical, input-less card to be re-rendered on every social-crawler
+// request. On the default (Node) runtime Next prerenders it once at build, so
+// it's served straight from the CDN and never regenerated per visitor.
 export const alt = "Surge — AI-assisted video craft review";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

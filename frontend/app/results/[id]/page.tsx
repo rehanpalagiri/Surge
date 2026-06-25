@@ -8,7 +8,7 @@ import VerdictBanner from "@/components/VerdictBanner";
 import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
-import { ReportSkeleton } from "@/components/Skeleton";
+import { AnalysisProgress } from "@/components/AnalysisProgress";
 import {
   getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus,
   getOutcomeSnapshots, AnalysisOut, OutcomeSnapshot,
@@ -215,6 +215,7 @@ export default function ResultsPage() {
   const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
   const [parentAnalysis, setParentAnalysis] = useState<AnalysisOut | null>(null);
   const [status, setStatus] = useState<"loading" | "ok" | "notfound" | "timeout">("loading");
+  const [pending, setPending] = useState(false); // true only while the review is still being generated
   const [loadingText, setLoadingText] = useState("Loading your results…");
   const [showUpsell, setShowUpsell] = useState(false);
   const [snapshots, setSnapshots] = useState<OutcomeSnapshot[]>([]);
@@ -232,11 +233,18 @@ export default function ResultsPage() {
         (scores.hook_velocity == null && !scores.error && !scores.locked);
 
       if (isPending(a.scores_json)) {
-        if (!cancelled) setLoadingText("Still analyzing your video — this can take up to 60 seconds…");
+        if (!cancelled) {
+          setPending(true); // switches the loading view to the percentage meter
+          setLoadingText("Still analyzing your video — this can take up to 60 seconds…");
+        }
 
+        // Ramped backoff: quick first checks so a near-finished review appears
+        // almost instantly, easing out to 3s. ~90s total budget.
         let timedOut = true;
-        for (let i = 0; i < 20; i++) {
-          await new Promise((r) => setTimeout(r, 3000));
+        let delay = 800;
+        const deadline = Date.now() + 90_000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, delay));
           if (cancelled) return;
 
           const { status: pollStatus } = await getAnalysisStatus(Number(id));
@@ -245,6 +253,7 @@ export default function ResultsPage() {
             timedOut = false;
             break;
           }
+          delay = Math.min(3000, Math.round(delay * 1.3));
         }
 
         if (timedOut) {
@@ -317,17 +326,17 @@ export default function ResultsPage() {
     return (
       <main className="min-h-screen bg-background">
         <Nav />
-        <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-          <div className="rounded-2xl border border-purple-to/20 bg-purple-from/5 px-5 py-4" role="status">
-            <div className="flex items-center gap-3">
-              <span className="pending-spinner shrink-0 text-purple-to" aria-hidden="true" />
-              <div>
-                <p className="text-text-primary text-sm font-semibold">Preparing your craft review</p>
-                <p className="text-text-muted text-sm mt-0.5">{loadingText}</p>
-              </div>
+        <div className="max-w-3xl mx-auto px-4 py-10">
+          {pending ? (
+            // Review still generating → percentage meter, skeleton only near done.
+            <AnalysisProgress active title="Finishing your review" expectedMs={40000} revealAt={86} compact />
+          ) : (
+            // Just fetching an existing review — a brief, quiet load.
+            <div className="flex flex-col items-center justify-center gap-3 py-24 text-center" role="status">
+              <span className="pending-spinner text-purple-to" aria-hidden="true" />
+              <p className="text-text-muted text-sm">{loadingText}</p>
             </div>
-          </div>
-          <ReportSkeleton />
+          )}
         </div>
       </main>
     );

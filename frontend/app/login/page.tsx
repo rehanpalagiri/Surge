@@ -3,9 +3,10 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { login, claimAnalysis } from "@/lib/api";
+import { login, claimAnalysis, getMe, googleAuth } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
+import GoogleSignInButton, { GOOGLE_ENABLED } from "@/components/GoogleSignInButton";
 
 function extractAnalysisId(next: string | null): string | null {
   if (!next) return null;
@@ -40,9 +41,32 @@ function LoginForm() {
           // Already owned / belongs to someone else — non-fatal.
         }
       }
+      // Unverified accounts must confirm their email before continuing.
+      const me = await getMe(access_token).catch(() => null);
+      if (me && me.email_verified === false) {
+        router.push(`/verify-email?next=${encodeURIComponent(next || "/")}`);
+        return;
+      }
       router.push(next || "/");
     } catch {
       setError("Invalid username or password.");
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogle(credential: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const { access_token } = await googleAuth(credential);
+      setToken(access_token);
+      const id = extractAnalysisId(next);
+      if (id) {
+        try { await claimAnalysis(id, access_token); } catch { /* non-fatal */ }
+      }
+      router.push(next || "/");
+    } catch {
+      setError("Google sign-in failed. Please try again.");
       setLoading(false);
     }
   }
@@ -83,6 +107,17 @@ function LoginForm() {
             {loading ? "Logging in…" : "Log in"}
           </button>
         </form>
+
+        {GOOGLE_ENABLED && (
+          <>
+            <div className="flex items-center gap-3 text-text-muted text-xs">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <GoogleSignInButton onCredential={handleGoogle} text="continue_with" />
+          </>
+        )}
         <div className="space-y-2 text-center text-sm">
           <p className="text-text-muted">
             No account?{" "}

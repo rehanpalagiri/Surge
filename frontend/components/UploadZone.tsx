@@ -7,8 +7,7 @@ import { FileVideo2 } from "lucide-react";
 import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUploadUrl, uploadFileToR2, analyzeFromR2, getAnalysisStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
-import { useFakeProgress } from "@/lib/useFakeProgress";
-import { ReportSkeleton } from "@/components/Skeleton";
+import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { track } from "@vercel/analytics";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import NichePicker from "@/components/NichePicker";
@@ -162,7 +161,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
   const [waking, setWaking] = useState(false);
-  const [tipIndex, setTipIndex] = useState(0);
   const [error, setError] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [rateLimit, setRateLimit] = useState<RateLimitStatus | null>(null);
@@ -173,21 +171,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
   const [compressPhase, setCompressPhase] = useState("");
   const [compressProgress, setCompressProgress] = useState(0);
 
-  // Upload state
+  // Upload state. The "analyzing" phase is handled by <AnalysisProgress>, which
+  // owns the percentage, the rotating steps, and the late skeleton reveal.
   const [uploadPhase, setUploadPhase] = useState<"idle" | "uploading" | "analyzing">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const analysisProgress = useFakeProgress(uploadPhase === "analyzing");
-  // After ~4s of analyzing, shrink the bar to a top loader and show the report
-  // skeleton so the review feels like it's already materializing.
-  const [analysisPreview, setAnalysisPreview] = useState(false);
-  useEffect(() => {
-    if (uploadPhase !== "analyzing" || waking) {
-      setAnalysisPreview(false);
-      return;
-    }
-    const t = setTimeout(() => setAnalysisPreview(true), 4000);
-    return () => clearTimeout(t);
-  }, [uploadPhase, waking]);
 
   useEffect(() => {
     const authed = !!getToken();
@@ -286,9 +273,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
     setLoading(true);
     setUploadPhase("idle");
     setUploadProgress(0);
-    setTipIndex(0);
-
-    let tipInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
       setWaking(true);
@@ -306,7 +290,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
       // Phase 3: trigger async analysis
       setUploadPhase("analyzing");
-      tipInterval = setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 4000);
 
       const { id } = await analyzeFromR2(
         key,
@@ -327,10 +310,14 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         getRateLimit().then(setRateLimit).catch(() => {});
       }
 
-      // Phase 4: poll until Gemini finishes (max 5 min)
-      const MAX_POLLS = 100;
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await new Promise((r) => setTimeout(r, 3000));
+      // Phase 4: poll until Gemini finishes. Ramped backoff instead of a flat
+      // 3s: the first checks come fast (≈0.8s) so a quick review returns almost
+      // immediately, then the interval eases out to 3s to spare the API. This
+      // removes up to ~3s of dead-time at the end of every analysis.
+      const deadline = Date.now() + 5 * 60 * 1000;
+      let delay = 800;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, delay));
         const { status } = await getAnalysisStatus(id);
         if (status === "complete") {
           track("analysis_complete", { platform, mode: "r2_async" });
@@ -340,6 +327,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         if (status === "error") {
           throw new Error("Analysis failed. Please try again.");
         }
+        delay = Math.min(3000, Math.round(delay * 1.3));
       }
       throw new Error("Analysis timed out. Please try again.");
     } catch (err: unknown) {
@@ -358,8 +346,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       setLoading(false);
       setWaking(false);
       setUploadPhase("idle");
-    } finally {
-      if (tipInterval) clearInterval(tipInterval);
     }
   };
 
@@ -408,48 +394,19 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                 </div>
               </div>
             </>
-          ) : analysisPreview ? (
-            <>
-              {/* Thin top loader — the only progress affordance once the skeleton shows */}
-              <div className="fixed top-0 left-0 right-0 h-1 bg-zinc-800 z-[60]">
-                <div
-                  className="h-full bg-purple-500"
-                  style={{ width: `${analysisProgress}%`, transition: "width 500ms cubic-bezier(0.25, 1, 0.5, 1)" }}
-                />
+          ) : waking ? (
+            <div className="flex w-full flex-col items-center gap-6 py-6 text-center">
+              <div className="space-y-1.5">
+                <p className="text-xl font-bold text-white">Waking up the server…</p>
+                <p className="text-zinc-500 text-sm">First request after a quiet period can take up to 20 seconds</p>
               </div>
-              <p className="text-center text-white text-lg font-bold mb-1">Building your review…</p>
-              <p className="text-center text-zinc-500 text-sm mb-6 animate-pulse">{TIPS[tipIndex]}</p>
-              <div className="w-full">
-                <ReportSkeleton />
+              <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-full w-1/4 rounded-full bg-purple-500 animate-pulse" />
               </div>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="text-center space-y-1">
-                <p className="text-xl font-bold text-white">
-                  {waking ? "Waking up the server…" : "Surge is analyzing your video..."}
-                </p>
-                <p className="text-zinc-500 text-sm">
-                  {waking
-                    ? "First request after a quiet period can take up to 20 seconds"
-                    : "Hang tight while the video is processed and reviewed"}
-                </p>
-              </div>
-              <div className="w-full max-w-xs space-y-2.5">
-                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-purple-500 rounded-full"
-                    style={{
-                      width: `${waking ? 5 : analysisProgress}%`,
-                      transition: "width 600ms cubic-bezier(0.25, 1, 0.5, 1)",
-                    }}
-                  />
-                </div>
-                <p className="text-zinc-400 text-sm text-center animate-pulse">
-                  {waking ? "Connecting to Surge's analysis engine…" : TIPS[tipIndex]}
-                </p>
-              </div>
-            </>
+            /* Percentage meter → late skeleton reveal, all owned by one component. */
+            <AnalysisProgress active steps={TIPS} />
           )}
           </div>
         </div>

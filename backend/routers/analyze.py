@@ -292,7 +292,9 @@ async def analyze(
         )
         db.add(analysis)
         await db.commit()
-        await db.refresh(analysis)
+        # analysis.id is populated by the flush the commit performed; the row is
+        # now durable so the background task's separate session can read it. No
+        # refresh needed — the response only echoes id + status.
         background_tasks.add_task(
             _run_r2_analysis,
             analysis.id,
@@ -402,9 +404,13 @@ async def analyze(
         calibration_version=0,
         parent_id=resolved_parent_id,
     )
+    # One transaction, one commit: flush assigns analysis.id (and the Python-side
+    # created_at default) so the artifact can reference it, then both rows commit
+    # atomically. The previous commit-then-upsert-then-commit-again wrote the same
+    # logical record in two transactions — a row could persist with no artifact if
+    # the process died between them, and it cost an extra round-trip refresh.
     db.add(analysis)
-    await db.commit()
-    await db.refresh(analysis)
+    await db.flush()
     await upsert_artifact(db, analysis.id, content_sha256=content_sha256)
     await db.commit()
 

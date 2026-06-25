@@ -17,8 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
 
 from database import get_db
-from models import User, PasswordResetToken
-from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn
+from models import User, PasswordResetToken, EmailVerificationToken
+from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn, VerifyEmailIn, GoogleAuthIn
 from auth import hash_password, verify_password, create_access_token, require_user, is_minor
 from services.throttle import check_rate
 
@@ -33,6 +33,9 @@ _FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
 # like Railway that block all outbound SMTP ports (587/2525/465/25). SMTP is the
 # local-dev fallback only.
 _BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+# Google OAuth client ID (…apps.googleusercontent.com). Set in Railway; the same
+# value is exposed to the frontend as NEXT_PUBLIC_GOOGLE_CLIENT_ID.
+_GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -41,6 +44,11 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Per-email reset cap (persistent, via the token table's created_at): at most this
 # many reset emails per hour to one account — guards a victim's inbox + Brevo quota.
 _RESET_PER_EMAIL_HOUR = 3
+
+# Email verification: codes live longer than reset codes (users may verify later),
+# and the resend cap protects the inbox + Brevo quota.
+_VERIFY_TTL = timedelta(hours=24)
+_VERIFY_PER_EMAIL_HOUR = 5
 
 
 def _client_ip(request: Request) -> str:
@@ -61,6 +69,7 @@ def user_to_out(user: User) -> dict:
         "birth_date": user.birth_date,
         "seed_consent": user.seed_consent or "ask",
         "is_minor": is_minor(user),
+        "email_verified": bool(user.email_verified),
         "created_at": user.created_at,
     }
 
@@ -109,13 +118,38 @@ async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: Async
         birth_date=payload.birth_date,
         seed_consent=consent,
         password_hash=hash_password(payload.password),
+        email_verified=False,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    background_tasks.add_task(_send_welcome_email, user.email, user.username)
+    # Email verification: send a 6-digit code now; the welcome email waits until
+    # they confirm (in /verify-email). They still get a token so the verify step
+    # is authenticated.
+    code = await _issue_verification_code(user.id, db)
+    background_tasks.add_task(_send_verification_email, user.email, user.username, code)
     return TokenOut(access_token=create_access_token(user.id))
+
+
+async def _issue_verification_code(user_id: int, db: AsyncSession) -> str:
+    """Invalidate any outstanding codes for the user and mint a fresh 6-digit one."""
+    existing = await db.execute(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.user_id == user_id,
+            EmailVerificationToken.used == False,  # noqa: E712
+        )
+    )
+    for tok in existing.scalars().all():
+        tok.used = True
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    db.add(EmailVerificationToken(
+        user_id=user_id,
+        token=code,
+        expires_at=datetime.utcnow() + _VERIFY_TTL,
+    ))
+    await db.commit()
+    return code
 
 
 @router.post("/login", response_model=TokenOut)
@@ -133,9 +167,152 @@ async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
     return TokenOut(access_token=create_access_token(user.id))
 
 
+@router.post("/google", response_model=TokenOut)
+async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+    """Sign in / sign up with Google. The Google ID token already proves email
+    ownership, so these accounts are created email_verified=True (no code)."""
+    if not _GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in isn't configured.")
+
+    # Verify the ID token via Google's tokeninfo endpoint (no extra crypto deps).
+    # tokeninfo only returns 200 for tokens with a valid signature and unexpired.
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": payload.credential},
+            )
+    except Exception:
+        raise HTTPException(status_code=502, detail="Couldn't reach Google. Please try again.")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Google sign-in.")
+    info = r.json()
+    # Critical checks: the token must be minted for OUR app and issued by Google.
+    if info.get("aud") != _GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=401, detail="Invalid Google sign-in.")
+    if info.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        raise HTTPException(status_code=401, detail="Invalid Google sign-in.")
+    if str(info.get("email_verified")).lower() != "true":
+        raise HTTPException(status_code=403, detail="Your Google account email isn't verified.")
+    email = (info.get("email") or "").strip().lower()
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Google didn't share a usable email.")
+
+    # Existing account → just log in (matched by email).
+    existing = await db.execute(select(User).where(func.lower(User.email) == email))
+    user = existing.scalar_one_or_none()
+    if user:
+        return TokenOut(access_token=create_access_token(user.id))
+
+    # New account. Enforce the 13+ age gate when a DOB was supplied (signup page);
+    # leave it unset otherwise (is_minor treats unknown as adult — see note in PR).
+    birth_year = None
+    birth_date = None
+    consent = "ask"
+    if payload.birth_date:
+        try:
+            bd = date.fromisoformat(payload.birth_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Please enter a valid date of birth.")
+        today = date.today()
+        if bd > today or bd.year < 1900:
+            raise HTTPException(status_code=400, detail="Please enter a valid date of birth.")
+        age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+        if age < 13:
+            raise HTTPException(status_code=403, detail="You must be 13 or older to use Surge.")
+        birth_year, birth_date = bd.year, payload.birth_date
+        consent = "no" if age < 18 else "ask"
+
+    # Username from the Google display name (or email local part), de-duplicated.
+    base = (info.get("name") or email.split("@")[0]).strip()[:30] or "creator"
+    username = base
+    suffix = 0
+    while (await db.execute(select(User).where(User.username == username))).scalar_one_or_none():
+        suffix += 1
+        username = f"{base}{suffix}"[:32]
+
+    user = User(
+        username=username,
+        email=email,
+        birth_year=birth_year,
+        birth_date=birth_date,
+        seed_consent=consent,
+        password_hash=hash_password(secrets.token_urlsafe(32)),  # unusable; OAuth-only
+        email_verified=True,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    background_tasks.add_task(_send_welcome_email, user.email, user.username)
+    return TokenOut(access_token=create_access_token(user.id))
+
+
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(require_user)):
     return user_to_out(user)
+
+
+@router.post("/verify-email", response_model=UserOut)
+async def verify_email(
+    payload: VerifyEmailIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Brute-force guard: codes are 6 digits and scoped to this user; cap guesses.
+    if not check_rate(f"verify-email-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
+
+    if user.email_verified:
+        return user_to_out(user)
+
+    code = payload.code.strip()
+    result = await db.execute(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.token == code,
+            EmailVerificationToken.used == False,  # noqa: E712
+        )
+    )
+    tok = result.scalar_one_or_none()
+    if not tok or tok.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired code. Request a new one.")
+
+    user.email_verified = True
+    tok.used = True
+    await db.commit()
+    await db.refresh(user)
+
+    if user.email:
+        background_tasks.add_task(_send_welcome_email, user.email, user.username)
+    return user_to_out(user)
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.email_verified or not user.email:
+        return {"ok": True}
+    # Per-IP + per-email caps protect the inbox and the Brevo quota.
+    if not check_rate(f"verify-resend-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a few minutes.")
+    recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+    recent_q = await db.execute(
+        select(func.count()).select_from(EmailVerificationToken).where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.created_at >= recent_cutoff,
+        )
+    )
+    if (recent_q.scalar() or 0) >= _VERIFY_PER_EMAIL_HOUR:
+        return {"ok": True}
+    code = await _issue_verification_code(user.id, db)
+    background_tasks.add_task(_send_verification_email, user.email, user.username, code)
+    return {"ok": True}
 
 
 @router.post("/forgot-password")
@@ -354,6 +531,30 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
         f"— The Surge team"
     )
     await _send_email(to_email, "Reset your Surge password", html, plain)
+
+
+async def _send_verification_email(to_email: str, username: str, code: str) -> None:
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#6d28d9">Confirm your email</h2>
+      <p>Hi <strong>{username}</strong>,</p>
+      <p>Welcome to Surge! Enter this code to confirm your email address:</p>
+      <p style="margin:24px 0;text-align:center">
+        <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#6d28d9">{code}</span>
+      </p>
+      <p style="color:#888;font-size:13px">
+        This code expires in 24 hours. If you didn't create a Surge account, ignore this email.
+      </p>
+      <p style="color:#888;font-size:12px">— The Surge team</p>
+    </div>
+    """
+    plain = (
+        f"Hi {username},\n\n"
+        f"Welcome to Surge! Your email confirmation code is: {code}\n\n"
+        f"It expires in 24 hours. If you didn't create an account, ignore this email.\n\n"
+        f"— The Surge team"
+    )
+    await _send_email(to_email, "Confirm your Surge email", html, plain)
 
 
 async def _send_welcome_email(to_email: str, username: str) -> None:

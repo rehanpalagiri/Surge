@@ -1,6 +1,9 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+// This card is the same for every analysis (it intentionally reveals nothing
+// private), so there's no reason to regenerate it per request. Dropping the edge
+// runtime + a long CDN cache means each id's card is rendered at most once, then
+// served from cache.
 export const alt = "My Surge Analysis";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -64,6 +67,12 @@ export default function Image() {
         </div>
       </div>
     ),
-    { ...size }
+    {
+      ...size,
+      headers: {
+        // Cache the rendered PNG at the CDN + browser; it never changes.
+        "cache-control": "public, max-age=86400, s-maxage=604800, immutable",
+      },
+    }
   );
 }

@@ -3,8 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signup, claimAnalysis, apiErrorDetail } from "@/lib/api";
+import { signup, claimAnalysis, apiErrorDetail, googleAuth } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import GoogleSignInButton, { GOOGLE_ENABLED } from "@/components/GoogleSignInButton";
 import PasswordInput from "@/components/PasswordInput";
 import { track } from "@vercel/analytics";
 
@@ -92,14 +93,41 @@ function SignupForm() {
         }
       }
       track("signup_complete", { from_results: !!extractAnalysisId(next) });
-      // If coming from a results page, go back there; otherwise go to onboarding.
-      if (next && next !== "/projects") {
-        router.push(next);
-      } else {
-        router.push("/onboarding");
-      }
+      // New accounts must confirm their email first. The verify page continues
+      // to `next` (or onboarding) once the 6-digit code checks out.
+      const dest = next && next !== "/projects" ? next : "/onboarding";
+      router.push(`/verify-email?next=${encodeURIComponent(dest)}`);
     } catch (err: unknown) {
       setError(apiErrorDetail(err, "Could not create your account. Please try again."));
+      setLoading(false);
+    }
+  }
+
+  // Google sign-up. We require a valid 13+ DOB first (the field above) so the
+  // age gate still applies; Google-verified email means no code step.
+  async function handleGoogle(credential: string) {
+    const bd = parseBirthday();
+    if (!bd || bd > new Date() || bd.getFullYear() < 1900 || calcAge(bd) < 13) {
+      setError("Enter your date of birth above first, then continue with Google.");
+      return;
+    }
+    const [mm, dd, yyyy] = birthday.split("/");
+    const isoDate = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    setLoading(true);
+    setError("");
+    try {
+      const { access_token } = await googleAuth(credential, isoDate);
+      setToken(access_token);
+      const id = extractAnalysisId(next);
+      if (id) {
+        try { await claimAnalysis(id, access_token); } catch { /* non-fatal */ }
+      }
+      track("signup_complete", { from_results: !!extractAnalysisId(next), method: "google" });
+      // Google verifies the email, so skip the code step.
+      const dest = next && next !== "/projects" ? next : "/onboarding";
+      router.push(dest);
+    } catch (err: unknown) {
+      setError(apiErrorDetail(err, "Google sign-in failed. Please try again."));
       setLoading(false);
     }
   }
@@ -191,6 +219,17 @@ function SignupForm() {
             {loading ? "Creating account…" : "Sign up free"}
           </button>
         </form>
+
+        {GOOGLE_ENABLED && (
+          <>
+            <div className="flex items-center gap-3 text-text-muted text-xs">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <GoogleSignInButton onCredential={handleGoogle} text="signup_with" />
+          </>
+        )}
         <p className="text-text-muted text-sm text-center">
           Already have an account?{" "}
           <Link

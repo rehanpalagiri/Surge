@@ -6,6 +6,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from database import engine
 from models import Base
@@ -166,6 +167,12 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE users ADD COLUMN seed_consent TEXT DEFAULT 'ask'"
         )
+    # email_verified: DEFAULT 1 grandfathers existing accounts as verified so
+    # the new signup verification step can't lock anyone out.
+    if "email_verified" not in user_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 1"
+        )
 
 
 async def _ensure_columns_pg(conn):
@@ -207,6 +214,8 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_year INTEGER",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
+        # DEFAULT TRUE grandfathers existing accounts as verified.
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'complete'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS correction_json TEXT",
@@ -275,6 +284,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Surge API", lifespan=lifespan)
+
+# Compress JSON/text responses on the wire. Analysis payloads (scores_json with
+# the full critique + improvement plan) are ~8–20 KB of highly repetitive JSON;
+# gzip cuts that ~70–80%, so it's the single biggest win for response latency on
+# slow/mobile connections. minimum_size skips tiny bodies where the gzip header
+# would cost more than it saves. Added BEFORE CORS so CORS stays the outermost
+# layer and still attaches its headers to the (now compressed) response.
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 
 # Comma-separated origins from env, e.g. "http://localhost:3000,https://viraliq.vercel.app"
 _origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
