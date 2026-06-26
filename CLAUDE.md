@@ -112,6 +112,10 @@ Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `us
 - `NEXT_PUBLIC_API_URL`, `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM`, `FRONTEND_URL`
 - `HIKERAPI_KEY`; R2 variables if upload persistence is enabled
 
+## Legal documents
+
+The Terms of Service lives at `frontend/app/terms/page.tsx`. If the website URL ever changes from `withsurge.com`, update every occurrence of `withsurge.com` in that file to match the new URL.
+
 ## Deploy discipline
 
 Railway is on a limited free plan. Backend deploys must be batched.
