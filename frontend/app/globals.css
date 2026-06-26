@@ -379,6 +379,10 @@ body {
   from { opacity: 0; transform: translateY(6px) scale(0.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes confetti-particle {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--tx, 0px), var(--ty, -60px)) rotate(var(--r, 180deg)); opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -16,31 +16,261 @@ function verdictColor(verdict: string): string {
   return "text-danger";
 }
 
-// Collapsed CTA inviting the user to link a posted video/Reel. Same card for both
-// platforms — only the headline differs.
-function LinkCtaButton({ title, onClick }: { title: string; onClick: () => void }) {
+const CONFETTI_PARTICLES: Array<{ color: string; tx: number; ty: number; r: number }> = [
+  { color: "#a855f7", tx:   0, ty: -72, r: 120 },
+  { color: "#ec4899", tx:  36, ty: -62, r: 210 },
+  { color: "#fbbf24", tx:  60, ty: -36, r:  45 },
+  { color: "#34d399", tx:  70, ty:   0, r: 300 },
+  { color: "#60a5fa", tx:  60, ty:  36, r: 150 },
+  { color: "#fb923c", tx:  36, ty:  60, r:  90 },
+  { color: "#a855f7", tx:   0, ty:  70, r: 270 },
+  { color: "#ec4899", tx: -36, ty:  60, r:  30 },
+  { color: "#fbbf24", tx: -60, ty:  36, r: 200 },
+  { color: "#34d399", tx: -70, ty:   0, r:  60 },
+  { color: "#60a5fa", tx: -60, ty: -36, r: 320 },
+  { color: "#fb923c", tx: -36, ty: -62, r: 170 },
+];
+
+const TIKTOK_HOW_TO = [
+  "Open TikTok and find the video you just posted.",
+  "Tap the Share arrow on the right side of the screen.",
+  'Tap "Copy link" from the share sheet.',
+  "Come back here and paste it in the box above.",
+];
+
+const INSTAGRAM_HOW_TO = [
+  "Open Instagram and find your Reel.",
+  "Tap the ⋯ (three dots) below or at the top of the post.",
+  'Tap "Copy link".',
+  "Come back here and paste it in the box above.",
+];
+
+type PostLinkPhase = "idle" | "celebrate" | "linking";
+
+function PostLinkRow({
+  a,
+  platform,
+  onUpdated,
+}: {
+  a: AnalysisSummary;
+  platform: "tiktok" | "instagram";
+  onUpdated: (id: number, patch: Partial<AnalysisSummary>) => void;
+}) {
+  const [phase, setPhase] = useState<PostLinkPhase>("idle");
+  const [link, setLink] = useState("");
+  const [captureAge, setCaptureAge] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [showHowTo, setShowHowTo] = useState(false);
+  const howTo = platform === "tiktok" ? TIKTOK_HOW_TO : INSTAGRAM_HOW_TO;
+
+  function handlePostedClick() {
+    setPhase("celebrate");
+    setTimeout(() => setPhase("linking"), 1500);
+  }
+
+  async function fetchStats(url?: string) {
+    if (platform === "instagram" && !captureAge && url !== undefined) {
+      setError("Choose the Reel's age for this capture.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await linkTikTokVideo(
+        a.id,
+        url,
+        platform === "instagram" && url !== undefined ? Number(captureAge) : undefined,
+      );
+      onUpdated(a.id, {
+        actual_views: updated.actual_views,
+        actual_likes: updated.actual_likes,
+        video_url: updated.video_url,
+        counts_fetched_at: updated.counts_fetched_at,
+      });
+      setPhase("idle");
+      setLink("");
+    } catch (err: unknown) {
+      setError(apiErrorDetail(err, "Couldn't fetch stats — try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Already linked — TikTok refreshes in-place; Instagram re-opens form
+  if (a.video_url && phase === "idle") {
+    return (
+      <div className="px-5 pb-4 space-y-2">
+        <button
+          onClick={() => {
+            if (platform === "tiktok") {
+              fetchStats(undefined);
+            } else {
+              setLink(a.video_url || "");
+              setPhase("linking");
+            }
+          }}
+          disabled={busy}
+          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+        >
+          {busy && <span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />}
+          {busy
+            ? "Refreshing…"
+            : platform === "tiktok"
+            ? "↻ Capture current TikTok stats"
+            : "↻ Capture current Instagram likes"}
+        </button>
+        {platform === "instagram" && (
+          <p className="text-[11px] text-text-muted">
+            Instagram likes are recorded as observations; Surge does not infer reach from them.
+          </p>
+        )}
+        {error && <p className="text-danger text-xs">{error}</p>}
+      </div>
+    );
+  }
+
+  // Celebration burst
+  if (phase === "celebrate") {
+    return (
+      <div className="px-5 pb-5 flex flex-col items-center gap-2 py-5">
+        <div className="relative flex justify-center items-center w-20 h-20">
+          {CONFETTI_PARTICLES.map((p, i) => (
+            <span
+              key={i}
+              className="absolute rounded-sm"
+              style={{
+                width: 10,
+                height: 10,
+                backgroundColor: p.color,
+                "--tx": `${p.tx}px`,
+                "--ty": `${p.ty}px`,
+                "--r": `${p.r}deg`,
+                animation: `confetti-particle 0.85s ${i * 40}ms cubic-bezier(0.1, 0.8, 0.3, 1) forwards`,
+              } as React.CSSProperties}
+            />
+          ))}
+          <span className="text-4xl relative z-10 select-none">🚀</span>
+        </div>
+        <p className="text-base font-bold text-white">You shipped it!</p>
+        <p className="text-sm text-zinc-400">Let&apos;s capture those results…</p>
+      </div>
+    );
+  }
+
+  // Link form (phase === "linking" or not-yet-linked idle)
+  if (phase === "linking") {
+    const placeholder =
+      platform === "tiktok"
+        ? "https://www.tiktok.com/@you/video/…"
+        : "https://www.instagram.com/reel/…";
+    return (
+      <div className="px-5 pb-4 space-y-2.5 motion-pop" aria-busy={busy}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (link.trim()) fetchStats(link.trim());
+          }}
+          className="flex flex-col gap-2 sm:flex-row"
+        >
+          {platform === "instagram" && (
+            <select
+              value={captureAge}
+              onChange={(e) => setCaptureAge(e.target.value)}
+              className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-purple-to"
+              required
+            >
+              <option value="">Capture age</option>
+              <option value="24">24 hours</option>
+              <option value="168">7 days</option>
+              <option value="720">30 days</option>
+            </select>
+          )}
+          <input
+            type="url"
+            autoFocus
+            placeholder={placeholder}
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+          />
+          <button
+            type="submit"
+            disabled={busy || !link.trim()}
+            className="gradient-btn text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap"
+          >
+            {busy ? "…" : "Fetch"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPhase("idle"); setError(""); setShowHowTo(false); }}
+            className="text-text-muted text-xs hover:text-text-primary"
+          >
+            ✕
+          </button>
+        </form>
+        {error && <p className="text-danger text-xs">{error}</p>}
+        {platform === "instagram" && !error && (
+          <p className="text-[11px] text-text-muted">
+            Instagram likes are recorded as observations; Surge does not infer reach from them.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowHowTo((v) => !v)}
+          className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors hover:underline underline-offset-2"
+        >
+          {showHowTo
+            ? "Hide tutorial ↑"
+            : `Don't know how to find the ${platform === "tiktok" ? "TikTok" : "Instagram"} link? ↓`}
+        </button>
+        {showHowTo && (
+          <ol className="space-y-2 pt-0.5 motion-pop">
+            {howTo.map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5">
+                <span className="flex-shrink-0 h-5 w-5 grid place-items-center rounded-full bg-purple-from/20 text-purple-300 text-[10px] font-bold">
+                  {i + 1}
+                </span>
+                <p className="text-[11px] text-zinc-400 leading-relaxed pt-0.5">{step}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    );
+  }
+
+  // Idle, not yet linked
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="project-link-cta group w-full text-left"
-    >
-      <span className="relative z-10 flex min-w-0 items-center gap-3">
-        <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-purple-to/25 bg-purple-from/15 text-purple-300 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
-          <Link2 className="h-5 w-5" strokeWidth={1.8} />
-        </span>
-        <span className="min-w-0">
-          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300">Posted it?</span>
-          <span className="block text-sm font-bold text-white">{title}</span>
-          <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-400">
-            Connect the post, start tracking results, and earn +1 analysis
+    <div className="px-5 pb-4">
+      <button
+        type="button"
+        onClick={handlePostedClick}
+        className="project-link-cta group w-full text-left"
+      >
+        <span className="relative z-10 flex min-w-0 items-center gap-3">
+          <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-purple-to/25 bg-purple-from/15 text-purple-300 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+            <Link2 className="h-5 w-5" strokeWidth={1.8} />
+          </span>
+          <span className="min-w-0">
+            <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300">
+              Posted it?
+            </span>
+            <span className="block text-sm font-bold text-white">
+              {platform === "tiktok"
+                ? "Did you post this? Track real stats"
+                : "Did you post this Reel? Track real likes"}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-400">
+              Connect the post, start tracking results, and earn +1 analysis
+            </span>
           </span>
         </span>
-      </span>
-      <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-purple-500 text-white shadow-lg shadow-purple-950/40 transition-transform group-hover:translate-x-1">
-        <ArrowUpRight className="h-4 w-4" />
-      </span>
-    </button>
+        <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-purple-500 text-white shadow-lg shadow-purple-950/40 transition-transform group-hover:translate-x-1">
+          <ArrowUpRight className="h-4 w-4" />
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -65,187 +295,6 @@ const PLATFORM_TABS: {
   },
 ];
 
-function TikTokStatsRow({
-  a,
-  onUpdated,
-}: {
-  a: AnalysisSummary;
-  onUpdated: (id: number, patch: Partial<AnalysisSummary>) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [link, setLink] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function fetchStats(url?: string) {
-    setBusy(true);
-    setError("");
-    try {
-      const updated = await linkTikTokVideo(a.id, url);
-      onUpdated(a.id, {
-        actual_views: updated.actual_views,
-        actual_likes: updated.actual_likes,
-        video_url: updated.video_url,
-        counts_fetched_at: updated.counts_fetched_at,
-      });
-      setExpanded(false);
-      setLink("");
-    } catch (err: unknown) {
-      setError(apiErrorDetail(err, "Couldn't fetch stats — try again."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="px-5 pb-4" aria-busy={busy}>
-      {a.video_url ? (
-        <button
-          onClick={() => fetchStats()}
-          disabled={busy}
-          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-        >
-          {busy && <span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />}
-          {busy ? "Refreshing…" : "↻ Capture current TikTok stats"}
-        </button>
-      ) : !expanded ? (
-        <LinkCtaButton title="Did you post this? Track real stats" onClick={() => setExpanded(true)} />
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (link.trim()) fetchStats(link.trim());
-          }}
-          className="motion-pop flex flex-col gap-2 sm:flex-row"
-        >
-          <input
-            type="url"
-            autoFocus
-            placeholder="https://www.tiktok.com/@you/video/…"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
-          />
-          <button
-            type="submit"
-            disabled={busy || !link.trim()}
-            className="gradient-btn text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap"
-          >
-            {busy ? "…" : "Fetch"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setExpanded(false); setError(""); }}
-            className="text-text-muted text-xs hover:text-text-primary"
-          >
-            ✕
-          </button>
-        </form>
-      )}
-      {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
-    </div>
-  );
-}
-
-function InstagramStatsRow({
-  a,
-  onUpdated,
-}: {
-  a: AnalysisSummary;
-  onUpdated: (id: number, patch: Partial<AnalysisSummary>) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [link, setLink] = useState("");
-  const [captureAge, setCaptureAge] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function fetchStats(url?: string) {
-    if (!captureAge) {
-      setError("Choose the Reel's age for this capture.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const updated = await linkTikTokVideo(a.id, url, Number(captureAge));
-      onUpdated(a.id, {
-        actual_likes: updated.actual_likes,
-        video_url: updated.video_url,
-        counts_fetched_at: updated.counts_fetched_at,
-      });
-      setExpanded(false);
-      setLink("");
-    } catch (err: unknown) {
-      setError(apiErrorDetail(err, "Couldn't fetch stats — try again."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="px-5 pb-4" aria-busy={busy}>
-      {a.video_url && !expanded ? (
-        <button
-          onClick={() => { setLink(a.video_url || ""); setExpanded(true); }}
-          disabled={busy}
-          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-        >
-          {busy && <span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />}
-          {busy ? "Refreshing…" : "↻ Capture current Instagram likes"}
-        </button>
-      ) : !expanded ? (
-        <LinkCtaButton title="Did you post this Reel? Track real likes" onClick={() => setExpanded(true)} />
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (link.trim()) fetchStats(link.trim());
-          }}
-          className="motion-pop flex flex-col gap-2 sm:flex-row"
-        >
-          <select
-            value={captureAge}
-            onChange={(e) => setCaptureAge(e.target.value)}
-            className="min-w-0 bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-purple-to"
-            required
-          >
-            <option value="">Capture age</option>
-            <option value="24">24 hours</option>
-            <option value="168">7 days</option>
-            <option value="720">30 days</option>
-          </select>
-          <input
-            type="url"
-            autoFocus
-            placeholder="https://www.instagram.com/reel/…"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
-          />
-          <button
-            type="submit"
-            disabled={busy || !link.trim()}
-            className="gradient-btn text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap"
-          >
-            {busy ? "…" : "Fetch"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setExpanded(false); setError(""); }}
-            className="text-text-muted text-xs hover:text-text-primary"
-          >
-            ✕
-          </button>
-        </form>
-      )}
-      <p className="text-[11px] text-text-muted mt-2">
-        Instagram likes are recorded as observations; Surge does not infer reach from them.
-      </p>
-      {error && <p className="text-danger text-xs mt-1.5">{error}</p>}
-    </div>
-  );
-}
 
 function ProjectCard({
   a,
@@ -339,8 +388,9 @@ function ProjectCard({
         </Link>
       </div>
 
-      {a.platform === "tiktok" && <TikTokStatsRow a={a} onUpdated={onUpdated} />}
-      {a.platform === "instagram" && <InstagramStatsRow a={a} onUpdated={onUpdated} />}
+      {(a.platform === "tiktok" || a.platform === "instagram") && (
+        <PostLinkRow a={a} platform={a.platform} onUpdated={onUpdated} />
+      )}
 
       {/* Delete button — appears on hover */}
       {!confirmDelete ? (
