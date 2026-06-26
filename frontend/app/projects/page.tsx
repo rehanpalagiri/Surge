@@ -428,7 +428,10 @@ export default function ProjectsPage() {
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="text-3xl font-extrabold">
-            Your <span className={cfg.textGradient}>Video Projects</span>
+            Your{" "}
+            <span className={cfg.textGradient}>
+              {platform === "tiktok" ? "TikTok Projects" : "Instagram Reels"}
+            </span>
           </h1>
           <p className="text-text-muted mt-1">
             Projects waiting for a post link appear first, followed by your newest work.

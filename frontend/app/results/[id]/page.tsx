@@ -216,6 +216,7 @@ export default function ResultsPage() {
   const [parentAnalysis, setParentAnalysis] = useState<AnalysisOut | null>(null);
   const [status, setStatus] = useState<"loading" | "ok" | "notfound" | "timeout">("loading");
   const [pending, setPending] = useState(false); // true only while the review is still being generated
+  const [analysisDone, setAnalysisDone] = useState(false); // signals AnalysisProgress to enter skeleton hold
   const [loadingText, setLoadingText] = useState("Loading your results…");
   const [showUpsell, setShowUpsell] = useState(false);
   const [snapshots, setSnapshots] = useState<OutcomeSnapshot[]>([]);
@@ -232,7 +233,9 @@ export default function ResultsPage() {
         Object.keys(scores).length === 0 ||
         (scores.hook_velocity == null && !scores.error && !scores.locked);
 
+      let wasPending = false;
       if (isPending(a.scores_json)) {
+        wasPending = true;
         if (!cancelled) {
           setPending(true); // switches the loading view to the percentage meter
           setLoadingText("Still analyzing your video — this can take up to 60 seconds…");
@@ -276,13 +279,18 @@ export default function ResultsPage() {
 
       if (!cancelled) {
         setAnalysis(a);
-        setStatus("ok");
         if (token && !a.scores_json.locked) {
           getOutcomeSnapshots(a.id, token).then(setSnapshots).catch(() => {});
         }
-        // Fetch the parent analysis for score comparison (best-effort, no error shown).
         if (a.parent_id && token) {
           getAnalysis(a.parent_id, token).then(setParentAnalysis).catch(() => {});
+        }
+        if (wasPending) {
+          // Analysis was still generating — signal the progress bar to enter its
+          // skeleton hold. onComplete (fired after ~3.5 s) will set status="ok".
+          setAnalysisDone(true);
+        } else {
+          setStatus("ok");
         }
       }
     }
@@ -329,7 +337,14 @@ export default function ResultsPage() {
         <div className="max-w-3xl mx-auto px-4 py-10">
           {pending ? (
             // Review still generating → percentage meter, skeleton only near done.
-            <AnalysisProgress active title="Finishing your review" expectedMs={40000} revealAt={86} compact />
+            <AnalysisProgress
+              active
+              done={analysisDone}
+              onComplete={() => setStatus("ok")}
+              title="Finishing your review"
+              expectedMs={40000}
+              compact
+            />
           ) : (
             // Just fetching an existing review — a brief, quiet load.
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-center" role="status">

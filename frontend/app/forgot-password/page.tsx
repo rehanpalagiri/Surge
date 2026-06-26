@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { forgotPassword, verifyResetCode, resetPassword, apiErrorDetail } from "@/lib/api";
+import { forgotPassword, verifyResetCode, resetPassword, login, apiErrorDetail } from "@/lib/api";
+import { setToken } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
 import OtpInput from "@/components/OtpInput";
 
@@ -57,6 +58,15 @@ export default function ForgotPasswordPage() {
     setError("");
     try {
       await resetPassword(code, password);
+      // Auto sign-in with the new password so the user doesn't have to log in again.
+      try {
+        const token = await login(email, password);
+        setToken(token.access_token);
+        router.push("/");
+        return;
+      } catch {
+        // Auto-login failed (edge case) — fall through to the manual "done" screen.
+      }
       setStep("done");
     } catch (err) {
       setError(apiErrorDetail(err, "Something went wrong. Please try again."));
@@ -161,7 +171,7 @@ export default function ForgotPasswordPage() {
         {step === "done" && (
           <div className="space-y-4 text-center">
             <p className="text-text-primary font-semibold">Password updated!</p>
-            <p className="text-text-muted text-sm">You can now log in with your new password.</p>
+            <p className="text-text-muted text-sm">Log in with your new password to continue.</p>
             <button onClick={() => router.push("/login")}
               className="w-full gradient-btn text-white font-semibold py-3 rounded-xl">
               Log in

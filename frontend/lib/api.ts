@@ -677,6 +677,49 @@ export async function getRateLimit(): Promise<RateLimitStatus> {
   return handleResponse<RateLimitStatus>(res);
 }
 
+export interface CraftInsightPost {
+  analysis_id: number;
+  project_name: string | null;
+  niche: string;
+  created_at: string | null;
+  scores: Record<string, number>;
+  views: number;
+  likes: number;
+  like_rate: number; // observed likes/views, percent
+}
+
+export interface CraftPattern {
+  dimension: string;
+  label: string;
+  n_high: number;
+  n_low: number;
+  median_like_rate_high: number;
+  median_like_rate_low: number;
+  delta: number;
+  direction: "higher" | "lower" | "flat";
+}
+
+export interface CraftInsights {
+  total_analyses: number;
+  with_verified_outcome: number;
+  horizon: "24h" | "7d" | "30d" | null;
+  metric: "observed_like_rate";
+  posts: CraftInsightPost[];
+  patterns: CraftPattern[];
+  pattern_min: number;
+  forecast:
+    | { available: false; need: number; have: number }
+    | { available: true; n: number; horizon: string; p25: number; median: number; p75: number; min: number; max: number };
+  notice: string;
+}
+
+export async function getCraftInsights(): Promise<CraftInsights> {
+  const res = await fetch(`${BASE}/api/me/craft-insights`, {
+    headers: authHeaders(),
+  });
+  return handleResponse<CraftInsights>(res);
+}
+
 export async function getPresignedUploadUrl(
   filename: string,
   contentType: string

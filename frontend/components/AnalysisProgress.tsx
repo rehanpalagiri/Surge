@@ -6,52 +6,47 @@ import { ReportSkeleton } from "@/components/Skeleton";
 /**
  * Single source of truth for the "analyzing your video" experience.
  *
- * Two phases, driven by one honest percentage:
- *   1. Meter      — a clean progress bar with a real % number underneath, while
- *                   the review is being built. This is what the user sees for
- *                   most of the wait.
- *   2. Near-done  — once the percentage crosses `revealAt` (≈ the home stretch,
- *                   "almost done / a few seconds left"), the report skeleton
- *                   fades in beneath a slim top bar so the results feel like
- *                   they're materializing. The skeleton is NOT shown the whole
- *                   time — only at the end, which is the whole point.
+ * Two phases:
+ *   1. Meter    — progress bar with live percentage + ETA, covering most of the wait.
+ *   2. Near-done — once the bar crosses `revealAt` the skeleton fades in beneath a
+ *                  slim top bar so results feel like they're materializing.
  *
- * The percentage is time-based (eases toward ~90% over `expectedMs`, then
- * crawls) so it tracks elapsed work instead of jumping. When the caller signals
- * `done`, it snaps to 100. We never claim 100% before the work is actually done.
+ * The bar is time-based (eases to ~90% over `expectedMs`, crawls to 99 after that).
+ * When `done` is set: the bar jumps to `revealAt` (showing the skeleton immediately),
+ * holds for `skelHoldMs`, snaps to 100, then calls `onComplete` — giving users a
+ * guaranteed 3-4 second skeleton view before results appear.
  */
 
-const TICK_MS = 120; // ~8 fps state updates; the bar's CSS transition smooths it
+const TICK_MS = 120;
 
-function useSmoothProgress(active: boolean, done: boolean, expectedMs: number): number {
+function useSmoothProgress(
+  active: boolean,
+  expectedMs: number,
+): [number, React.Dispatch<React.SetStateAction<number>>, number] {
   const [pct, setPct] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const startRef = useRef(0);
 
   useEffect(() => {
     if (!active) {
       setPct(0);
+      setElapsed(0);
       return;
     }
     startRef.current = performance.now();
     const id = setInterval(() => {
-      const elapsed = performance.now() - startRef.current;
-      // Ease-out 0 → 90 over expectedMs, then a slow crawl 90 → 97 so it never
-      // looks stalled and never looks finished early.
-      const t = Math.min(1, elapsed / expectedMs);
+      const ms = performance.now() - startRef.current;
+      setElapsed(ms);
+      const t = Math.min(1, ms / expectedMs);
       const eased = 90 * (1 - Math.pow(1 - t, 2.2));
-      const crawl = elapsed > expectedMs ? Math.min(7, ((elapsed - expectedMs) / 5000) * 7) : 0;
-      const target = Math.min(97, eased + crawl);
-      setPct((prev) => (target > prev ? target : prev)); // monotonic — never goes backwards
+      const crawl = ms > expectedMs ? Math.min(9, ((ms - expectedMs) / 5000) * 9) : 0;
+      const target = Math.min(99, eased + crawl);
+      setPct((prev) => (target > prev ? target : prev));
     }, TICK_MS);
     return () => clearInterval(id);
   }, [active, expectedMs]);
 
-  // Real completion wins immediately.
-  useEffect(() => {
-    if (done) setPct(100);
-  }, [done]);
-
-  return pct;
+  return [pct, setPct, elapsed];
 }
 
 function useRotatingStep(steps: string[], active: boolean, intervalMs = 3500): string {
@@ -65,10 +60,24 @@ function useRotatingStep(steps: string[], active: boolean, intervalMs = 3500): s
   return steps[Math.min(i, steps.length - 1)] ?? "";
 }
 
+function etaText(elapsed: number, expectedMs: number, pct: number): string {
+  if (pct >= 90) return "Almost there…";
+  const remainingMs = Math.max(0, expectedMs - elapsed);
+  const secs = Math.ceil(remainingMs / 1000);
+  if (secs <= 5) return "A few seconds left…";
+  if (secs < 60) return `~${secs}s left`;
+  return `~${Math.ceil(secs / 60)}m left`;
+}
+
 export interface AnalysisProgressProps {
   active: boolean;
-  /** Set true the instant the real work finishes — snaps the bar to 100%. */
+  /** Set true the instant the real work finishes — triggers the skeleton hold then onComplete. */
   done?: boolean;
+  /** Called after the skeleton has been visible for `skelHoldMs` ms. Use this to unmount
+   *  this component and reveal actual results — do NOT unmount before onComplete fires. */
+  onComplete?: () => void;
+  /** How long (ms) to hold the skeleton after `done` before calling onComplete. Default 3 500. */
+  skelHoldMs?: number;
   title?: string;
   steps?: string[];
   /** Expected wall-clock duration used to pace the bar (ms). */
@@ -86,30 +95,37 @@ const DEFAULT_STEPS = [
   "Writing your craft review…",
 ];
 
-/**
- * The inner experience (no overlay chrome) — drop it straight into a page, or
- * wrap it with <AnalysisOverlay> for the full-screen upload flow.
- */
 export function AnalysisProgress({
   active,
   done = false,
+  onComplete,
+  skelHoldMs = 3500,
   title = "Analyzing your video",
   steps = DEFAULT_STEPS,
-  expectedMs = 26000,
-  revealAt = 88,
+  expectedMs = 8000,
+  revealAt = 99,
   compact = false,
 }: AnalysisProgressProps) {
-  const pct = useSmoothProgress(active, done, expectedMs);
+  const [pct, setPct, elapsed] = useSmoothProgress(active, expectedMs);
   const step = useRotatingStep(steps, active);
   const rounded = Math.round(pct);
   const revealed = pct >= revealAt;
 
-  // The skeleton tree is static; memoize it so the ~8fps progress ticks only
-  // re-paint the bar + percentage, not the whole placeholder report.
+  // When done fires: jump to revealAt (shows skeleton), hold skelHoldMs, then complete.
+  useEffect(() => {
+    if (!done) return;
+    setPct((prev) => Math.max(prev, revealAt));
+    const timer = setTimeout(() => {
+      setPct(100);
+      onComplete?.();
+    }, skelHoldMs);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
+
   const skeleton = useMemo(() => <ReportSkeleton compact={compact} />, [compact]);
 
   if (revealed) {
-    // ── Near-done: slim top bar + the skeleton "materializing" ──
     return (
       <div className="w-full" role="status" aria-live="polite">
         <div className="mb-5 space-y-2">
@@ -130,7 +146,6 @@ export function AnalysisProgress({
     );
   }
 
-  // ── Meter: the main wait, a clean bar with the % right under it ──
   return (
     <div className="flex w-full flex-col items-center gap-6 py-6" role="status" aria-live="polite">
       <div className="text-center space-y-1.5">
@@ -145,11 +160,14 @@ export function AnalysisProgress({
             style={{ width: `${pct}%`, transition: "width 400ms cubic-bezier(0.25, 1, 0.5, 1)" }}
           />
         </div>
-        {/* the percentage, right under the bar */}
         <div className="flex items-center justify-between">
           <span className="text-xs text-zinc-500 animate-pulse">{step}</span>
           <span className="text-sm font-bold tabular-nums text-purple-300">{rounded}%</span>
         </div>
+        {/* Live ETA — shown while bar is in the main meter phase */}
+        <p className="text-center text-xs text-zinc-600">
+          {etaText(elapsed, expectedMs, pct)}
+        </p>
       </div>
     </div>
   );

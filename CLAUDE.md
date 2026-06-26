@@ -17,6 +17,7 @@ Surge is an outcome-blind AI craft reviewer and post-experiment tracker. It is n
 - Do not produce an aggregate Viral Score, predicted views/likes, projected verdict, or performance promise.
 - Recommendations are hypotheses for the creator's next controlled experiment. They must identify one change, what to hold constant, and what to observe.
 - Keep AI critique separate from observed platform outcomes in code, storage, API contracts, and UX.
+- The read-only insights surface (`GET /api/me/craft-insights`, `app/insights`) MAY relate a creator's craft scores to THEIR OWN verified outcomes as descriptive statistics — observed like rate at a single maturity window, creator-grouped, explicit sample sizes. It stays correlational: never a causal claim, never a pixel-based or aggregate "viral" forecast. Per-dimension patterns require ≥6 verified age-matched posts (a non-degenerate median split needs ≥3 per side); the empirical like-rate range requires ≥8 (interquartile band spans ≥4 points).
 - Compare outcomes only at compatible maturity windows: 24h (±6h), 7d (±24h), and 30d (±72h). Off-window observations remain timestamped but unlabelled.
 - Likes/views is only an observed like rate. Never call it content quality, retention, or causal impact.
 - Instagram metrics are likes-only unless provider fields are runtime-verified. Never infer reach from likes.
@@ -74,6 +75,7 @@ Key services and routes:
 - `services/telemetry.py`: provider/model operational telemetry. Do not claim cost or margin until pricing and payload measurements are verified.
 - `services/economics.py`: admin operations report with measured reliability, unit coverage, row counts, and explicit unknown cost/margin fields.
 - `services/niche_classifier.py`: canonicalizes niche context; failures use `UNCATEGORIZED` rather than guessing.
+- `services/craft_insights.py`: descriptive craft-vs-verified-outcome aggregation for one creator (`GET /api/me/craft-insights`). Correlational only, gated by justified sample sizes; never causal, never a pixel-based forecast.
 - `auth.py`: JWT helpers and the single canonical `is_minor()` implementation.
 - `routers/settings.py`: account deletion removes analyses, artifacts, snapshots, and usage events in FK-safe order.
 
@@ -88,6 +90,7 @@ New tables are created by `create_all`. Existing-column additions require model 
 - `app/results/[id]/improve/page.tsx`: editing hypotheses and next experiment; no projected performance.
 - `app/projects/page.tsx`: named project history, with unlinked posts sorted first and then newest-first; mixed-age latest counts are not comparisons.
 - `app/sample/page.tsx`: static example showing critique and observed results as separate evidence.
+- `app/insights/page.tsx`: "Craft vs. Your Results" — the creator's own craft scores against their verified outcomes, with an honest empirical like-rate range and a correlation-not-causation notice.
 - `components/VerdictBanner.tsx`: qualitative craft verdict only.
 - `components/FeedbackModal.tsx`: manual unverified observations; provider fetches are preferred where available.
 - `lib/api.ts`: typed review and outcome contracts.

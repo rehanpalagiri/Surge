@@ -69,6 +69,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             <>
               <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
               <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">Projects</Link>
+              <Link href="/insights" className="text-zinc-400 hover:text-white transition-colors">Insights</Link>
               <Link href="/profile"  className="text-zinc-400 hover:text-white transition-colors">Profile</Link>
               <Link href="/settings" className="text-zinc-400 hover:text-white transition-colors">Settings</Link>
               <button onClick={logout} className="text-zinc-400 hover:text-white transition-colors">Log out</button>
@@ -100,6 +101,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
                 <>
                   <Link href="/" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Dashboard</Link>
                   <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Projects</Link>
+                  <Link href="/insights" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Insights</Link>
                   <Link href="/profile"  className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Profile</Link>
                   <Link href="/settings" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Settings</Link>
                   <div className="border-t border-zinc-700 my-1" />
