@@ -67,6 +67,9 @@ class AnalysisOut(BaseModel):
     actual_likes: Optional[int]
     video_url: Optional[str] = None          # posted TikTok link (counts auto-fetched)
     counts_fetched_at: Optional[datetime] = None
+    # Only present in the initial response for anonymous analyses. The frontend
+    # stores it locally and must send it back to claim the result after signup/login.
+    claim_token: Optional[str] = None
     # v1.24: owner's seed_consent was "ask" — results page shows the consent banner
     pending_seed_consent: bool = False
     # #4: Surge wasn't confident about the niche (routed to the generic rubric) —
@@ -107,6 +110,7 @@ class FeedbackIn(BaseModel):
     actual_views: Optional[int] = None  # None for Instagram (platform hides views)
     actual_likes: Optional[int] = None
     post_age_hours: Optional[int] = None  # user-asserted capture age for manual observations
+    video_url: Optional[str] = None  # optional posted URL so manual entries can still schedule refreshes
 
 
 class VideoLinkIn(BaseModel):
@@ -114,6 +118,10 @@ class VideoLinkIn(BaseModel):
     url: Optional[str] = None
     # Used only when the provider does not return a trustworthy post timestamp.
     post_age_hours: Optional[int] = None
+
+
+class ClaimAnalysisIn(BaseModel):
+    claim_token: Optional[str] = None
 
 
 class SignupIn(BaseModel):

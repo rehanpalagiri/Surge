@@ -114,7 +114,7 @@ async def promote_analysis_to_seed(
         result = await analyze_seed_video(
             file_path, "tiktok", canonical, view_count, like_count
         )
-        if not isinstance(result, dict) or "virality_rating" not in result:
+        if not isinstance(result, dict) or "seed_quality" not in result:
             logger.warning(
                 "promote %s: seed analysis failed: %s",
                 analysis_id,
@@ -122,7 +122,7 @@ async def promote_analysis_to_seed(
             )
             return
         try:
-            rating = max(0, min(10, int(round(float(result["virality_rating"])))))
+            rating = max(0, min(10, int(round(float(result["seed_quality"])))))
         except (ValueError, TypeError):
             logger.warning("promote %s: non-numeric rating, skipping", analysis_id)
             return

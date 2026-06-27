@@ -1,6 +1,7 @@
 import { getToken } from "./auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const CLAIM_TOKEN_PREFIX = "surge_claim_token:";
 
 function authHeaders(token?: string | null): Record<string, string> {
   const t = token ?? getToken();
@@ -51,11 +52,14 @@ export interface AnalysisOut {
     improvement_plan?: ImprovementItem[];
     caption_rewrite?: string;
     hook_rewrite?: string;
+    attention_risk_map?: AttentionRiskItem[];
+    rubric_context?: RubricContext;
     first_improvement?: ImprovementItem | null;
     emotional_analysis?: EmotionalAnalysis;
     recommended_experiment?: RecommendedExperiment;
     craft_review_version?: number;
     evidence_notice?: string;
+    niche_harvest_used?: boolean;
     locked?: boolean;
     error?: string;
   };
@@ -64,10 +68,33 @@ export interface AnalysisOut {
   actual_likes: number | null;
   video_url?: string | null;          // posted TikTok link (counts auto-fetched)
   counts_fetched_at?: string | null;
+  claim_token?: string | null;        // initial anonymous response only
   pending_seed_consent?: boolean;     // owner's consent is "ask" — show the banner
   mode?: string;
   parent_id?: number | null;          // ID of the analysis this updates
   created_at: string;
+}
+
+function browserStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberAnalysisClaimToken(id: string | number, token?: string | null) {
+  if (!token) return;
+  browserStorage()?.setItem(`${CLAIM_TOKEN_PREFIX}${id}`, token);
+}
+
+export function analysisClaimToken(id: string | number): string | null {
+  return browserStorage()?.getItem(`${CLAIM_TOKEN_PREFIX}${id}`) ?? null;
+}
+
+export function forgetAnalysisClaimToken(id: string | number) {
+  browserStorage()?.removeItem(`${CLAIM_TOKEN_PREFIX}${id}`);
 }
 
 export interface AnalysisSummary {
@@ -125,6 +152,25 @@ export interface RecommendedExperiment {
   change: string;
   keep_constant: string;
   observe: string;
+}
+
+export interface AttentionRiskItem {
+  section: string;
+  risk: "low" | "medium" | "high";
+  reason: string;
+  fix?: string;
+}
+
+export interface RubricContext {
+  source?: "auto_detected" | "user_hint" | "fallback" | string;
+  primary_niche?: string | null;
+  secondary_niche?: string | null;
+  reviewed_primary_niche?: string | null;
+  reviewed_secondary_niche?: string | null;
+  format?: string;
+  intent?: string;
+  confidence?: "high" | "medium" | "low" | string;
+  evidence?: string[];
 }
 
 export interface OutcomeSnapshot {
@@ -223,7 +269,7 @@ export async function analyzeVideo(
   videoUrl: string = "",
   secondary: string = "",
   projectName: string = ""
-): Promise<{ id: number }> {
+): Promise<{ id: number; claim_token?: string | null }> {
   const form = new FormData();
   if (file) form.append("file", file);
   if (videoUrl) form.append("video_url", videoUrl);
@@ -238,7 +284,10 @@ export async function analyzeVideo(
     headers: authHeaders(),
     body: form,
   });
-  return handleResponse<AnalysisOut>(res).then((a) => ({ id: a.id }));
+  return handleResponse<AnalysisOut>(res).then((a) => {
+    rememberAnalysisClaimToken(a.id, a.claim_token);
+    return { id: a.id, claim_token: a.claim_token };
+  });
 }
 
 export async function getProfile(platform: string): Promise<UserProfile | null> {
@@ -351,20 +400,26 @@ export async function getOutcomeSnapshots(
 
 export async function claimAnalysis(
   id: string | number,
-  token?: string | null
+  token?: string | null,
+  claimToken: string | null = analysisClaimToken(id)
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/claim`, {
     method: "POST",
-    headers: authHeaders(token),
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ claim_token: claimToken }),
   });
-  return handleResponse<AnalysisOut>(res);
+  return handleResponse<AnalysisOut>(res).then((a) => {
+    forgetAnalysisClaimToken(id);
+    return a;
+  });
 }
 
 export async function submitFeedback(
   id: string | number,
   actualViews: number | undefined,
   actualLikes?: number,
-  postAgeHours?: number
+  postAgeHours?: number,
+  videoUrl?: string
 ): Promise<AnalysisOut> {
   const res = await fetch(`${BASE}/api/analyses/${id}/feedback`, {
     method: "PATCH",
@@ -373,6 +428,7 @@ export async function submitFeedback(
       ...(actualViews !== undefined ? { actual_views: actualViews } : {}),
       ...(actualLikes !== undefined ? { actual_likes: actualLikes } : {}),
       ...(postAgeHours !== undefined ? { post_age_hours: postAgeHours } : {}),
+      ...(videoUrl ? { video_url: videoUrl } : {}),
     }),
   });
   return handleResponse<AnalysisOut>(res);
@@ -707,7 +763,7 @@ export interface CraftInsights {
   posts: CraftInsightPost[];
   patterns: CraftPattern[];
   pattern_min: number;
-  forecast:
+  observed_range:
     | { available: false; need: number; have: number }
     | { available: true; n: number; horizon: string; p25: number; median: number; p75: number; min: number; max: number };
   notice: string;
@@ -763,7 +819,7 @@ export async function analyzeFromR2(
   secondary: string = "",
   parentId?: number,
   projectName: string = ""
-): Promise<{ id: number; status: string }> {
+): Promise<{ id: number; status: string; claim_token?: string | null }> {
   const form = new FormData();
   form.append("r2_key", r2Key);
   form.append("niche", niche);
@@ -778,7 +834,10 @@ export async function analyzeFromR2(
     headers: authHeaders(),
     body: form,
   });
-  return handleResponse<{ id: number; status: string }>(res);
+  return handleResponse<{ id: number; status: string; claim_token?: string | null }>(res).then((a) => {
+    rememberAnalysisClaimToken(a.id, a.claim_token);
+    return a;
+  });
 }
 
 export async function getAnalysisStatus(

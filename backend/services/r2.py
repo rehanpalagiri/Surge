@@ -49,6 +49,29 @@ async def download(key: str) -> bytes:
         raise
 
 
+async def object_size(key: str) -> int | None:
+    started = time.perf_counter()
+    loop = asyncio.get_running_loop()
+    try:
+        client = _client()
+        bucket = os.environ["R2_BUCKET_NAME"]
+        resp = await loop.run_in_executor(None, lambda: client.head_object(Bucket=bucket, Key=key))
+        size = resp.get("ContentLength")
+        await record_usage_event(
+            operation="object_head", provider="cloudflare_r2", success=True,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            output_bytes=0,
+        )
+        return int(size) if size is not None else None
+    except Exception as exc:
+        await record_usage_event(
+            operation="object_head", provider="cloudflare_r2", success=False,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            error_code=type(exc).__name__,
+        )
+        raise
+
+
 async def delete(key: str) -> None:
     started = time.perf_counter()
     loop = asyncio.get_running_loop()

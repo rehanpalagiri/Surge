@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
-import { getAnalysis, AnalysisOut, ImprovementItem } from "@/lib/api";
+import { getAnalysis, AnalysisOut, AttentionRiskItem, ImprovementItem } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ImproveSkeleton } from "@/components/Skeleton";
 
@@ -24,6 +24,12 @@ function scoreBarBg(score: number): string {
   if (score >= 7) return "bg-success";
   if (score >= 4) return "bg-warning";
   return "bg-danger";
+}
+
+function riskClass(risk: AttentionRiskItem["risk"]): string {
+  if (risk === "high") return "border-danger/30 text-danger";
+  if (risk === "medium") return "border-warning/30 text-warning";
+  return "border-success/30 text-success";
 }
 
 export default function ImprovePage() {
@@ -104,6 +110,9 @@ export default function ImprovePage() {
     ? [...s.improvement_plan].sort((a, b) => a.priority - b.priority).slice(0, 3)
     : [];
   const hasPlan = plan.length > 0;
+  const attentionRisks: AttentionRiskItem[] = Array.isArray(s.attention_risk_map)
+    ? s.attention_risk_map
+    : [];
 
   // Emotional impact. Gemini is told emotional_analysis is required, but the type marks it
   // optional and the model can omit/malform fields — so guard achieved_score (a missing or
@@ -124,10 +133,10 @@ export default function ImprovePage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-extrabold">
-            Your <span className="gradient-text">Next Experiment</span>
+            Your <span className="gradient-text">Next Retention Experiment</span>
           </h1>
           <p className="text-text-muted">
-            Editing hypotheses based on observable craft—not a forecast or causal guarantee.
+            Editing hypotheses for keeping attention, based on observable craft and not a forecast.
           </p>
         </div>
 
@@ -141,6 +150,36 @@ export default function ImprovePage() {
             <p className="text-text-muted text-sm"><span className="font-semibold">Observe:</span> {s.recommended_experiment?.observe ?? "Compare verified results at the same post age."}</p>
           </div>
         </div>
+
+        {attentionRisks.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+            <div>
+              <h2 className="text-text-primary font-semibold text-lg">
+                Retention risk map
+              </h2>
+              <p className="text-text-muted text-xs mt-1">
+                AI-estimated attention risks, not measured retention data.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {attentionRisks.map((item, i) => (
+                <div key={`${item.section}-${i}`} className={`border bg-surface rounded-xl px-4 py-3 ${riskClass(item.risk)}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-text-primary font-semibold text-sm">{item.section}</p>
+                    <span className="text-xs uppercase tracking-wide font-bold">{item.risk}</span>
+                  </div>
+                  <p className="text-text-muted text-sm mt-2">{item.reason}</p>
+                  {item.fix && (
+                    <p className="text-text-primary text-sm mt-2">
+                      <span className="font-semibold">Try: </span>
+                      {item.fix}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Prioritized action list */}
         {hasPlan ? (

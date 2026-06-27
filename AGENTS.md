@@ -10,10 +10,12 @@ Guidance for Codex when working in this repository. Keep this file and `CLAUDE.m
 
 ## Product contract
 
-Surge is an outcome-blind AI craft reviewer and post-experiment tracker. It is not a virality predictor.
+Surge is an outcome-blind AI retention craft reviewer and post-experiment tracker. It is not a virality or retention predictor.
 
-- Gemini assesses six observable craft dimensions: hook velocity, cut frequency, text scannability, curiosity gap, audio-visual sync, and loop seamlessness.
+- Gemini assesses six observable attention-retention craft dimensions: hook velocity, cut frequency, text scannability, curiosity gap, audio-visual sync, and ending strength (does the ending earn the finish — payoff, CTA, or a clean loop; internal key remains `loop_seamlessness` for data continuity).
 - Dimension values are subjective AI assessments, not retention, engagement, reach, or causal measurements.
+- Attention-risk maps are AI-estimated craft diagnostics by video section, not measured retention, watch time, or drop-off data.
+- Niche selection is optional friction, not source of truth. When no user hint is supplied, Surge auto-detects rubric context from the video/caption and falls back to a broad craft rubric on low confidence.
 - Do not produce an aggregate Viral Score, predicted views/likes, projected verdict, or performance promise.
 - Recommendations are hypotheses for the creator's next controlled experiment. They must identify one change, what to hold constant, and what to observe.
 - Keep AI critique separate from observed platform outcomes in code, storage, API contracts, and UX.
@@ -59,23 +61,24 @@ Browser → Next.js (Vercel) → FastAPI (Railway) → Neon Postgres
 Key models in `models.py`:
 
 - `users`, `user_profiles`, `password_reset_tokens`: identity, settings, age gate, and reset flow.
-- `user_analyses`: uploaded review, creator-facing `project_name`, update lineage, and full Gemini response. New reviews use `mode="craft_review"`; prediction/calibration columns are legacy compatibility fields.
+- `user_analyses`: uploaded review, creator-facing `project_name`, update lineage, guest `claim_token` handoff secret, and full Gemini response. New reviews use `mode="craft_review"`; prediction/calibration columns are legacy compatibility fields.
 - `analysis_artifacts`: exact SHA-256, creator/post identity, and future perceptual/audio fingerprint slots.
 - `outcome_snapshots`: immutable public-metric observations with capture time, post age, maturity horizon, provenance, integrity flags, metric version, and payload hash.
-- `outcome_collection_jobs`: durable maturity-window jobs; protected admin collection endpoint exists, but no external scheduler is active yet.
+- `outcome_collection_jobs`: durable maturity-window jobs; protected admin collection endpoint and in-process daily scheduler collect due jobs.
 - `usage_events`: latency, bytes, tokens, success, and optional verified cost. Cost stays NULL until real pricing is configured.
 - `seed_videos`, `calibration_notes`, correction/calibration fields: legacy research infrastructure; never feed them into live craft reviews.
 
 Key services and routes:
 
 - `routers/analyze.py`: upload/review, owner serialization, manual outcomes, provider links, and `GET /api/analyses/{id}/outcomes`.
-- `services/gemini.py`: uploads media, applies injection-resistant system/data separation, returns six dimensions plus qualitative critique and a next experiment. It removes legacy aggregate/prediction fields from new output.
+- `services/gemini.py`: uploads media, runs an agentic perception pass plus text-only reasoning pass, auto-detects rubric context when no niche hint is supplied, applies injection-resistant system/data separation, returns six retention craft dimensions, a section-level attention-risk map, qualitative critique, and a next experiment. It removes legacy aggregate/prediction fields from new output.
+- `services/scheduler.py`: in-process APScheduler job calls outcome collection daily at 06:00 UTC.
 - `services/outcomes.py`: computes post age, assigns fixed maturity windows, and stores immutable snapshots.
 - `services/tiktok_fetch.py` / `instagram_fetch.py`: untrusted provider adapters. Missing required counts fail closed; optional fields remain NULL.
 - `services/telemetry.py`: provider/model operational telemetry. Do not claim cost or margin until pricing and payload measurements are verified.
 - `services/economics.py`: admin operations report with measured reliability, unit coverage, row counts, and explicit unknown cost/margin fields.
 - `services/niche_classifier.py`: canonicalizes niche context; failures use `UNCATEGORIZED` rather than guessing.
-- `services/craft_insights.py`: descriptive craft-vs-verified-outcome aggregation for one creator (`GET /api/me/craft-insights`). Correlational only, gated by justified sample sizes; never causal, never a pixel-based forecast.
+- `services/craft_insights.py`: descriptive craft-vs-verified-outcome aggregation for one creator (`GET /api/me/craft-insights`). Correlational only, gated by justified sample sizes; returns `observed_range`, never a forecast.
 - `auth.py`: JWT helpers and the single canonical `is_minor()` implementation.
 - `routers/settings.py`: account deletion removes analyses, artifacts, snapshots, and usage events in FK-safe order.
 
@@ -85,17 +88,18 @@ New tables are created by `create_all`. Existing-column additions require model 
 
 ### Frontend
 
-- `app/page.tsx`: positions Surge as craft review plus learn-from-each-post experimentation.
-- `app/results/[id]/page.tsx`: AI craft dimensions, explicit evidence notice, recommended experiment, and a separate 24h/7d/30d outcome timeline.
-- `app/results/[id]/improve/page.tsx`: editing hypotheses and next experiment; no projected performance.
+- `app/page.tsx`: positions Surge as retention craft review plus learn-from-each-post experimentation; upload keeps niche/rubric hints optional.
+- `app/results/[id]/page.tsx`: AI retention craft dimensions, attention-risk map, explicit evidence notice, recommended experiment, and a separate 24h/7d/30d outcome timeline.
+- `app/results/[id]/improve/page.tsx`: attention-risk map, editing hypotheses, and next experiment; no projected performance.
 - `app/projects/page.tsx`: named project history, with unlinked posts sorted first and then newest-first; mixed-age latest counts are not comparisons.
 - `app/sample/page.tsx`: static example showing critique and observed results as separate evidence.
 - `app/insights/page.tsx`: "Craft vs. Your Results" — the creator's own craft scores against their verified outcomes, with an honest empirical like-rate range and a correlation-not-causation notice.
 - `components/VerdictBanner.tsx`: qualitative craft verdict only.
 - `components/FeedbackModal.tsx`: manual unverified observations; provider fetches are preferred where available.
-- `lib/api.ts`: typed review and outcome contracts.
+- `lib/api.ts`: typed review and outcome contracts, plus local anonymous-analysis claim-token storage.
 - `components/Skeleton.tsx` and shared motion rules in `app/globals.css`: reusable dark-theme loading shapes, delayed shimmer, busy indicators, focus states, and reduced-motion behavior. Prefer page-shaped skeletons for unavailable content and localized busy feedback for background refreshes.
 - `components/ReactiveVideoDropzone.tsx`: shared guest/authenticated upload target with pointer spotlight, drag state, validated-file state, keyboard operation, and matching transfer progress styling from `app/globals.css`.
+- `components/NichePicker.tsx`: optional rubric hint picker; never make it required in the main upload flow.
 
 Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `useSearchParams`, and auth state. The theme is dark-only. PWA assets are under `frontend/public`.
 
@@ -106,7 +110,7 @@ Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `us
 - Account deletion must delete user-owned review and measurement data, not merely anonymize it.
 - Consent to measurement research never turns observational data into causal evidence.
 - Exact hashes prevent duplicate uploads; near-duplicate detection is not implemented yet and must be added before any evaluation dataset is trusted.
-- There is no scheduler for automatic 24h/7d/30d refreshes yet; users manually capture near those windows.
+- Automatic 24h/7d/30d refreshes use the in-process daily scheduler; users can still manually capture near those windows.
 - Cost, refresh cost, storage growth, latency distribution, and gross margin remain unverified until real production telemetry is collected. Do not invent estimates from absent payloads.
 
 ## Environment variables

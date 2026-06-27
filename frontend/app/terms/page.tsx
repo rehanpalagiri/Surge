@@ -103,11 +103,11 @@ export default function TermsPage() {
         </Section>
 
         <Section number="Section 3" title="Description of Service">
-          <p>Surge is an AI-assisted craft review tool for short-form video content. The Service allows you to:</p>
+          <p>Surge is an AI-assisted retention craft review tool for short-form video content. The Service allows you to:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
-              Upload short-form video files for AI-powered craft analysis across six observable dimensions: hook
-              velocity, cut frequency, text scannability, curiosity gap, audio-visual sync, and loop seamlessness;
+              Upload short-form video files for AI-powered retention craft analysis across six observable dimensions: hook
+              velocity, cut frequency, text scannability, curiosity gap, audio-visual sync, and ending strength;
             </li>
             <li>
               Link public social media post URLs (TikTok, Instagram) to track observed engagement metrics over time;
@@ -379,7 +379,7 @@ export default function TermsPage() {
               performance prediction;
             </li>
             <li>
-              The six craft dimensions are editorial dimensions, not retention or engagement measurements;
+              The six retention craft dimensions are editorial dimensions, not retention or engagement measurements;
             </li>
             <li>
               Editing recommendations are hypotheses for your next controlled experiment, not proven optimization

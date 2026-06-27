@@ -383,6 +383,23 @@ body {
   0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
   100% { transform: translate(var(--tx, 0px), var(--ty, -60px)) rotate(var(--r, 180deg)); opacity: 0; }
 }
+@keyframes float-up-fade {
+  0%   { transform: translateX(var(--fx, 0px)) translateY(0)     scale(1);   opacity: 1; }
+  100% { transform: translateX(var(--fx, 0px)) translateY(-90px) scale(0.7); opacity: 0; }
+}
+@keyframes celebrate-text-in {
+  0%   { transform: scale(0.45) translateY(10px); opacity: 0; }
+  65%  { transform: scale(1.1)  translateY(-2px); opacity: 1; }
+  100% { transform: scale(1)    translateY(0);    opacity: 1; }
+}
+@keyframes achievement-rise {
+  0%   { transform: translateY(18px); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+@keyframes pulse-ring {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(7);   opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -216,8 +216,8 @@ What on-screen text strategies (timing, position, size, style, density) appear i
 AUDIO-VISUAL SYNC PATTERNS:
 What audio strategies, sync approaches, music choices, or sound design patterns characterize winners? Are there niche-specific audio norms? What audio failures appear in low performers?
 
-LOOP SEAMLESSNESS PATTERNS:
-How do high performers end their videos — what endings create rewatch loops? What endings appear in low performers that signal scroll-away?
+ENDING STRENGTH PATTERNS:
+How do high performers end their videos — what endings earn the finish (payoff, CTA, or a clean loop) and create rewatch/share impulse? What endings appear in low performers that signal scroll-away?
 
 NICHE-SPECIFIC INSIGHTS:
 What is unique about the {niche} niche on {pname} that a general scoring AI would miss? What topics, angles, formats, or creator behaviors perform disproportionately well or poorly here specifically?

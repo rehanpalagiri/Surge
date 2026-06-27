@@ -15,7 +15,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
   const [likes, setLikes] = useState("");
   const [link, setLink] = useState("");
   const [captureAge, setCaptureAge] = useState("");
-  const [manualMode, setManualMode] = useState(false); // TikTok only
+  const [manualMode, setManualMode] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [fetchedStats, setFetchedStats] = useState<{ views: number | null; likes: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,13 +54,17 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
 
   async function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const viewNum = parseInt(views, 10);
-    if (isNaN(viewNum) || viewNum < 0) {
+    const viewNum = isTikTok ? parseInt(views, 10) : undefined;
+    if (isTikTok && (viewNum === undefined || isNaN(viewNum) || viewNum < 0)) {
       setError("Please enter a valid view count.");
       return;
     }
     const likeNum = likes.trim() ? parseInt(likes, 10) : undefined;
     if (likeNum !== undefined && (isNaN(likeNum) || likeNum < 0)) {
+      setError("Please enter a valid like count.");
+      return;
+    }
+    if (!isTikTok && likeNum === undefined) {
       setError("Please enter a valid like count.");
       return;
     }
@@ -71,7 +75,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
     setLoading(true);
     setError("");
     try {
-      await submitFeedback(analysisId, viewNum, likeNum, Number(captureAge));
+      await submitFeedback(analysisId, viewNum, likeNum, Number(captureAge), link.trim() || undefined);
       setSubmitted(true);
       void Promise.resolve(onSubmitted?.()).catch(() => {});
     } catch (err: unknown) {
@@ -109,13 +113,15 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
       <p className="text-text-muted text-sm mb-4">
         {isTikTok
           ? manualMode
-            ? "Share your actual stats to help evaluate Surge's craft assessments."
+              ? "Share your observed stats to help evaluate Surge's craft assessments."
             : "Paste your posted TikTok link and we'll pull the real numbers — no typing, always current."
-          : "Paste your posted Reel link and we'll try to retrieve its public like count. Instagram views are not used until their meaning is verified."}
+          : manualMode
+            ? "Enter the Reel's observed public likes. Instagram views are not used until their meaning is verified."
+            : "Paste your posted Reel link and we'll try to retrieve its public like count. Instagram views are not used until their meaning is verified."}
       </p>
 
       {/* ── Instagram: link only ── */}
-      {!isTikTok && (
+      {!isTikTok && !manualMode && (
         <form onSubmit={handleLinkSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <input
@@ -133,6 +139,13 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
               {loading ? "Fetching…" : "Fetch my stats"}
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => { setManualMode(true); setError(""); }}
+            className="text-text-muted text-xs hover:text-text-primary self-start underline-offset-2 hover:underline"
+          >
+            Provider not working? Enter likes manually
+          </button>
         </form>
       )}
 
@@ -165,8 +178,15 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
         </form>
       )}
 
-      {isTikTok && manualMode && (
+      {manualMode && (
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-3">
+          <input
+            type="url"
+            placeholder={isTikTok ? "Optional TikTok link for later refreshes" : "Optional Instagram Reel link for later refreshes"}
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            className="bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+          />
           <select
             value={captureAge}
             onChange={(e) => setCaptureAge(e.target.value)}
@@ -179,18 +199,20 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
             <option value="720">About 30 days after posting</option>
           </select>
           <div className="flex flex-col sm:flex-row gap-3">
+            {isTikTok && (
+              <input
+                type="number"
+                min="0"
+                placeholder="Views (e.g. 15000)"
+                value={views}
+                onChange={(e) => setViews(e.target.value)}
+                className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+              />
+            )}
             <input
               type="number"
               min="0"
-              placeholder="Views (e.g. 15000)"
-              value={views}
-              onChange={(e) => setViews(e.target.value)}
-              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
-            />
-            <input
-              type="number"
-              min="0"
-              placeholder="Likes (optional)"
+              placeholder={isTikTok ? "Likes (optional)" : "Likes"}
               value={likes}
               onChange={(e) => setLikes(e.target.value)}
               className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
@@ -208,7 +230,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
             onClick={() => { setManualMode(false); setError(""); }}
             className="text-text-muted text-xs hover:text-text-primary self-start underline-offset-2 hover:underline"
           >
-            ← Or paste your TikTok link instead
+            {isTikTok ? "← Or paste your TikTok link instead" : "← Or fetch from Instagram instead"}
           </button>
         </form>
       )}

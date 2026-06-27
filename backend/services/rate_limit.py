@@ -14,7 +14,7 @@ link videos anyway and their analyses are not tied to an account).
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import UserAnalysis
@@ -56,12 +56,19 @@ async def get_rate_limit(user_id: int, db: AsyncSession) -> dict:
       window_hours — always WINDOW_HOURS
     """
     window_start = datetime.utcnow() - timedelta(hours=WINDOW_HOURS)
+    consumes_credit = or_(
+        UserAnalysis.status.is_(None),
+        UserAnalysis.status != "error",
+    )
 
-    # Uploads consumed in current window
+    # Uploads consumed in current window. Failed async analyses are excluded so
+    # users are not charged a slot for a report they never received. Active rows
+    # still count to prevent repeated pending jobs from bypassing the limiter.
     used_q = await db.execute(
         select(func.count()).select_from(UserAnalysis).where(
             UserAnalysis.user_id == user_id,
             UserAnalysis.created_at >= window_start,
+            consumes_credit,
         )
     )
     used: int = used_q.scalar() or 0
@@ -92,6 +99,7 @@ async def get_rate_limit(user_id: int, db: AsyncSession) -> dict:
         select(UserAnalysis.created_at).where(
             UserAnalysis.user_id == user_id,
             UserAnalysis.created_at >= window_start,
+            consumes_credit,
         ).order_by(UserAnalysis.created_at.asc()).limit(1)
     )
     oldest = oldest_q.scalar()

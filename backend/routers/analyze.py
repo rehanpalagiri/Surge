@@ -2,9 +2,12 @@ import os
 import uuid
 import json
 import logging
+import hmac
+import secrets
+import time
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update
 
@@ -14,7 +17,7 @@ from models import (
     User, UserAnalysis, UserProfile,
 )
 from schemas import (
-    AnalysisOut, AnalysisSummaryOut, FeedbackIn, OutcomeSnapshotOut,
+    AnalysisOut, AnalysisSummaryOut, ClaimAnalysisIn, FeedbackIn, OutcomeSnapshotOut,
     SeedConsentDecisionIn, VideoLinkIn,
 )
 from services.gemini import analyze_video
@@ -54,6 +57,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
+# Upload key ownership store: key → (user_id | None, requester_ip, issued_at)
+# Matches the 300s presigned URL TTL; entries are pruned lazily on each access.
+_PRESIGN_TTL = 300
+_pending_uploads: dict[str, tuple[int | None, str, float]] = {}
+
+
+def _prune_pending() -> None:
+    cutoff = time.time() - _PRESIGN_TTL
+    stale = [k for k, (_, _, issued_at) in _pending_uploads.items() if issued_at < cutoff]
+    for k in stale:
+        del _pending_uploads[k]
+
 
 def _title_from_caption(caption: str, max_words: int = 3) -> str:
     """Build a short project title from the first few words of the caption.
@@ -74,18 +89,74 @@ def resolve_mode(user, has_usable_seeds: bool, channel_profile) -> str:
     return "craft_review"
 
 
+def _rubric_context(result: dict) -> dict:
+    ctx = result.get("rubric_context") if isinstance(result, dict) else None
+    return ctx if isinstance(ctx, dict) else {}
+
+
+def _display_niche(raw_niche: str, result: dict, fallback: str) -> str:
+    if (raw_niche or "").strip():
+        return raw_niche
+    ctx = _rubric_context(result)
+    primary = ctx.get("reviewed_primary_niche") or ctx.get("primary_niche")
+    secondary = ctx.get("reviewed_secondary_niche") or ctx.get("secondary_niche")
+    if primary and primary != "Uncategorized":
+        return f"{primary} + {secondary}" if secondary else str(primary)
+    return fallback if fallback != "Uncategorized" else "Auto-detected"
+
+
+def _canonical_from_result(result: dict, fallback: str) -> str:
+    ctx = _rubric_context(result)
+    primary = ctx.get("reviewed_primary_niche") or ctx.get("primary_niche")
+    if primary and primary != "Uncategorized":
+        return str(primary)
+    return fallback
+
+
+def _needs_niche_confirmation(result: dict, fallback: bool) -> bool:
+    ctx = _rubric_context(result)
+    confidence = str(ctx.get("confidence") or "").lower()
+    source = str(ctx.get("source") or "")
+    return bool(fallback or source == "fallback" or confidence == "low")
+
+
 @router.post("/upload/presigned-url")
 async def get_upload_presigned_url(
+    request: Request,
     filename: str = Form(...),
     content_type: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(optional_user),
 ):
+    requester_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+    if user is None:
+        if not check_rate(f"guest-upload-url:{requester_ip}", 10, 24 * 3600):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many upload attempts. Sign up free to keep analyzing.",
+            )
+    else:
+        rl = await get_rate_limit(user.id, db)
+        if not rl["allowed"]:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Upload limit reached ({rl['effective_limit']} per {rl['window_hours']}h).",
+            )
     if not os.getenv("R2_ACCOUNT_ID"):
         raise HTTPException(status_code=503, detail="File upload service not configured.")
     ct = (content_type or "").lower()
     if ct not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported video format. Try MP4, MOV, WEBM, AVI, WMV, MPEG, or 3GP (MKV isn't supported yet).")
-    key = f"uploads/{uuid.uuid4()}_{os.path.basename(filename or 'upload')}"
+    safe_filename = os.path.basename(filename or "upload")
+    if len(safe_filename) > 140:
+        safe_filename = safe_filename[-140:]
+    key = f"uploads/{uuid.uuid4()}_{safe_filename}"
     upload_url = r2.presigned_upload_url(key, ct)
+    _prune_pending()
+    _pending_uploads[key] = (user.id if user else None, requester_ip, time.time())
     return {"upload_url": upload_url, "key": key}
 
 
@@ -111,7 +182,14 @@ async def _run_r2_analysis(
             await db.commit()
 
     try:
+        size = await r2.object_size(r2_key)
+        if size is None:
+            raise ValueError("Uploaded file is unavailable.")
+        if size > MAX_FILE_BYTES:
+            raise ValueError("File too large. Maximum size is 100MB.")
         video_bytes = await r2.download(r2_key)
+        if len(video_bytes) > MAX_FILE_BYTES:
+            raise ValueError("File too large. Maximum size is 100MB.")
         with open(file_path, "wb") as fh:
             fh.write(video_bytes)
         content_sha256 = sha256_file(file_path)
@@ -133,7 +211,9 @@ async def _run_r2_analysis(
         async with AsyncSessionLocal() as db:
             row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
             if row:
-                result["niche_needs_confirmation"] = niche_needs_confirmation
+                result["niche_needs_confirmation"] = _needs_niche_confirmation(result, niche_needs_confirmation)
+                row.niche = _display_niche(raw_niche, result, canonical_niche)
+                row.canonical_niche = _canonical_from_result(result, canonical_niche)
                 row.scores_json = json.dumps(result)
                 row.verdict = result.get("verdict", "Needs revision")
                 row.mode = effective_mode
@@ -276,6 +356,26 @@ async def analyze(
 
     # --- R2 async path: file already in cloud storage, process in background ---
     if has_r2:
+        _prune_pending()
+        _upload_entry = _pending_uploads.pop(r2_key.strip(), None)
+        if _upload_entry is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Upload key not recognized or expired. Please re-upload your video.",
+            )
+        _issued_user_id, _issued_ip, _ = _upload_entry
+        _caller_user_id = user.id if user else None
+        _caller_ip = (
+            request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            or (request.client.host if request.client else "unknown")
+        )
+        if _issued_user_id != _caller_user_id or (
+            _caller_user_id is None and _issued_ip != _caller_ip
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Upload key does not belong to this session.",
+            )
         analysis = UserAnalysis(
             user_id=user.id if user else None,
             platform=platform,
@@ -290,6 +390,7 @@ async def analyze(
             mode="quick",
             status="pending",
             parent_id=resolved_parent_id,
+            guest_claim_token=secrets.token_urlsafe(32) if user is None else None,
         )
         db.add(analysis)
         await db.commit()
@@ -311,7 +412,10 @@ async def analyze(
             secondary_niche,
             resolved_parent_id,
         )
-        return {"id": analysis.id, "status": "pending"}
+        out = {"id": analysis.id, "status": "pending"}
+        if analysis.guest_claim_token:
+            out["claim_token"] = analysis.guest_claim_token
+        return out
 
     if has_url and not has_file:
         url_stripped = video_url.strip()
@@ -389,14 +493,14 @@ async def analyze(
         except OSError:
             pass
 
-    result["niche_needs_confirmation"] = niche_needs_confirmation
+    result["niche_needs_confirmation"] = _needs_niche_confirmation(result, niche_needs_confirmation)
     analysis = UserAnalysis(
         user_id=user.id if user else None,
         platform=platform,
         filename=safe_name,
         project_name=resolved_project_name,
-        niche=raw_niche,  # the user's own words — shown in My Projects
-        canonical_niche=canonical_niche,
+        niche=_display_niche(raw_niche, result, canonical_niche),
+        canonical_niche=_canonical_from_result(result, canonical_niche),
         caption=caption or None,
         bio=bio or None,
         scores_json=json.dumps(result),
@@ -404,6 +508,7 @@ async def analyze(
         mode=effective_mode,
         calibration_version=0,
         parent_id=resolved_parent_id,
+        guest_claim_token=secrets.token_urlsafe(32) if user is None else None,
     )
     # One transaction, one commit: flush assigns analysis.id (and the Python-side
     # created_at default) so the artifact can reference it, then both rows commit
@@ -415,7 +520,7 @@ async def analyze(
     await upsert_artifact(db, analysis.id, content_sha256=content_sha256)
     await db.commit()
 
-    return _to_out(analysis)
+    return _to_out(analysis, include_claim_token=True)
 
 
 @router.get("/analyses/{analysis_id}", response_model=AnalysisOut)
@@ -524,6 +629,7 @@ async def my_analyses(
 @router.post("/analyses/{analysis_id}/claim", response_model=AnalysisOut)
 async def claim_analysis(
     analysis_id: int,
+    payload: Optional[ClaimAnalysisIn] = Body(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -534,7 +640,12 @@ async def claim_analysis(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     if analysis.user_id is None:
+        supplied = (payload.claim_token if payload else None) or ""
+        stored = analysis.guest_claim_token or ""
+        if not stored or not supplied or not hmac.compare_digest(supplied, stored):
+            raise HTTPException(status_code=403, detail="This analysis can only be claimed from the browser that created it.")
         analysis.user_id = user.id
+        analysis.guest_claim_token = None
         await db.commit()
         await db.refresh(analysis)
     elif analysis.user_id != user.id:
@@ -778,6 +889,19 @@ async def submit_feedback(
             raise HTTPException(status_code=400, detail="Likes can't exceed views.")
     if feedback.post_age_hours is not None and feedback.post_age_hours not in (24, 168, 720):
         raise HTTPException(status_code=400, detail="Capture age must be 24 hours, 7 days, or 30 days.")
+    manual_url = (feedback.video_url or "").strip() or None
+    if manual_url:
+        platform = analysis.platform or "tiktok"
+        valid = is_instagram_url(manual_url) if platform == "instagram" else is_tiktok_url(manual_url)
+        if not valid:
+            label = "Instagram Reel" if platform == "instagram" else "TikTok"
+            raise HTTPException(status_code=400, detail=f"That doesn't look like a {label} link.")
+        if analysis.video_url and manual_url.rstrip("/") != analysis.video_url.rstrip("/"):
+            raise HTTPException(
+                status_code=409,
+                detail="This experiment is already linked to a different post. Use a separate analysis for each post.",
+            )
+        analysis.video_url = manual_url
 
     if feedback.actual_views is not None:
         analysis.actual_views = feedback.actual_views
@@ -842,7 +966,7 @@ async def delete_analysis(
     await db.commit()
 
 
-def _to_out(analysis: UserAnalysis) -> dict:
+def _to_out(analysis: UserAnalysis, *, include_claim_token: bool = False) -> dict:
     try:
         scores = json.loads(analysis.scores_json)
     except (ValueError, TypeError):
@@ -861,6 +985,7 @@ def _to_out(analysis: UserAnalysis) -> dict:
         "actual_likes": analysis.actual_likes,
         "video_url": analysis.video_url,
         "counts_fetched_at": analysis.counts_fetched_at,
+        "claim_token": analysis.guest_claim_token if include_claim_token and analysis.user_id is None else None,
         "pending_seed_consent": bool(analysis.pending_seed_consent),
         "niche_needs_confirmation": bool(scores.get("niche_needs_confirmation")),
         "mode": analysis.mode or "quick",

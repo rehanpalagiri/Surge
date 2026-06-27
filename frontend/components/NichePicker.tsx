@@ -28,7 +28,9 @@ interface Props {
 export default function NichePicker({ selected, onChange, max = 2 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click.
   useEffect(() => {
@@ -39,16 +41,40 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  // Reset highlight when query changes or dropdown opens.
+  useEffect(() => { setHighlightedIndex(-1); }, [query, open]);
+
+  // Scroll highlighted item into view.
+  useEffect(() => {
+    if (highlightedIndex < 0 || !listRef.current) return;
+    const el = listRef.current.querySelector<HTMLElement>(`[data-idx="${highlightedIndex}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
+
   const atMax = selected.length >= max;
   const q = query.trim().toLowerCase();
   const filtered = NICHE_OPTIONS.filter((n) => n.toLowerCase().includes(q));
   const exactExists =
     NICHE_OPTIONS.some((n) => n.toLowerCase() === q) ||
     selected.some((n) => n.toLowerCase() === q);
+  const showCustom = !!q && !exactExists && !atMax;
+
+  // Navigable items: filtered list + custom entry slot.
+  const navItems: string[] = [...filtered, ...(showCustom ? ["__custom__"] : [])];
+
+  const select = (n: string) => {
+    if (!selected.includes(n) && !atMax) {
+      onChange([...selected, n]);
+      setQuery("");
+      setOpen(false);
+    }
+  };
+
+  const deselect = (n: string) => onChange(selected.filter((x) => x !== n));
 
   const toggle = (n: string) => {
-    if (selected.includes(n)) onChange(selected.filter((x) => x !== n));
-    else if (!atMax) onChange([...selected, n]);
+    if (selected.includes(n)) deselect(n);
+    else select(n);
   };
 
   const addCustom = () => {
@@ -56,6 +82,28 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
     if (v && !atMax && !selected.some((s) => s.toLowerCase() === v.toLowerCase())) {
       onChange([...selected, v]);
       setQuery("");
+      setOpen(false);
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.min(i + 1, navItems.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < navItems.length) {
+        const item = navItems[highlightedIndex];
+        if (item === "__custom__") addCustom();
+        else toggle(item);
+      } else if (showCustom) {
+        addCustom();
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
     }
   };
 
@@ -68,7 +116,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
   return (
     <div className="space-y-2" ref={ref}>
       <div className="flex items-baseline justify-between">
-        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Content Niche</p>
+        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Niche Hint</p>
         <p className="text-[11px] text-text-muted">primary + optional 2nd</p>
       </div>
 
@@ -82,7 +130,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
       >
         <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
           {selected.length === 0 ? (
-            <span className="text-text-muted text-sm">Select up to 2 niches…</span>
+            <span className="text-text-muted text-sm">Optional: choose up to 2 niches…</span>
           ) : (
             selected.map((n, i) => (
               <span
@@ -104,7 +152,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                 <button
                   type="button"
                   aria-label={`Remove ${n}`}
-                  onClick={(e) => { e.stopPropagation(); toggle(n); }}
+                  onClick={(e) => { e.stopPropagation(); deselect(n); }}
                   className="hover:bg-white/10 rounded-full p-0.5 transition-colors"
                 >
                   <X className="w-3 h-3" />
@@ -126,19 +174,26 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!exactExists && q) addCustom(); } }}
+                onKeyDown={handleInputKeyDown}
                 placeholder="Search niches or type your own…"
                 className="flex-1 bg-transparent text-text-primary text-sm placeholder:text-text-muted focus:outline-none"
               />
             </div>
-            <div className="max-h-60 overflow-y-auto py-1">
-              {filtered.map((n) => {
+            <div ref={listRef} className="max-h-60 overflow-y-auto py-1">
+              {filtered.length === 0 && q && (
+                <p className="px-3 pt-3 pb-1 text-sm text-text-muted text-center">
+                  No results for &ldquo;<span className="text-text-primary">{query.trim()}</span>&rdquo;
+                </p>
+              )}
+              {filtered.map((n, idx) => {
                 const sel = selected.includes(n);
                 const disabled = atMax && !sel;
+                const highlighted = highlightedIndex === idx;
                 return (
                   <button
                     key={n}
                     type="button"
+                    data-idx={idx}
                     disabled={disabled}
                     onClick={() => toggle(n)}
                     className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
@@ -146,6 +201,8 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                         ? "text-purple-to bg-purple-from/10"
                         : disabled
                         ? "text-text-muted/50 cursor-not-allowed"
+                        : highlighted
+                        ? "text-text-primary bg-surface"
                         : "text-text-primary hover:bg-surface"
                     }`}
                   >
@@ -154,12 +211,19 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                   </button>
                 );
               })}
-              {q && !exactExists && (
+              {showCustom && (
                 <button
                   type="button"
+                  data-idx={filtered.length}
                   disabled={atMax}
                   onClick={addCustom}
-                  className={`w-full px-3 py-2 text-sm text-left ${atMax ? "text-text-muted/50 cursor-not-allowed" : "text-text-primary hover:bg-surface"}`}
+                  className={`w-full px-3 py-2 text-sm text-left transition-colors ${
+                    atMax
+                      ? "text-text-muted/50 cursor-not-allowed"
+                      : highlightedIndex === filtered.length
+                      ? "text-text-primary bg-surface"
+                      : "text-text-primary hover:bg-surface"
+                  }`}
                 >
                   Use &ldquo;<span className="text-purple-to font-medium">{query.trim()}</span>&rdquo;
                 </button>
@@ -179,8 +243,8 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
 
       {selected.length === 1 && (
         <p className="text-[11px] text-text-muted">
-          <span className="text-purple-to font-medium">{selected[0]}</span> is your{" "}
-          <span className="text-text-muted">primary</span> niche — it sets the craft context. Add a 2nd for a blend.
+          <span className="text-purple-to font-medium">{selected[0]}</span> is the{" "}
+          <span className="text-text-muted">primary</span> hint. Add a 2nd for a blend.
         </p>
       )}
 

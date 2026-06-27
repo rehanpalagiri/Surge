@@ -2,7 +2,7 @@
 
 When a seed video is added (admin, harvest, or auto-promoted user video) we send it
 to Gemini ONCE to score the video's CRAFT — the 6 dimensions — *blind to the view/like
-counts*. The outcome label (`virality_rating` + `performance_driver` + `driver_confidence`)
+counts*. The outcome label (`seed_quality` + `performance_driver` + `driver_confidence`)
 is then computed in CODE from the real counts via `score_outcome()`, NOT by the model.
 
 Why the split: asking one LLM call to both judge craft AND derive a rating from the counts
@@ -13,7 +13,7 @@ that only *hoped* to obey the de-confound / thin-sample / linkage rules. Separat
   - the de-confound, thin-sample cap, and driver↔rating linkage are ENFORCED in code.
 
 The full JSON (craft fields + the code-computed outcome fields) is stored on the seed row
-(`gemini_analysis`); `virality_rating` becomes the seed's `rating`. The video file is deleted
+(`gemini_analysis`); `seed_quality` becomes the seed's `rating`. The video file is deleted
 after analysis — the JSON is the durable artifact, read back into niche synthesis + live scoring.
 
 This module reuses the Gemini client, `_PLATFORM_CONTEXT`, and the upload→poll-ACTIVE→
@@ -43,7 +43,7 @@ DISTRIBUTION_MIN_VIEWS = 100_000
 
 
 def score_outcome(view_count: Optional[int], like_count: int) -> tuple[int, str, str]:
-    """Deterministically derive (virality_rating, performance_driver, driver_confidence)
+    """Deterministically derive (seed_quality, performance_driver, driver_confidence)
     from the REAL counts — pure arithmetic, never the LLM. This is what makes the rating
     consistent and the de-confound / thin-sample / linkage rules enforceable in code.
 
@@ -125,7 +125,7 @@ CG (curiosity_gap): Does the opening force a specific unresolved question?
 AVS (audio_visual_sync): Does audio amplify and sync with the visuals?
   10 = beats land on cuts, emphasis aligns | 7 = good choice, roughly synced | 4 = generic, ignores rhythm | 0 = audio fights content
 
-LS (loop_seamlessness): Does the ending create rewatch/share impulse?
+LS (loop_seamlessness / ending strength): Does the ending earn the finish — rewatch/share impulse?
   10 = loops to start OR converting CTA | 7 = satisfying close, weak loop | 4 = clean end, no pull | 0 = hard cut / fade signalling "done"
 
 --- OUTPUT FIELD RULES ---
@@ -180,7 +180,7 @@ async def analyze_seed_video(
 ) -> dict:
     """Score a seed video's craft (Gemini, blind to counts), then attach the code-computed
     outcome (rating/driver/confidence). Returns the parsed dict on success, or a dict with an
-    "error" key on any failure. The caller MUST treat a missing/invalid "virality_rating" as a
+    "error" key on any failure. The caller MUST treat a missing/invalid "seed_quality" as a
     failure and not persist the seed.
     """
     started = time.perf_counter()
@@ -225,7 +225,7 @@ async def analyze_seed_video(
         # Outcome is computed in CODE from the real counts — deterministic, de-confounded,
         # rules (thin-sample cap, distribution↔rating linkage) enforced rather than requested.
         rating, driver, confidence = score_outcome(view_count, like_count)
-        data["virality_rating"] = rating
+        data["seed_quality"] = rating
         data["performance_driver"] = driver
         data["driver_confidence"] = confidence
         input_tokens, output_tokens = response_token_usage(response)

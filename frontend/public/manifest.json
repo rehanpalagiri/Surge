@@ -1,7 +1,7 @@
 {
   "name": "Surge",
   "short_name": "Surge",
-  "description": "AI-assisted video craft review and post experiment tracking",
+  "description": "AI-assisted retention craft review and post experiment tracking",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0f",

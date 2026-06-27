@@ -11,7 +11,7 @@ import UpsellModal from "@/components/UpsellModal";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import {
   getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus,
-  getOutcomeSnapshots, AnalysisOut, OutcomeSnapshot,
+  getOutcomeSnapshots, AnalysisOut, AttentionRiskItem, OutcomeSnapshot, RubricContext,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { fireConfetti } from "@/lib/confetti";
@@ -23,7 +23,7 @@ const SCORE_DIMENSIONS = [
   { key: "text_scannability",  label: "Text Scannability" },
   { key: "curiosity_gap",      label: "Curiosity Gap" },
   { key: "audio_visual_sync",  label: "Audio-Visual Sync" },
-  { key: "loop_seamlessness",  label: "Loop Seamlessness" },
+  { key: "loop_seamlessness",  label: "Ending Strength" },
 ] as const;
 
 type ScoreKey = typeof SCORE_DIMENSIONS[number]["key"];
@@ -137,6 +137,66 @@ function OutcomeTimeline({ snapshots }: { snapshots: OutcomeSnapshot[] }) {
       {snapshots.length > 0 && snapshots.every((row) => !row.horizon) && (
         <p className="text-warning text-xs">Metrics were captured, but not close enough to a supported maturity window for comparison.</p>
       )}
+    </div>
+  );
+}
+
+function riskColor(risk: AttentionRiskItem["risk"]): string {
+  if (risk === "high") return "border-danger/30 text-danger bg-danger/5";
+  if (risk === "medium") return "border-warning/30 text-warning bg-warning/5";
+  return "border-success/30 text-success bg-success/5";
+}
+
+function AttentionRiskMap({ risks }: { risks: AttentionRiskItem[] }) {
+  if (!Array.isArray(risks) || risks.length === 0) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <div>
+        <h3 className="text-text-primary font-semibold">Retention risk map</h3>
+        <p className="text-text-muted text-xs mt-1">
+          AI-estimated places viewer attention may weaken. This is not measured retention or drop-off data.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {risks.map((item, i) => (
+          <div key={`${item.section}-${i}`} className={`border rounded-xl p-4 ${riskColor(item.risk)}`}>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-text-primary font-semibold text-sm">{item.section}</p>
+              <span className="text-xs font-bold uppercase tracking-wide">{item.risk}</span>
+            </div>
+            <p className="text-text-muted text-sm">{item.reason}</p>
+            {item.fix && (
+              <p className="text-text-primary text-sm mt-3">
+                <span className="font-semibold">Try: </span>
+                {item.fix}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RubricContextBadge({ context, fallbackNiche }: { context?: RubricContext; fallbackNiche: string }) {
+  const primary = context?.reviewed_primary_niche || context?.primary_niche || fallbackNiche;
+  const secondary = context?.reviewed_secondary_niche || context?.secondary_niche;
+  const format = context?.format;
+  const confidence = context?.confidence;
+  const source = context?.source === "user_hint" ? "Hinted rubric" : context?.source === "fallback" ? "Broad rubric" : "Auto-detected rubric";
+  const reviewedAs = primary && primary !== "Auto-detected"
+    ? `${primary}${secondary ? ` + ${secondary}` : ""}`
+    : "Broad short-form";
+
+  return (
+    <div className="bg-card border border-border rounded-2xl px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="text-text-muted text-xs uppercase tracking-wider font-semibold">{source}</span>
+        <span className="text-text-primary font-semibold">{reviewedAs}</span>
+        {format && <span className="text-text-muted">Format: {format}</span>}
+        {confidence && <span className="text-text-muted">Confidence: {confidence}</span>}
+      </div>
     </div>
   );
 }
@@ -389,8 +449,9 @@ export default function ResultsPage() {
     { label: "Text Scannability",   score: s.text_scannability },
     { label: "Curiosity Gap",       score: s.curiosity_gap },
     { label: "Audio-Visual Sync",   score: s.audio_visual_sync },
-    { label: "Loop Seamlessness",   score: s.loop_seamlessness },
+    { label: "Ending Strength",     score: s.loop_seamlessness },
   ];
+  const attentionRisks = Array.isArray(s.attention_risk_map) ? s.attention_risk_map : [];
 
   const MODE_LABEL: Record<string, string> = {
     quick: "Legacy craft review",
@@ -423,6 +484,8 @@ export default function ResultsPage() {
           </span>
         </div>
 
+        <RubricContextBadge context={s.rubric_context} fallbackNiche={analysis.niche} />
+
         {/* Verdict banner — always shown */}
         <VerdictBanner verdict={analysis.verdict} />
 
@@ -432,10 +495,10 @@ export default function ResultsPage() {
             {/* Scores grid — visible to guests (numbers only, no critique) */}
             <div className="bg-card border border-border rounded-2xl p-6">
               <h2 className="text-text-primary font-semibold text-lg mb-5">
-                AI-Assessed Craft Dimensions
+                AI-Assessed Retention Craft
               </h2>
               <p className="text-text-muted text-xs -mt-3 mb-5">
-                Subjective assessments of observable execution. They are not retention, engagement, or performance measurements.
+                Subjective assessments of observable execution for keeping attention. They are not measured retention, engagement, or performance.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {scores.map((sc, i) => (
@@ -513,10 +576,10 @@ export default function ResultsPage() {
             {/* Scores grid */}
             <div className="bg-card border border-border rounded-2xl p-6">
               <h2 className="text-text-primary font-semibold text-lg mb-5">
-                AI-Assessed Craft Dimensions
+                AI-Assessed Retention Craft
               </h2>
               <p className="text-text-muted text-xs -mt-3 mb-5">
-                Subjective assessments of observable execution. They are not retention, engagement, or performance measurements.
+                Subjective assessments of observable execution for keeping attention. They are not measured retention, engagement, or performance.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {scores.map((sc, i) => (
@@ -540,6 +603,8 @@ export default function ResultsPage() {
                 <p><span className="text-text-muted font-semibold">Observe: </span><span className="text-text-primary">{s.recommended_experiment?.observe ?? "Compare verified results at the same post age."}</span></p>
               </div>
             </div>
+
+            <AttentionRiskMap risks={attentionRisks} />
 
             <OutcomeTimeline snapshots={snapshots} />
 

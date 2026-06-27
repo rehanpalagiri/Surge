@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
@@ -16,19 +16,48 @@ function verdictColor(verdict: string): string {
   return "text-danger";
 }
 
-const CONFETTI_PARTICLES: Array<{ color: string; tx: number; ty: number; r: number }> = [
-  { color: "#a855f7", tx:   0, ty: -72, r: 120 },
-  { color: "#ec4899", tx:  36, ty: -62, r: 210 },
-  { color: "#fbbf24", tx:  60, ty: -36, r:  45 },
-  { color: "#34d399", tx:  70, ty:   0, r: 300 },
-  { color: "#60a5fa", tx:  60, ty:  36, r: 150 },
-  { color: "#fb923c", tx:  36, ty:  60, r:  90 },
-  { color: "#a855f7", tx:   0, ty:  70, r: 270 },
-  { color: "#ec4899", tx: -36, ty:  60, r:  30 },
-  { color: "#fbbf24", tx: -60, ty:  36, r: 200 },
-  { color: "#34d399", tx: -70, ty:   0, r:  60 },
-  { color: "#60a5fa", tx: -60, ty: -36, r: 320 },
-  { color: "#fb923c", tx: -36, ty: -62, r: 170 },
+const CONFETTI_PARTICLES: Array<{ color: string; tx: number; ty: number; r: number; size: number; round: boolean; delay: number }> = [
+  // First burst — centre cluster going up
+  { color: "#a855f7", tx:   0, ty: -140, r: 270, size: 10, round: false, delay:   0 },
+  { color: "#fbbf24", tx: -25, ty: -120, r:  45, size:  7, round: true,  delay:  30 },
+  { color: "#ec4899", tx:  25, ty: -120, r: 180, size:  8, round: false, delay:  60 },
+  { color: "#34d399", tx: -10, ty: -100, r: 315, size:  6, round: false, delay:  20 },
+  { color: "#60a5fa", tx:  10, ty: -100, r:  90, size:  9, round: true,  delay:  50 },
+  // Left spread
+  { color: "#fb923c", tx: -60, ty: -130, r: 200, size:  7, round: false, delay:  40 },
+  { color: "#a855f7", tx: -80, ty:  -90, r: 140, size: 10, round: true,  delay:  80 },
+  { color: "#ec4899", tx:-110, ty: -110, r:  30, size:  6, round: false, delay: 100 },
+  { color: "#fbbf24", tx: -45, ty:  -70, r: 255, size:  8, round: false, delay:  70 },
+  { color: "#34d399", tx:-120, ty:  -50, r: 320, size:  7, round: true,  delay: 120 },
+  // Right spread
+  { color: "#60a5fa", tx:  60, ty: -130, r:  60, size:  9, round: false, delay:  40 },
+  { color: "#fb923c", tx:  80, ty:  -90, r: 220, size:  6, round: true,  delay:  80 },
+  { color: "#a855f7", tx: 110, ty: -110, r: 350, size: 10, round: false, delay: 100 },
+  { color: "#ec4899", tx:  45, ty:  -70, r: 110, size:  7, round: false, delay:  70 },
+  { color: "#fbbf24", tx: 120, ty:  -50, r: 170, size:  8, round: true,  delay: 120 },
+  // Second wave — delayed
+  { color: "#34d399", tx: -90, ty: -160, r:  80, size:  6, round: false, delay: 150 },
+  { color: "#60a5fa", tx:  90, ty: -160, r: 300, size:  7, round: false, delay: 150 },
+  { color: "#fb923c", tx: -50, ty: -150, r: 195, size: 10, round: true,  delay: 180 },
+  { color: "#a855f7", tx:  50, ty: -150, r:  25, size:  8, round: false, delay: 180 },
+  { color: "#ec4899", tx:-100, ty:  -80, r: 145, size:  6, round: false, delay: 200 },
+  { color: "#fbbf24", tx: 100, ty:  -80, r: 265, size:  9, round: true,  delay: 200 },
+  // Falling outward — drift sideways / slightly down for realism
+  { color: "#34d399", tx:-125, ty:  30, r:  50, size:  7, round: false, delay:  60 },
+  { color: "#60a5fa", tx: 125, ty:  30, r: 230, size:  6, round: false, delay:  60 },
+  { color: "#a855f7", tx:-110, ty:  60, r: 100, size:  8, round: true,  delay:  90 },
+  { color: "#fb923c", tx: 110, ty:  60, r: 280, size:  9, round: false, delay:  90 },
+  { color: "#ec4899", tx: -65, ty:  80, r: 170, size:  6, round: false, delay: 110 },
+  { color: "#fbbf24", tx:  65, ty:  80, r:  10, size:  7, round: true,  delay: 110 },
+  { color: "#34d399", tx:   0, ty:  90, r: 310, size: 10, round: false, delay: 140 },
+];
+
+const FLOAT_EMOJI = [
+  { emoji: "🎉", fx: -90, delay:  60, cls: "text-2xl" },
+  { emoji: "🚀", fx: -30, delay:   0, cls: "text-3xl" },
+  { emoji: "⭐", fx:  20, delay: 130, cls: "text-xl"  },
+  { emoji: "🎊", fx:  75, delay: 220, cls: "text-2xl" },
+  { emoji: "🔥", fx: -55, delay: 310, cls: "text-lg"  },
 ];
 
 const TIKTOK_HOW_TO = [
@@ -62,11 +91,26 @@ function PostLinkRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showHowTo, setShowHowTo] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const howTo = platform === "tiktok" ? TIKTOK_HOW_TO : INSTAGRAM_HOW_TO;
+
+  // Glow the whole project card during celebration
+  useEffect(() => {
+    if (phase !== "celebrate") return;
+    const card = containerRef.current?.closest("article") as HTMLElement | null;
+    if (!card) return;
+    card.style.borderColor = "rgb(168 85 247 / 0.75)";
+    card.style.boxShadow = "0 0 0 1px rgb(168 85 247 / 0.35), 0 0 50px rgb(168 85 247 / 0.22)";
+    card.style.transition = "border-color 0.25s, box-shadow 0.25s";
+    return () => {
+      card.style.borderColor = "";
+      card.style.boxShadow = "";
+    };
+  }, [phase]);
 
   function handlePostedClick() {
     setPhase("celebrate");
-    setTimeout(() => setPhase("linking"), 1500);
+    setTimeout(() => setPhase("linking"), 3000);
   }
 
   async function fetchStats(url?: string) {
@@ -133,27 +177,87 @@ function PostLinkRow({
   // Celebration burst
   if (phase === "celebrate") {
     return (
-      <div className="px-5 pb-5 flex flex-col items-center gap-2 py-5">
-        <div className="relative flex justify-center items-center w-20 h-20">
+      <div ref={containerRef} className="relative overflow-hidden px-5 pb-6 pt-4 flex flex-col items-center gap-3 min-h-[190px]">
+        {/* Radial purple glow bg */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse 90% 70% at 50% 55%, rgb(168 85 247 / 0.22) 0%, transparent 68%)" }}
+        />
+
+        {/* Shockwave rings — burst from centre */}
+        {[0, 180, 360].map((delay, i) => (
+          <span
+            key={i}
+            className="pointer-events-none absolute rounded-full border-2 border-purple-400/60"
+            style={{
+              width: 36, height: 36,
+              top: "50%", left: "50%",
+              animation: `pulse-ring 0.95s ${delay}ms ease-out forwards`,
+            }}
+          />
+        ))}
+
+        {/* Confetti particles */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           {CONFETTI_PARTICLES.map((p, i) => (
             <span
               key={i}
-              className="absolute rounded-sm"
+              className="absolute"
               style={{
-                width: 10,
-                height: 10,
+                width: p.size,
+                height: p.size,
+                borderRadius: p.round ? "50%" : "2px",
                 backgroundColor: p.color,
                 "--tx": `${p.tx}px`,
                 "--ty": `${p.ty}px`,
                 "--r": `${p.r}deg`,
-                animation: `confetti-particle 0.85s ${i * 40}ms cubic-bezier(0.1, 0.8, 0.3, 1) forwards`,
+                animation: `confetti-particle 1.3s ${p.delay}ms cubic-bezier(0.15, 0.8, 0.35, 1) forwards`,
               } as React.CSSProperties}
             />
           ))}
-          <span className="text-4xl relative z-10 select-none">🚀</span>
         </div>
-        <p className="text-base font-bold text-white">You shipped it!</p>
-        <p className="text-sm text-zinc-400">Let&apos;s capture those results…</p>
+
+        {/* Floating emoji */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          {FLOAT_EMOJI.map((e, i) => (
+            <span
+              key={i}
+              className={`absolute select-none ${e.cls}`}
+              style={{
+                "--fx": `${e.fx}px`,
+                animation: `float-up-fade 2s ${e.delay}ms ease-out forwards`,
+              } as React.CSSProperties}
+            >
+              {e.emoji}
+            </span>
+          ))}
+        </div>
+
+        {/* Text content */}
+        <div className="relative z-10 flex flex-col items-center gap-2 pt-6">
+          <p
+            className="text-2xl font-extrabold tracking-widest text-white uppercase"
+            style={{ animation: "celebrate-text-in 0.55s 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
+          >
+            You posted it!
+          </p>
+          <p
+            className="text-sm text-zinc-400 text-center"
+            style={{ animation: "celebrate-text-in 0.5s 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
+          >
+            Your video is live. Let&apos;s see how the world responds.
+          </p>
+          <div
+            className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-500/15 px-4 py-1.5 text-xs font-bold text-yellow-300"
+            style={{
+              animation: "achievement-rise 0.45s 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+              boxShadow: "0 0 18px rgb(234 179 8 / 0.28)",
+            }}
+          >
+            <span>🏆</span>
+            <span>+1 analysis credit earned</span>
+          </div>
+        </div>
       </div>
     );
   }

@@ -2,7 +2,7 @@
 
 Verifies the honest-by-construction guarantees: only verified, age-matched,
 view-bearing snapshots count; maturity windows are never mixed; the observed
-like rate is computed correctly; and patterns/forecasts appear only at the
+like rate is computed correctly; and patterns/observed ranges appear only at the
 justified sample sizes.
 """
 import json
@@ -66,7 +66,7 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
             out = await build_craft_insights(USER, db)
         self.assertEqual(out["total_analyses"], 0)
         self.assertEqual(out["with_verified_outcome"], 0)
-        self.assertFalse(out["forecast"]["available"])
+        self.assertFalse(out["observed_range"]["available"])
 
     async def test_like_rate_and_exclusions(self):
         async with self.Session() as db:
@@ -119,7 +119,7 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
         self.assertLess(out["with_verified_outcome"], PATTERN_MIN)
         self.assertEqual(out["patterns"], [])
 
-    async def test_pattern_detects_hook_signal_and_forecast_unlocks(self):
+    async def test_pattern_detects_hook_signal_and_observed_range_unlocks(self):
         async with self.Session() as db:
             # 4 high-hook posts with high like rate, 4 low-hook with low like rate.
             for likes in (50, 60, 70, 80):       # 5–8%
@@ -139,8 +139,8 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(p["dimension"] == "cut_frequency" for p in out["patterns"]))
         # Forecast unlocks at >= FORECAST_MIN with an ordered range.
         self.assertGreaterEqual(8, FORECAST_MIN)
-        self.assertTrue(out["forecast"]["available"])
-        f = out["forecast"]
+        self.assertTrue(out["observed_range"]["available"])
+        f = out["observed_range"]
         self.assertLessEqual(f["min"], f["p25"])
         self.assertLessEqual(f["p25"], f["median"])
         self.assertLessEqual(f["median"], f["p75"])

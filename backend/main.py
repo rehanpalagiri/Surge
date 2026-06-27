@@ -50,6 +50,10 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN counts_fetched_at DATETIME"
         )
+    if "guest_claim_token" not in existing:
+        await conn.exec_driver_sql(
+            "ALTER TABLE user_analyses ADD COLUMN guest_claim_token TEXT"
+        )
     if "promoted_seed_id" not in existing:
         await conn.exec_driver_sql(
             "ALTER TABLE user_analyses ADD COLUMN promoted_seed_id INTEGER"
@@ -200,6 +204,7 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS mode VARCHAR DEFAULT 'quick'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS video_url VARCHAR",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS counts_fetched_at TIMESTAMP",
+        "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS guest_claim_token VARCHAR",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS promoted_seed_id INTEGER",
         # --- seed_videos ---
         "ALTER TABLE seed_videos ADD COLUMN IF NOT EXISTS platform VARCHAR DEFAULT 'tiktok'",
@@ -280,7 +285,10 @@ async def lifespan(app: FastAPI):
             await _ensure_columns(conn)
         else:
             await _ensure_columns_pg(conn)
+    from services.scheduler import start as start_scheduler, stop as stop_scheduler
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(title="Surge API", lifespan=lifespan)

@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { getToken, clearToken } from "@/lib/auth";
+import { usePathname } from "next/navigation";
+import { getToken } from "@/lib/auth";
 import { Skeleton } from "@/components/Skeleton";
 
 export default function Nav({ subtitle }: { subtitle?: string }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -36,12 +35,6 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
-
-  function logout() {
-    clearToken();
-    setMenuOpen(false);
-    router.push("/");
-  }
 
   return (
     <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-20">
@@ -70,9 +63,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
               <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
               <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">Projects</Link>
               <Link href="/insights" className="text-zinc-400 hover:text-white transition-colors">Insights</Link>
-              <Link href="/profile"  className="text-zinc-400 hover:text-white transition-colors">Profile</Link>
               <Link href="/settings" className="text-zinc-400 hover:text-white transition-colors">Settings</Link>
-              <button onClick={logout} className="text-zinc-400 hover:text-white transition-colors">Log out</button>
             </>
           ) : (
             <>
@@ -102,10 +93,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
                   <Link href="/" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Dashboard</Link>
                   <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Projects</Link>
                   <Link href="/insights" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Insights</Link>
-                  <Link href="/profile"  className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Profile</Link>
                   <Link href="/settings" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Settings</Link>
-                  <div className="border-t border-zinc-700 my-1" />
-                  <button onClick={logout} className="px-4 py-3 text-left text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Log out</button>
                 </>
               ) : (
                 <>

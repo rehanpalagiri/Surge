@@ -39,7 +39,7 @@ export default function UpsellModal({ analysisId, onClose }: UpsellModalProps) {
             Your craft review is just the start
           </h2>
           <p className="text-text-muted leading-relaxed mb-6">
-            Sign up free to unlock timestamped craft observations, editing hypotheses,
+            Sign up free to unlock timestamped attention observations, editing hypotheses,
             hook and caption alternatives, and one clearly defined experiment to test next.
           </p>
 

@@ -27,7 +27,7 @@ const PROCESSING_STEPS = [
   "Analyzing the first-3-second hook…",
   "Scanning for on-screen text collisions…",
   "Measuring cut rhythm and pacing…",
-  "Checking audio-visual sync and loop…",
+  "Checking audio-visual sync and the ending…",
   "Writing your craft review…",
 ];
 
@@ -51,6 +51,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
   const [file, setFile] = useState<File | null>(null);
   const [niches, setNiches] = useState<string[]>([]);  // up to 2; first = primary, second = blend
+  const [showRubricHint, setShowRubricHint] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
 
@@ -98,7 +99,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
       await wakeBackend();
       const { id } = await analyzeVideo(
         file,
-        niches[0] || "Lifestyle",
+        niches[0] ?? "",
         "", "", "tiktok", "",
         niches[1] ?? "",
       );
@@ -165,12 +166,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             {/* Headline */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
-                Make Each Post{" "}
-                <span className="text-purple-400">Teach You Something.</span>
+                Find Where Viewers{" "}
+                <span className="text-purple-400">Might Drift.</span>
               </h1>
               <p className="text-zinc-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
-                Review observable craft before posting, then track verified results at the
-                same post ages and choose one clear experiment for the next version.
+                Review the hook, pacing, text, tension, sync, and ending before posting, then
+                choose one retention-focused experiment for the next version.
               </p>
             </div>
 
@@ -184,8 +185,44 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}
               />
 
-              {/* Niche — searchable multi-select (up to 2) */}
-              <NichePicker selected={niches} onChange={setNiches} />
+              {/* Optional rubric hint */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+                {showRubricHint || niches.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Rubric Hint</p>
+                        <p className="text-[11px] text-zinc-500">Optional — Surge can detect this automatically</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNiches([]);
+                          setShowRubricHint(false);
+                        }}
+                        className="text-xs font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
+                      >
+                        Auto-detect
+                      </button>
+                    </div>
+                    <NichePicker selected={niches} onChange={setNiches} />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-zinc-300">Surge will auto-detect the rubric</p>
+                      <p className="text-xs text-zinc-500">Add a hint only if this video is easy to misread.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRubricHint(true)}
+                      className="shrink-0 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-purple-400 hover:text-white transition-colors"
+                    >
+                      Add hint
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Error */}
               {error && (
@@ -201,7 +238,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
                 className="gradient-btn w-full text-white font-bold py-4 rounded-2xl text-lg
                   disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Analyze My Video →
+                Review My Video →
               </button>
             </form>
 
@@ -312,7 +349,7 @@ export default function Home() {
           Analyze your next {PLATFORM_LABEL[platform]} video
         </h1>
         <p className="text-zinc-400 text-sm mt-2">
-          Get an outcome-blind craft review and one experiment to test next.
+          Find attention risks and one retention-focused experiment to test next.
         </p>
       </section>
 

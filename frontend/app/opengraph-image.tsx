@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 // this identical, input-less card to be re-rendered on every social-crawler
 // request. On the default (Node) runtime Next prerenders it once at build, so
 // it's served straight from the CDN and never regenerated per visitor.
-export const alt = "Surge — AI-assisted video craft review";
+export const alt = "Surge — AI-assisted retention craft review";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -50,7 +50,7 @@ export default function Image() {
             lineHeight: 1.4,
           }}
         >
-          Review your video craft before you post.
+          Find attention risks before you post.
         </div>
 
         {/* Review pills */}

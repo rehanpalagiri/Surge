@@ -1,10 +1,10 @@
 """
-Trending Feed harvest — pulls RECENTLY viral TikTok videos per niche.
+Trending Feed harvest — pulls RECENTLY high-performing TikTok videos per niche.
 
-Unlike the regular keyword harvest (which finds any viral video regardless of age),
+Unlike the regular keyword harvest (which finds any high-performing video regardless of age),
 this specifically targets videos posted in the last 30 days that are already
 accumulating high view counts. A video with 500K views in 7 days vs 500K in 6 months
-is a completely different signal — viral velocity is the trend detector.
+is a completely different signal — view velocity is the trend detector.
 
 Entry points:
   harvest_trending(niches, max_age_days, min_velocity, max_per_niche)
@@ -110,14 +110,14 @@ async def harvest_trending_niche(
                 gemini_calls += 1
                 result = await analyze_seed_video(tmp, "tiktok", niche, play_count, like_count)
 
-                if "error" in result or "virality_rating" not in result:
+                if "error" in result or "seed_quality" not in result:
                     logger.warning("Trend analysis failed vid:%s — %s", video_id, result.get("error"))
                     errors += 1
                     consecutive_errors += 1
                     continue
 
                 consecutive_errors = 0
-                rating = max(0, min(10, int(round(float(result["virality_rating"])))))
+                rating = max(0, min(10, int(round(float(result["seed_quality"])))))
                 posted_at_dt = datetime.utcfromtimestamp(create_time) if create_time else None
                 caption = str(v.get("title") or "").strip()[:300]
                 note_parts = [

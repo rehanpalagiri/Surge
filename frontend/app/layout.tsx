@@ -10,9 +10,9 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://surge-chi-khaki.vercel.app"),
-  title: "Surge — AI Video Craft Review",
+  title: "Surge — AI Retention Craft Review",
   description:
-    "Get an AI-assisted craft review of your TikTok or Instagram Reel before you post it.",
+    "Find attention risks in your TikTok or Instagram Reel before you post it.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -23,18 +23,18 @@ export const metadata: Metadata = {
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
-    title: "Surge — Review your video before you post",
+    title: "Surge — Find retention risks before you post",
     description:
-      "Review observable video craft before posting, then track verified results at comparable post ages.",
+      "Review observable retention craft before posting, then track verified results at comparable post ages.",
     url: "https://surge-chi-khaki.vercel.app",
     siteName: "Surge",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Surge — Review your video before you post",
+    title: "Surge — Find retention risks before you post",
     description:
-      "Review observable video craft before posting, then track verified results at comparable post ages.",
+      "Review observable retention craft before posting, then track verified results at comparable post ages.",
   },
 };
 

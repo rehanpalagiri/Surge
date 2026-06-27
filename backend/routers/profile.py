@@ -1,12 +1,12 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from database import get_db
-from models import UserProfile, UserAnalysis, PasswordResetToken, User
-from schemas import UserProfileIn, UserProfileOut, DeleteAccountIn
-from auth import require_user, verify_password
+from models import UserProfile, User
+from schemas import UserProfileIn, UserProfileOut
+from auth import require_user
 
 router = APIRouter(prefix="/api/me", tags=["profile"])
 
@@ -73,21 +73,3 @@ async def upsert_profile(
     await db.commit()
     await db.refresh(profile)
     return profile
-
-
-@router.delete("/account")
-async def delete_account(
-    payload: DeleteAccountIn,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_user),
-):
-    if not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Incorrect password.")
-
-    # Delete in FK order to avoid constraint violations
-    await db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
-    await db.execute(delete(UserProfile).where(UserProfile.user_id == user.id))
-    await db.execute(delete(UserAnalysis).where(UserAnalysis.user_id == user.id))
-    await db.delete(user)
-    await db.commit()
-    return {"ok": True}

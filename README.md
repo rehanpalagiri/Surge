@@ -1,8 +1,8 @@
 # Surge
 
-Surge is an outcome-blind AI craft reviewer and post-experiment tracker for short-form video.
+Surge is an outcome-blind AI retention craft reviewer and post-experiment tracker for short-form video.
 
-It reviews observable editing choices—hook, pacing, text, curiosity, audio/visual sync, and loop construction—then proposes one focused change for the creator's next post. If the creator links a published post, Surge stores timestamped public metrics separately at comparable 24-hour, 7-day, and 30-day windows.
+It reviews observable editing choices that help keep attention: hook, pacing, text, curiosity, audio/visual sync, and ending strength. Then it proposes one focused retention experiment for the creator's next post. If the creator links a published post, Surge stores timestamped public metrics separately at comparable 24-hour, 7-day, and 30-day windows.
 
 Surge does **not** predict virality, retention, views, or likes. Its craft assessments are AI opinions, and its recommendations are hypotheses for future experiments—not causal prescriptions.
 

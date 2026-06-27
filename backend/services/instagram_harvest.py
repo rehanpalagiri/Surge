@@ -185,8 +185,8 @@ async def harvest_instagram_niche(
                 gemini_calls += 1
                 result = await analyze_seed_video(tmp, "instagram", niche, None, like_count)
 
-                if "error" in result or "virality_rating" not in result:
-                    err_msg = str(result.get("error", "missing virality_rating"))[:200]
+                if "error" in result or "seed_quality" not in result:
+                    err_msg = str(result.get("error", "missing seed_quality"))[:200]
                     logger.warning("Analysis failed ig:%s — %s", media_pk, err_msg)
                     analysis_errors += 1
                     errors += 1
@@ -195,7 +195,7 @@ async def harvest_instagram_niche(
                     continue
 
                 consecutive_errors = 0  # success — reset the circuit breaker
-                rating = max(0, min(10, int(round(float(result["virality_rating"])))))
+                rating = max(0, min(10, int(round(float(result["seed_quality"])))))
                 caption = str(media.get("caption_text") or "").strip()[:300]
                 note_parts = [f"Auto-harvested Instagram · hashtag: #{hashtag} · ig:{media_pk}"]
                 if caption:

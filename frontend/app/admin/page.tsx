@@ -228,7 +228,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("viraliq_admin_pw");
+    const saved = sessionStorage.getItem("viraliq_admin_pw");
     if (saved) {
       setPassword(saved);
       setAuthed(true);
@@ -258,7 +258,7 @@ export default function AdminPage() {
     setAuthPending(true);
     try {
       await getAdminSeeds(password);
-      localStorage.setItem("viraliq_admin_pw", password);
+      sessionStorage.setItem("viraliq_admin_pw", password);
       setAuthed(true);
       setAuthError("");
       loadSeeds(password);
@@ -426,7 +426,7 @@ export default function AdminPage() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("viraliq_admin_pw");
+    sessionStorage.removeItem("viraliq_admin_pw");
     setAuthed(false);
     setPassword("");
     setSeeds([]);

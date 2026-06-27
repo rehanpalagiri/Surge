@@ -9,6 +9,51 @@ import { getToken, clearToken } from "@/lib/auth";
 import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
 import { SettingsPrivacySkeleton, SettingsSkeleton } from "@/components/Skeleton";
 
+function ProfileCard() {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg">Profile</h2>
+          <p className="text-text-muted text-sm mt-0.5">Manage your public handle and display name.</p>
+        </div>
+        <Link
+          href="/profile"
+          className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-5 py-2 rounded-xl transition-colors text-sm"
+        >
+          Edit profile
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function LogOutCard() {
+  const router = useRouter();
+
+  function handleLogOut() {
+    clearToken();
+    router.push("/");
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg">Log out</h2>
+          <p className="text-text-muted text-sm mt-0.5">Sign out of your account on this device.</p>
+        </div>
+        <button
+          onClick={handleLogOut}
+          className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-text-muted/60 transition-colors text-sm"
+        >
+          Log out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
@@ -27,9 +72,11 @@ export default function SettingsPage() {
       <div className="max-w-2xl mx-auto w-full px-4 py-10 space-y-6">
         {!authReady ? <SettingsSkeleton /> : (
           <>
+            <ProfileCard />
             <ChangeUsernameCard />
             <ChangePasswordCard />
             <DataPrivacyCard />
+            <LogOutCard />
             <DeleteAccountCard />
           </>
         )}

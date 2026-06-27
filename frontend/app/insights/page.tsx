@@ -13,7 +13,7 @@ const DIMENSION_ORDER = [
   ["text_scannability", "Text"],
   ["curiosity_gap", "Curiosity"],
   ["audio_visual_sync", "A/V Sync"],
-  ["loop_seamlessness", "Loop"],
+  ["loop_seamlessness", "Ending"],
 ] as const;
 
 const HORIZON_LABEL: Record<string, string> = {
@@ -106,30 +106,30 @@ export default function InsightsPage() {
               {verified === 1 ? "post" : "posts"} at the <strong className="text-text-primary">{horizonLabel}</strong> mark.
             </p>
 
-            {/* ── Forecast (only when enough data) ── */}
-            {data.forecast.available ? (
+            {/* ── Observed range (only when enough data) ── */}
+            {data.observed_range.available ? (
               <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-6 space-y-3">
                 <h2 className="text-text-primary font-semibold">What your posts tend to land</h2>
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
                   <div>
                     <p className="text-3xl font-bold text-purple-to tabular-nums">
-                      {data.forecast.p25}–{data.forecast.p75}%
+                      {data.observed_range.p25}–{data.observed_range.p75}%
                     </p>
                     <p className="text-text-muted text-xs mt-1">middle 50% of your like rates</p>
                   </div>
                   <div className="text-sm text-text-muted">
-                    <p>median <span className="text-text-primary font-semibold tabular-nums">{data.forecast.median}%</span></p>
-                    <p>range <span className="text-text-primary tabular-nums">{data.forecast.min}–{data.forecast.max}%</span></p>
+                    <p>median <span className="text-text-primary font-semibold tabular-nums">{data.observed_range.median}%</span></p>
+                    <p>range <span className="text-text-primary tabular-nums">{data.observed_range.min}–{data.observed_range.max}%</span></p>
                   </div>
                 </div>
                 <p className="text-text-muted text-xs">
-                  Empirical spread across your {data.forecast.n} verified posts — a realistic range to expect, not a target or a promise.
+                  Empirical spread across your {data.observed_range.n} verified posts — historical context, not a target or a promise.
                 </p>
               </div>
             ) : (
               <div className="bg-card border border-border rounded-2xl p-5 text-sm text-text-muted">
-                Link <strong className="text-text-primary">{Math.max(0, data.forecast.need - data.forecast.have)}</strong> more
-                verified {Math.max(0, data.forecast.need - data.forecast.have) === 1 ? "post" : "posts"} to unlock your expected like-rate range.
+                Link <strong className="text-text-primary">{Math.max(0, data.observed_range.need - data.observed_range.have)}</strong> more
+                verified {Math.max(0, data.observed_range.need - data.observed_range.have) === 1 ? "post" : "posts"} to unlock your historical like-rate band.
               </div>
             )}
 

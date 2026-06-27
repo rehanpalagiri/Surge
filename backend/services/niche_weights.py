@@ -1,7 +1,7 @@
-"""Niche-specific dimension weighting profiles for the Gemini scoring prompt.
+"""Niche-specific dimension priority profiles for the Gemini scoring prompt.
 
-Each profile defines how the 6 viral dimensions should be weighted when scoring
-videos in a specific niche. Different niches have fundamentally different virality
+Each profile defines how the 6 craft dimensions should be prioritized when
+reviewing videos in a specific niche. Different niches have different attention
 mechanics: Comedy fails if the first 2 seconds aren't funny; ASMR fails if there
 are too many cuts; Finance lives on the curiosity gap claim.
 
@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 
 @dataclass
 class NicheProfile:
-    critical: list[str]   # ≤ 3 here caps overall_score at 4
-    high: list[str]       # strongly shapes overall_score
+    critical: list[str]   # severe issues here should dominate the edit priority
+    high: list[str]       # strongly shapes the edit priority
     standard: list[str]   # normal weight
     low: list[str]        # minimal weight for this niche
     context: str          # why this niche has a different profile
@@ -41,7 +41,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         standard=["audio_visual_sync", "loop_seamlessness"],
         low=["text_scannability"],
         context=(
-            "Comedy virality is decided entirely in the first 2 seconds — it's either immediately "
+            "Comedy attention is decided heavily in the first 2 seconds — it's either immediately "
             "funny or it gets scrolled. Fast cuts amplify timing and land punchlines. "
             "Text scannability is lowest: comedy is audio-driven and muted viewers miss the "
             "joke regardless of captions."
@@ -66,7 +66,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         standard=["cut_frequency", "text_scannability"],
         low=["loop_seamlessness"],
         context=(
-            "True crime virality is almost entirely curiosity-gap driven — the unsolved framing, "
+            "True crime attention is almost entirely curiosity-gap driven — the unsolved framing, "
             "the chilling detail, the 'this hasn't been reported' hook. The open loop must be set "
             "in the first 5 seconds. Audio-visual sync creates atmospheric tension."
         ),
@@ -80,7 +80,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "News content hooks with urgency and novelty — the claim must feel important and "
             "time-sensitive in the first 2 seconds. Curiosity gap IS the product here. "
-            "Loop seamlessness is lowest priority because news content is consumed once."
+            "Ending strength is lowest priority because news content is consumed once."
         ),
     ),
 
@@ -92,7 +92,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Book content hooks with a controversial take or life-changing claim about a specific "
             "book. Curiosity gap is primary ('This book changed how I think about money — and most "
-            "people miss the point'). Loop seamlessness is lowest priority."
+            "people miss the point'). Ending strength is lowest priority."
         ),
     ),
 
@@ -104,7 +104,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Astrology content hooks with personal relevance ('Your sign is about to experience a "
             "major shift') and curiosity gap. The sign callout or prediction must appear within "
-            "3 seconds. Loop seamlessness is lowest priority."
+            "3 seconds. Ending strength is lowest priority."
         ),
     ),
 
@@ -116,7 +116,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         low=["text_scannability"],
         context=(
             "Cuts must land on beats — audio-visual sync IS the product in this niche. "
-            "Loop seamlessness drives the replay count that signals virality (people rewatch "
+            "Ending strength can support rewatches in music content (people rewatch "
             "music content). Text scannability and curiosity gap are least important: "
             "viewers come for the performance, not the reveal."
         ),
@@ -130,8 +130,8 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "ASMR requires impeccable audio-visual sync (triggers must land exactly on visual cues). "
             "IMPORTANT: a LOW cut_frequency score (2–4) is CORRECT and EXPECTED for this niche — "
-            "slow, uninterrupted takes are a feature. Do NOT penalize overall_score for low "
-            "cut_frequency. Loop seamlessness drives completion rate. Curiosity gap is minimal."
+            "slow, uninterrupted takes are a feature. Do NOT over-prioritize low "
+            "cut_frequency. Ending strength supports a calmer viewing flow. Curiosity gap is minimal."
         ),
     ),
 
@@ -143,8 +143,8 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Like ASMR — slow, deliberate visuals matched to ambient audio. "
             "IMPORTANT: a LOW cut_frequency score is EXPECTED and CORRECT for this niche — "
-            "frequent cuts destroy the meditative flow. Do NOT penalize overall_score for low "
-            "cut_frequency. Loop seamlessness matters because meditation content loops well."
+            "frequent cuts destroy the meditative flow. Do NOT over-prioritize low "
+            "cut_frequency. Ending strength matters because meditation content loops well."
         ),
     ),
 
@@ -156,7 +156,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         low=["text_scannability"],
         context=(
             "The cute or funny moment must appear in the FIRST 2 seconds — no setup, no intro. "
-            "Loop seamlessness drives replays (people rewatch funny animal moments). "
+            "Ending strength drives replays (people rewatch funny animal moments). "
             "Text scannability and curiosity gap are lowest priority: the video IS the hook."
         ),
     ),
@@ -168,7 +168,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         low=["text_scannability"],
         context=(
             "Baby/kid content must deliver the 'aww' or laugh moment within the first 2 seconds. "
-            "Loop seamlessness matters because the best kid content gets replayed many times. "
+            "Ending strength matters because the best kid content gets replayed many times. "
             "Text scannability is irrelevant — no one is reading while a baby does something funny."
         ),
     ),
@@ -195,7 +195,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Fitness content needs an immediate visual hook (physique reveal, heavy lift, or "
             "transformation) AND a strong curiosity gap (the 'mistake' or 'secret' framing). "
-            "Fast cuts match workout energy. Loop seamlessness is high because workout "
+            "Fast cuts match workout energy. Ending strength is high because workout "
             "montages get rewatched for motivation."
         ),
     ),
@@ -209,7 +209,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Health content lives and dies by the curiosity gap — the health claim must create "
             "urgency ('Most people are making this mistake with their sleep'). Text scannability "
-            "is high because people screenshot health tips and stats. Loop seamlessness is lowest."
+            "is high because people screenshot health tips and stats. Ending strength is lowest."
         ),
     ),
 
@@ -222,7 +222,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
             "Mental health content hooks through radical vulnerability or a provocative framing "
             "('If you do this every morning, your anxiety is yours to manage'). Curiosity gap "
             "slightly outweighs hook velocity — viewers need to feel 'this is about me' before "
-            "committing. Loop seamlessness is lowest priority."
+            "committing. Ending strength is lowest priority."
         ),
     ),
 
@@ -272,7 +272,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "The finished dish or the most visually striking moment must appear in the first "
             "2 seconds. Text scannability is high because viewers screenshot recipes and ingredient "
-            "lists. Loop seamlessness matters least — people watch for the recipe, not to rewatch."
+            "lists. Ending strength matters least — people watch for the recipe, not to rewatch."
         ),
     ),
 
@@ -300,7 +300,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
             "Educational content is driven primarily by the curiosity gap — the question or "
             "problem posed must make viewers feel they will lose something by not watching. "
             "Text scannability is high because instructional content needs readable on-screen steps. "
-            "Loop seamlessness is lowest — people watch tutorials once."
+            "Ending strength is lowest — people watch tutorials once."
         ),
     ),
 
@@ -310,7 +310,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         standard=["cut_frequency", "audio_visual_sync"],
         low=["loop_seamlessness"],
         context=(
-            "Career content virality is almost entirely curiosity-gap driven — 'The one mistake "
+            "Career content attention is almost entirely curiosity-gap driven — 'The one mistake "
             "that got me fired' or 'How I got a $200K offer in 2 months'. The insight must be "
             "teased immediately. Text scannability is high for tip-format lists."
         ),
@@ -324,7 +324,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Finance content lives entirely on the money claim in the curiosity gap — the claim "
             "must land in the first 3 seconds of the script. Text scannability is high because "
-            "finance viewers screenshot data, percentages, and charts. Loop seamlessness is lowest."
+            "finance viewers screenshot data, percentages, and charts. Ending strength is lowest."
         ),
     ),
 
@@ -336,7 +336,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Business content hooks with contrarian insight or income claim. Curiosity gap is "
             "primary. Text scannability is high for metrics, steps, and frameworks. "
-            "Loop seamlessness is lowest priority."
+            "Ending strength is lowest priority."
         ),
     ),
 
@@ -384,7 +384,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Sustainability content hooks with a surprising environmental claim or challenge. "
             "Curiosity gap and text scannability (stats, numbers) are both elevated. "
-            "Loop seamlessness is lowest priority."
+            "Ending strength is lowest priority."
         ),
     ),
 
@@ -409,7 +409,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Beauty content uses the final look or before/after transformation as the immediate "
             "hook. Audio-visual sync is elevated for beat-synced makeup reveal moments. "
-            "Text scannability high for product names and prices. Loop seamlessness is lowest."
+            "Text scannability high for product names and prices. Ending strength is lowest."
         ),
     ),
 
@@ -422,7 +422,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Hair content hooks with the transformation reveal and product curiosity gap. "
             "Text scannability is high because product names and steps drive saves — "
-            "people screenshot routines. Loop seamlessness is lowest priority."
+            "people screenshot routines. Ending strength is lowest priority."
         ),
     ),
 
@@ -484,7 +484,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Vlog content must open with the most compelling moment, not a greeting or intro. "
             "The curiosity gap frames what's about to unfold. Both hook and curiosity gap are "
-            "equally critical. Loop seamlessness is elevated for series-style content. "
+            "equally critical. Ending strength is elevated for series-style content. "
             "Text scannability is lowest priority."
         ),
     ),
@@ -498,7 +498,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Dating content hooks with a relatable frustration or controversial opinion that "
             "creates immediate identification. Curiosity gap is primary. Text scannability and "
-            "loop seamlessness are lowest priority."
+            "ending strength are lowest priority."
         ),
     ),
 
@@ -549,7 +549,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Art content uses the finished piece or most dramatic moment of the creation process "
             "as the opening hook (timelapse approach). Audio-visual sync elevated for music-matched "
-            "reveals. Loop seamlessness works well because creative timelapses reward rewatching."
+            "reveals. Ending strength works well because creative timelapses reward rewatching."
         ),
     ),
 
@@ -577,7 +577,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
             "Luxury content hooks with the price reveal or the most jaw-dropping visual in the "
             "first 2 seconds — no buildup, just immediate spectacle. Text scannability is "
             "elevated because price, brand, and cost overlays are the entire content strategy. "
-            "Loop seamlessness is lowest priority."
+            "Ending strength is lowest priority."
         ),
     ),
 
@@ -616,7 +616,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
             "Money content is pure curiosity-gap — the savings claim, the 'nobody tells you this' "
             "money hack, or the income/net-worth reveal must land in the first 3 seconds. Text "
             "scannability is high because viewers screenshot dollar figures, percentages, and "
-            "step lists. Loop seamlessness is lowest priority."
+            "step lists. Ending strength is lowest priority."
         ),
     ),
 
@@ -626,9 +626,9 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         standard=["cut_frequency", "curiosity_gap"],
         low=["text_scannability"],
         context=(
-            "Dance virality lives on audio-visual sync — the moves must hit exactly on the beat. "
+            "Dance attention lives on audio-visual sync — the moves must hit exactly on the beat. "
             "The first move has to land in the opening second (no walk-up, no intro). Loop "
-            "seamlessness drives the rewatches and duets that signal virality. Text scannability "
+            "seamlessness supports rewatches and duet-friendly structure. Text scannability "
             "is least important — viewers come for the performance."
         ),
     ),
@@ -654,7 +654,7 @@ NICHE_PROFILES: dict[str, NicheProfile] = {
         context=(
             "Edits live and die on audio-visual sync — every cut, zoom, and transition must hit "
             "the beat or the drop. The most striking frame has to open the video (no build-up). "
-            "Cut frequency and loop seamlessness drive the rewatches that make edits go viral. "
+            "Cut frequency and ending strength support the rewatches that make edits feel satisfying. "
             "Text scannability is least important — edits are felt, not read."
         ),
     ),
@@ -761,17 +761,15 @@ def get_emotional_target_block(niche: str, secondary_niche: str = "") -> str:
 
 
 _GENERIC_HIERARCHY = (
-    "DIMENSION HIERARCHY — used for overall_score, verdict, and predictions:\n"
+    "DIMENSION HIERARCHY — used for craft priority and edit ordering:\n"
     "Tier 1 — GATING (determines if anyone watches past 3 seconds): hook_velocity, curiosity_gap\n"
     "Tier 2 — RETENTION (determines if viewers complete the video): cut_frequency, audio_visual_sync\n"
-    "Tier 3 — AMPLIFICATION (multiplies reach once Tier 1/2 are strong): text_scannability, loop_seamlessness\n"
+    "Tier 3 — RESOLUTION (helps clarity and a satisfying finish once Tier 1/2 are strong): text_scannability, loop_seamlessness (ending strength — does the ending earn the finish: payoff, CTA, or a clean loop)\n"
     "\n"
-    "overall_score computation rules (NOT a simple average — apply these exactly):\n"
-    "- If BOTH hook_velocity AND curiosity_gap are ≤ 3 → overall_score is capped at 4.\n"
-    "- If EITHER hook_velocity OR curiosity_gap is ≤ 3 → overall_score is capped at 5.\n"
-    "- Otherwise: overall_score is a holistic judgment weighted toward Tier 1, then Tier 2, then Tier 3.\n"
-    "- A video with hook=8, curiosity=8, everything else=5 → overall can reach 7.\n"
-    "- A video with hook=3, curiosity=3, everything else=9 → overall cannot exceed 4.\n"
+    "craft priority rules (NOT an aggregate score):\n"
+    "- If BOTH hook_velocity AND curiosity_gap are ≤ 3, prioritize those before polish.\n"
+    "- If EITHER hook_velocity OR curiosity_gap is ≤ 3, it should usually be the first edit.\n"
+    "- Otherwise: order edits toward Tier 1, then Tier 2, then Tier 3.\n"
     "\n"
     "improvement_plan ordering: Tier 1 fixes (hook_velocity, curiosity_gap) almost always "
     "outrank Tier 2 fixes, which outrank Tier 3 — UNLESS the Tier 1 dimensions are already "
@@ -907,18 +905,18 @@ def get_dimension_hierarchy_block(niche: str, platform: str, secondary_niche: st
     pname = "TikTok" if platform == "tiktok" else "Instagram Reels"
     lines: list[str] = [
         f"DIMENSION HIERARCHY — NICHE-SPECIFIC ({label} on {pname}):",
-        "Apply these weights INSTEAD OF the generic tier hierarchy when computing overall_score.",
+        "Apply these priorities INSTEAD OF the generic tier hierarchy when ordering edits.",
     ]
     if blend_line:
         lines += ["", blend_line]
     lines += [
         "",
-        "CRITICAL — a score of ≤ 3 here caps overall_score at 4:",
+        "CRITICAL — a score of ≤ 3 here should dominate the edit priority:",
     ]
     for d in profile.critical:
         lines.append(f"  • {d}")
     lines.append("")
-    lines.append("HIGH WEIGHT — strongly shapes overall_score:")
+    lines.append("HIGH PRIORITY — strongly shapes edit ordering:")
     for d in profile.high:
         lines.append(f"  • {d}")
     lines.append("")
@@ -933,27 +931,26 @@ def get_dimension_hierarchy_block(niche: str, platform: str, secondary_niche: st
         lines.append("")
 
     if profile.low:
-        lines.append(f"LOW WEIGHT for {label} (score independently, but minimal effect on overall_score):")
+        lines.append(f"LOW PRIORITY for {label} (score independently, but minimal effect on edit ordering):")
         for d in profile.low:
             lines.append(f"  • {d}")
         lines.append("")
 
     lines.append(f"Niche context: {profile.context}")
     lines.append("")
-    lines.append(f"overall_score rules for {label} (NOT a simple average — apply these exactly):")
+    lines.append(f"craft priority rules for {label} (NOT an aggregate score):")
 
     if len(profile.critical) == 1:
         g = profile.critical[0]
-        lines.append(f"- If {g} ≤ 3 → overall_score is capped at 4 (non-negotiable for this niche).")
+        lines.append(f"- If {g} ≤ 3, prioritize it before polish (non-negotiable for this niche).")
         lines.append(
             f"- Otherwise: weight {g} and the HIGH dimensions above most heavily. "
-            f"LOW dimensions have minimal influence — a video can reach overall_score 8 "
-            f"even with LOW dimensions at 2–3, as long as CRITICAL and HIGH are strong."
+            f"LOW dimensions have minimal priority as long as CRITICAL and HIGH dimensions are strong."
         )
     else:
         g0, g1 = profile.critical[0], profile.critical[1]
-        lines.append(f"- If BOTH {g0} AND {g1} ≤ 3 → overall_score is capped at 4.")
-        lines.append(f"- If EITHER {g0} OR {g1} ≤ 3 → overall_score is capped at 5.")
+        lines.append(f"- If BOTH {g0} AND {g1} ≤ 3, prioritize those before polish.")
+        lines.append(f"- If EITHER {g0} OR {g1} ≤ 3, it should usually be the first edit.")
         lines.append(
             "- Otherwise: weight CRITICAL and HIGH dimensions most heavily. "
             "LOW dimensions have minimal influence on the final holistic score."

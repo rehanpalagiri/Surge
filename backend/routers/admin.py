@@ -91,7 +91,7 @@ async def _analyze_and_persist_seed(
         except OSError:
             pass
 
-    if not isinstance(result, dict) or "error" in result or "virality_rating" not in result:
+    if not isinstance(result, dict) or "error" in result or "seed_quality" not in result:
         detail = result.get("error", "invalid response") if isinstance(result, dict) else "invalid response"
         raise HTTPException(
             status_code=502,
@@ -99,7 +99,7 @@ async def _analyze_and_persist_seed(
         )
 
     try:
-        rating = max(0, min(10, int(round(float(result["virality_rating"])))))
+        rating = max(0, min(10, int(round(float(result["seed_quality"])))))
     except (ValueError, TypeError):
         raise HTTPException(
             status_code=502,
@@ -644,7 +644,7 @@ async def get_calibration(
 
 
 # ---------------------------------------------------------------------------
-# Trend Feed harvest (recently viral videos — velocity-filtered)
+# Trend Feed harvest (recently high-performing videos — velocity-filtered)
 # ---------------------------------------------------------------------------
 
 class TrendHarvestRequest(BaseModel):
@@ -660,8 +660,8 @@ async def trigger_trend_harvest(
     req: TrendHarvestRequest = TrendHarvestRequest(),
     _: None = Depends(check_admin),
 ):
-    """Trigger a trending video harvest. Pulls recent viral TikTok videos
-    (published in last max_age_days) filtered by viral velocity (views/day).
+    """Trigger a trending video harvest. Pulls recent high-performing TikTok videos
+    (published in last max_age_days) filtered by view velocity (views/day).
     Run after regular harvest to populate the trend signal layer."""
     target = req.niches or list(NICHE_KEYWORDS.keys())
     background_tasks.add_task(

@@ -148,6 +148,9 @@ class UserAnalysis(Base):
     # outcome_snapshots and are the only source for maturity-window comparisons.
     video_url = Column(String, nullable=True)
     counts_fetched_at = Column(DateTime, nullable=True)
+    # Anonymous analysis handoff secret. Returned only to the browser that created
+    # the guest analysis, then required when a logged-in user claims it.
+    guest_claim_token = Column(String, nullable=True)
     # Legacy seed-promotion fields. New craft reviews are never promoted into the
     # live evaluator and outcomes never calibrate its response.
     promoted_seed_id = Column(Integer, nullable=True)

@@ -91,7 +91,7 @@ const DEFAULT_STEPS = [
   "Analyzing the first-3-second hook…",
   "Scanning for on-screen text collisions…",
   "Measuring cut rhythm and pacing…",
-  "Checking audio-visual sync and loop…",
+  "Checking audio-visual sync and the ending…",
   "Writing your craft review…",
 ];
 

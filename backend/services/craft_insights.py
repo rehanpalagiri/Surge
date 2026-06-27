@@ -33,7 +33,7 @@ DIMENSION_LABELS = {
     "text_scannability": "Text Scannability",
     "curiosity_gap": "Curiosity Gap",
     "audio_visual_sync": "Audio-Visual Sync",
-    "loop_seamlessness": "Loop Seamlessness",
+    "loop_seamlessness": "Ending Strength",
 }
 
 # A median split is only non-degenerate when each half holds >= 3 observations,
@@ -43,7 +43,7 @@ DIMENSION_LABELS = {
 PATTERN_MIN = 6
 # An empirical interquartile range is only more than two raw values when the
 # middle 50% spans >= 4 points, i.e. >= 8 observations. Below that we don't
-# pretend to forecast a range.
+# pretend the observed range is a predictive band.
 FORECAST_MIN = 8
 # Provider sources we treat as verified (vs user-asserted manual entries).
 VERIFIED_SOURCES = ("tikwm", "rapidapi", "hikerapi")
@@ -108,7 +108,7 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
         "posts": [],
         "patterns": [],
         "pattern_min": PATTERN_MIN,
-        "forecast": {"available": False, "need": FORECAST_MIN, "have": 0},
+        "observed_range": {"available": False, "need": FORECAST_MIN, "have": 0},
         "notice": (
             "Patterns are correlations on your own posts at the same post age — "
             "not proof that an edit caused a result, and not a performance guarantee."
@@ -195,10 +195,10 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
         # Strongest (by absolute delta) first — that's the most suggestive signal.
         patterns.sort(key=lambda p: abs(p["delta"]), reverse=True)
 
-    # Empirical forecast range from the creator's own like rates (no point estimate).
+    # Empirical observed range from the creator's own like rates (no point estimate).
     if n >= FORECAST_MIN:
         s = sorted(like_rates)
-        forecast = {
+        observed_range = {
             "available": True,
             "n": n,
             "horizon": horizon,
@@ -209,7 +209,7 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
             "max": round(s[-1], 2),
         }
     else:
-        forecast = {"available": False, "need": FORECAST_MIN, "have": n}
+        observed_range = {"available": False, "need": FORECAST_MIN, "have": n}
 
     return {
         "total_analyses": total_analyses,
@@ -219,6 +219,6 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
         "posts": posts,
         "patterns": patterns,
         "pattern_min": PATTERN_MIN,
-        "forecast": forecast,
+        "observed_range": observed_range,
         "notice": empty["notice"],
     }

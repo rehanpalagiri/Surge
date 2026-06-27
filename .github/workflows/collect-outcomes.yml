@@ -1,0 +1,35 @@
+name: Daily Outcome Collection
+
+on:
+  schedule:
+    # Daily at 06:00 UTC — matches the in-process APScheduler target window
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max jobs to collect"
+        default: "100"
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake backend
+        run: |
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://surge-production-8973.up.railway.app/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend healthy (attempt $i)"
+              break
+            fi
+            echo "Attempt $i: status=$STATUS — waiting 10s"
+            sleep 10
+          done
+
+      - name: Collect due outcomes
+        run: |
+          curl -sf -X POST \
+            -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -d '{"limit": ${{ github.event.inputs.limit || 100 }}}' \
+            https://surge-production-8973.up.railway.app/api/admin/outcomes/collect-due

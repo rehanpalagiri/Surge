@@ -31,7 +31,7 @@ const SAMPLE = {
   improvement_plan: [
     {
       priority: "High",
-      action: "Fix the loop ending",
+      action: "Strengthen the ending",
       detail:
         "Test removing the generic sign-off and ending with a visual or thematic callback to the opening. Treat this as an editing hypothesis, then compare fixed-age outcomes.",
     },
@@ -56,7 +56,7 @@ const SCORES = [
   { label: "Text Scannability", score: SAMPLE.text_scannability },
   { label: "Curiosity Gap",     score: SAMPLE.curiosity_gap },
   { label: "Audio-Visual Sync", score: SAMPLE.audio_visual_sync },
-  { label: "Loop Seamlessness", score: SAMPLE.loop_seamlessness },
+  { label: "Ending Strength", score: SAMPLE.loop_seamlessness },
 ];
 
 const PRIORITY_COLOR: Record<string, string> = {

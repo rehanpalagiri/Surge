@@ -27,7 +27,7 @@ _DIMENSIONS = [
     ("text_scannability", "text scannability"),
     ("curiosity_gap", "curiosity gap"),
     ("audio_visual_sync", "audio-visual sync"),
-    ("loop_seamlessness", "loop seamlessness"),
+    ("loop_seamlessness", "ending strength"),
 ]
 
 MIN_ANALYSES = 2          # below this → no profile at all (Deep → Thinking)
