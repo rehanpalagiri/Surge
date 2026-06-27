@@ -312,6 +312,9 @@ app.include_router(profile_router)
 app.include_router(settings_router)
 
 
-@app.get("/health")
+# Accept HEAD as well as GET: UptimeRobot (and many uptime probes) default to
+# HEAD requests, and FastAPI's @app.get does not auto-add HEAD, which would
+# otherwise return 405 Method Not Allowed and trip a false "down" incident.
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     return {"status": "ok"}
