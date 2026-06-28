@@ -69,7 +69,7 @@ _CONTEXT_NICHES = tuple(sorted(NICHE_PROFILES.keys()))
 def _quote_untrusted(value: str) -> str:
     """JSON-quote creator text and neutralize markup-looking prompt delimiters."""
     return (
-        json.dumps(value, ensure_ascii=True)
+        json.dumps(value, ensure_ascii=False)
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
         .replace("&", "\\u0026")
@@ -424,11 +424,14 @@ ground truth for what THIS video does:
 {emotional_block}
 
 FEEDBACK RULES — apply to every field:
-- strengths: only things the observations genuinely support. If none, ONE honest entry saying so.
+- strengths: find what the creator genuinely got right — name the dimension and say exactly
+  what works. Every video has something worth calling out; if truly nothing stands out, ONE
+  honest entry noting the most workable element.
 - improvements: exactly three short phrases, one problem each, no explanation.
-- analysis_summary: EXACTLY 3 sentences — (1) biggest observable craft issue, naming the
-  section; (2) one genuine strength or "no clear strengths"; (3) one editing hypothesis worth
-  testing. No reach prediction, no causation.
+- analysis_summary: EXACTLY 3 sentences — (1) one genuine strength: name what works and why
+  (be specific, not vague — reference the dimension or section); (2) the biggest observable
+  craft issue, naming the section where attention risk is highest; (3) one concrete editing
+  hypothesis to test next. No reach prediction, no causation.
 - improvement_plan: EXACTLY 3 editing hypotheses ordered by likely craft impact; Tier-1
   dimensions (per the hierarchy) come first UNLESS already >=6. Each item: area (exact display
   name), priority (1–3, 1 = highest), current_score (copied from the observations), problem

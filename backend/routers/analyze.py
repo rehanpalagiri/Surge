@@ -683,7 +683,11 @@ async def link_video(
     new_url = (payload.url or "").strip() or None
     if payload.post_age_hours is not None and payload.post_age_hours not in (24, 168, 720):
         raise HTTPException(status_code=400, detail="Capture age must be 24 hours, 7 days, or 30 days.")
-    if analysis.video_url and new_url and new_url.rstrip("/") != analysis.video_url.rstrip("/"):
+    # Block URL changes only once stats have been confirmed (counts_fetched_at set).
+    # An unconfirmed link (URL saved but stats never fetched due to provider outage)
+    # can be corrected by re-submitting.
+    if (analysis.video_url and analysis.counts_fetched_at and
+            new_url and new_url.rstrip("/") != analysis.video_url.rstrip("/")):
         raise HTTPException(
             status_code=409,
             detail="This experiment is already linked to a different post. Use a separate analysis for each post.",
@@ -712,7 +716,13 @@ async def link_video(
         try:
             likes = await fetch_instagram_likes(url)
         except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Couldn't fetch that Reel: {e}")
+            # Both providers down — save the URL so the link is recorded.
+            logger.warning("fetch_instagram_likes for analysis %s failed: %r — saving URL without stats", analysis_id, e)
+            if not analysis.video_url:
+                analysis.video_url = url
+                await db.commit()
+                await db.refresh(analysis)
+            return _to_out(analysis)
 
         analysis.video_url = url
         analysis.actual_likes = likes
@@ -769,7 +779,14 @@ async def link_video(
     try:
         meta = await fetch_tiktok(url)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Couldn't fetch that video: {e}")
+        # Provider temporarily down — save the URL so the link is recorded.
+        # Stats will be null until the user retries with the refresh button.
+        logger.warning("fetch_tiktok for analysis %s failed: %r — saving URL without stats", analysis_id, e)
+        if not analysis.video_url:
+            analysis.video_url = url
+            await db.commit()
+            await db.refresh(analysis)
+        return _to_out(analysis)
 
     # Soft ownership check: only enforced when BOTH a saved handle and the
     # video's author handle are known. Keeps Deep mode's "verified performance"

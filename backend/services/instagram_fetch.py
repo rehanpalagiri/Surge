@@ -1,6 +1,7 @@
-"""Fetch like count for a single Instagram Reel via RapidAPI.
+"""Fetch like count for a single Instagram Reel.
 
-Uses the same RAPIDAPI_KEY as the admin seed-from-url endpoint.
+Primary: RapidAPI (RAPIDAPI_KEY + configurable host/path).
+Fallback: HikerAPI (HIKERAPI_KEY) via /v1/media/by/shortcode.
 """
 import os
 import time
@@ -10,6 +11,7 @@ from services.telemetry import record_usage_event
 
 _DEFAULT_IG_HOST = "instagram-reels-downloader-api.p.rapidapi.com"
 _DEFAULT_IG_PATH = "/download"
+_HIKERAPI_BASE = "https://api.hikerapi.com"
 
 
 def is_instagram_url(url: str) -> bool:
@@ -23,15 +25,26 @@ def is_instagram_url(url: str) -> bool:
         return False
 
 
-async def fetch_instagram_likes(url: str) -> int:
-    """Return the like count for an Instagram Reel URL."""
-    api_key = os.getenv("RAPIDAPI_KEY", "")
-    if not api_key:
-        raise ValueError("Instagram link fetching is not yet configured. Enter your likes manually.")
+def _shortcode_from_url(url: str) -> str | None:
+    """Extract the Reel shortcode from an Instagram URL.
+    URL formats: /reel/{code}/ or /p/{code}/
+    """
+    try:
+        parts = urlsplit(url.strip())
+        segs = [s for s in parts.path.split("/") if s]
+        # ['reel', 'DXC-Lp_Ef83'] → 'DXC-Lp_Ef83'
+        if len(segs) >= 2 and segs[-2] in ("reel", "p", "tv"):
+            return segs[-1]
+        if len(segs) >= 1:
+            return segs[-1]
+    except Exception:
+        pass
+    return None
 
+
+async def _fetch_via_rapidapi(url: str, api_key: str) -> int:
     ig_host = os.getenv("RAPIDAPI_IG_HOST", _DEFAULT_IG_HOST)
     ig_path = os.getenv("RAPIDAPI_IG_PATH", _DEFAULT_IG_PATH)
-
     started = time.perf_counter()
     success = False
     error_code = None
@@ -65,3 +78,77 @@ async def fetch_instagram_likes(url: str) -> int:
             output_bytes=len(str(body).encode("utf-8")) if body is not None else None,
             error_code=error_code,
         )
+
+
+async def _fetch_via_hikerapi(url: str) -> int:
+    """Fallback: fetch likes via HikerAPI /v1/media/by/shortcode."""
+    key = os.getenv("HIKERAPI_KEY", "")
+    if not key:
+        raise ValueError("HIKERAPI_KEY is not configured.")
+    shortcode = _shortcode_from_url(url)
+    if not shortcode:
+        raise ValueError("Could not extract shortcode from Instagram URL.")
+    started = time.perf_counter()
+    success = False
+    error_code = None
+    body = None
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(
+                f"{_HIKERAPI_BASE}/v1/media/by/shortcode",
+                params={"code": shortcode},
+                headers={"x-access-key": key, "accept": "application/json"},
+            )
+            r.raise_for_status()
+            body = r.json()
+        like_count = body.get("like_count")
+        if like_count is None:
+            raise ValueError("HikerAPI did not return a like count for this Reel.")
+        success = True
+        return int(like_count)
+    except Exception as exc:
+        error_code = type(exc).__name__
+        raise
+    finally:
+        await record_usage_event(
+            operation="fetch_post_metrics", provider="hikerapi_instagram",
+            success=success, latency_ms=(time.perf_counter() - started) * 1000,
+            output_bytes=len(str(body).encode("utf-8")) if body is not None else None,
+            error_code=error_code,
+        )
+
+
+async def fetch_instagram_likes(url: str) -> int:
+    """Return the like count for an Instagram Reel URL.
+
+    Tries RapidAPI first (if RAPIDAPI_KEY is set), then HikerAPI as fallback.
+    Raises ValueError if neither provider returns a usable count.
+    """
+    api_key = os.getenv("RAPIDAPI_KEY", "")
+    hikerapi_key = os.getenv("HIKERAPI_KEY", "")
+
+    if not api_key and not hikerapi_key:
+        raise ValueError("Instagram link fetching is not configured. Enter your likes manually.")
+
+    primary_err: Exception | None = None
+
+    # Try RapidAPI first
+    if api_key:
+        try:
+            return await _fetch_via_rapidapi(url, api_key)
+        except Exception as e:
+            primary_err = e
+
+    # Fallback to HikerAPI
+    if hikerapi_key:
+        try:
+            return await _fetch_via_hikerapi(url)
+        except Exception as fallback_err:
+            # Both failed — raise the primary error for a more descriptive message
+            raise primary_err or fallback_err
+
+    # Only RapidAPI was configured but it failed
+    if primary_err:
+        raise primary_err
+
+    raise ValueError("Instagram link fetching is not configured.")

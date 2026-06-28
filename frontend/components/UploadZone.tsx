@@ -10,7 +10,6 @@ import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation"
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { track } from "@vercel/analytics";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
-import NichePicker from "@/components/NichePicker";
 
 
 const TIPS = [
@@ -150,14 +149,11 @@ interface Props {
   platform?: string;
   initialFile?: File | null;
   parentId?: number;
-  initialNiches?: string[];
 }
 
-export default function UploadZone({ platform = "tiktok", initialFile = null, parentId, initialNiches }: Props) {
+export default function UploadZone({ platform = "tiktok", initialFile = null, parentId }: Props) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [niches, setNiches] = useState<string[]>(initialNiches ?? []);  // up to 2; first = primary, second = blend
-  const [showRubricHint, setShowRubricHint] = useState(Boolean(initialNiches?.length));
   const [caption, setCaption] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -266,7 +262,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
     e.preventDefault();
     if (!file) return;
     setError("");
-    track("upload_started", { platform, niche_count: niches.length, logged_in: loggedIn });
+    track("upload_started", { platform, niche_count: 0, logged_in: loggedIn });
     setLoading(true);
     setUploadPhase("idle");
     setUploadProgress(0);
@@ -290,11 +286,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
       const { id } = await analyzeFromR2(
         key,
-        niches[0] ?? "",
+        "",
         caption,
         bio,
         platform,
-        niches[1] ?? "",
+        "",
         parentId,
       );
 
@@ -449,45 +445,6 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             ) : undefined}
           />
         )}
-
-        {/* ── Optional rubric hint ── */}
-        <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
-          {showRubricHint || niches.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Rubric Hint</p>
-                  <p className="text-[11px] text-zinc-500">Optional — Surge can detect this automatically</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNiches([]);
-                    setShowRubricHint(false);
-                  }}
-                  className="text-xs font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  Auto-detect
-                </button>
-              </div>
-              <NichePicker selected={niches} onChange={setNiches} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-zinc-300">Surge will auto-detect the rubric</p>
-                <p className="text-xs text-zinc-500">Add a hint only if this video is easy to misread.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowRubricHint(true)}
-                className="shrink-0 rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-purple-400 hover:text-white transition-colors"
-              >
-                Add hint
-              </button>
-            </div>
-          )}
-        </div>
 
         {/* ── Caption ── */}
         <div>

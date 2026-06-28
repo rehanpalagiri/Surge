@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
-import { getAnalysis, AnalysisOut, AttentionRiskItem, ImprovementItem } from "@/lib/api";
+import { getAnalysis, AnalysisOut, AttentionRiskItem, ImprovementItem, RubricContext } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ImproveSkeleton } from "@/components/Skeleton";
 
@@ -110,9 +110,11 @@ export default function ImprovePage() {
     ? [...s.improvement_plan].sort((a, b) => a.priority - b.priority).slice(0, 3)
     : [];
   const hasPlan = plan.length > 0;
+  const _riskOrder = { high: 0, medium: 1, low: 2 } as const;
   const attentionRisks: AttentionRiskItem[] = Array.isArray(s.attention_risk_map)
-    ? s.attention_risk_map
+    ? [...s.attention_risk_map].sort((a, b) => _riskOrder[a.risk] - _riskOrder[b.risk])
     : [];
+  const rubricContext = s.rubric_context as RubricContext | undefined;
 
   // Emotional impact. Gemini is told emotional_analysis is required, but the type marks it
   // optional and the model can omit/malform fields — so guard achieved_score (a missing or
@@ -133,7 +135,7 @@ export default function ImprovePage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-extrabold">
-            Your <span className="gradient-text">Next Retention Experiment</span>
+            Your <span className="gradient-text">Next Retention Project</span>
           </h1>
           <p className="text-text-muted">
             Editing hypotheses for keeping attention, based on observable craft and not a forecast.
@@ -281,6 +283,23 @@ export default function ImprovePage() {
             <p className="text-text-primary text-sm whitespace-pre-wrap bg-surface border border-border rounded-xl px-4 py-3">
               {s.caption_rewrite}
             </p>
+          </div>
+        )}
+
+        {/* Niche context — shown near the behavior/emotional section */}
+        {rubricContext && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+            <span className="uppercase tracking-wide font-semibold">AI detected niche</span>
+            <span className="bg-surface border border-border rounded-lg px-2.5 py-1 text-text-primary font-medium">
+              {rubricContext.reviewed_primary_niche || rubricContext.primary_niche || analysis.niche || "General"}
+              {(() => {
+                const sec = rubricContext.reviewed_secondary_niche || rubricContext.secondary_niche;
+                return sec ? ` + ${sec}` : "";
+              })()}
+            </span>
+            {rubricContext.format && (
+              <span className="text-text-muted">· {rubricContext.format}</span>
+            )}
           </div>
         )}
 

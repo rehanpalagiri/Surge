@@ -87,7 +87,6 @@ function PostLinkRow({
 }) {
   const [phase, setPhase] = useState<PostLinkPhase>("idle");
   const [link, setLink] = useState("");
-  const [captureAge, setCaptureAge] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showHowTo, setShowHowTo] = useState(false);
@@ -109,31 +108,30 @@ function PostLinkRow({
   }, [phase]);
 
   function handlePostedClick() {
-    setPhase("celebrate");
-    setTimeout(() => setPhase("linking"), 3000);
+    setPhase("linking");
   }
 
   async function fetchStats(url?: string) {
-    if (platform === "instagram" && !captureAge && url !== undefined) {
-      setError("Choose the Reel's age for this capture.");
-      return;
-    }
     setBusy(true);
     setError("");
     try {
-      const updated = await linkTikTokVideo(
-        a.id,
-        url,
-        platform === "instagram" && url !== undefined ? Number(captureAge) : undefined,
-      );
+      const updated = await linkTikTokVideo(a.id, url, undefined);
       onUpdated(a.id, {
         actual_views: updated.actual_views,
         actual_likes: updated.actual_likes,
         video_url: updated.video_url,
         counts_fetched_at: updated.counts_fetched_at,
       });
-      setPhase("idle");
       setLink("");
+      const pendingWarning =
+        updated.video_url && !updated.counts_fetched_at
+          ? "Link saved — stats couldn't be fetched right now. Try the refresh button in a few hours."
+          : "";
+      setPhase("celebrate");
+      setTimeout(() => {
+        setPhase("idle");
+        if (pendingWarning) setError(pendingWarning);
+      }, 3000);
     } catch (err: unknown) {
       setError(apiErrorDetail(err, "Couldn't fetch stats — try again."));
     } finally {
@@ -143,6 +141,7 @@ function PostLinkRow({
 
   // Already linked — TikTok refreshes in-place; Instagram re-opens form
   if (a.video_url && phase === "idle") {
+    const statsNotYetFetched = !a.counts_fetched_at && !!a.video_url;
     return (
       <div className="px-5 pb-4 space-y-2">
         <button
@@ -164,12 +163,17 @@ function PostLinkRow({
             ? "↻ Capture current TikTok stats"
             : "↻ Capture current Instagram likes"}
         </button>
+        {statsNotYetFetched && !error && (
+          <p className="text-[11px] text-warning">
+            Stats pending — our provider is temporarily down. Try refreshing in a few hours.
+          </p>
+        )}
         {platform === "instagram" && (
           <p className="text-[11px] text-text-muted">
             Instagram likes are recorded as observations; Surge does not infer reach from them.
           </p>
         )}
-        {error && <p className="text-danger text-xs">{error}</p>}
+        {error && <p className={`text-xs ${error.includes("saved") ? "text-warning" : "text-danger"}`}>{error}</p>}
       </div>
     );
   }
@@ -277,19 +281,6 @@ function PostLinkRow({
           }}
           className="flex flex-col gap-2 sm:flex-row"
         >
-          {platform === "instagram" && (
-            <select
-              value={captureAge}
-              onChange={(e) => setCaptureAge(e.target.value)}
-              className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-purple-to"
-              required
-            >
-              <option value="">Capture age</option>
-              <option value="24">24 hours</option>
-              <option value="168">7 days</option>
-              <option value="720">30 days</option>
-            </select>
-          )}
           <input
             type="url"
             autoFocus

@@ -451,7 +451,10 @@ export default function ResultsPage() {
     { label: "Audio-Visual Sync",   score: s.audio_visual_sync },
     { label: "Ending Strength",     score: s.loop_seamlessness },
   ];
-  const attentionRisks = Array.isArray(s.attention_risk_map) ? s.attention_risk_map : [];
+  const _riskOrder = { high: 0, medium: 1, low: 2 } as const;
+  const attentionRisks = Array.isArray(s.attention_risk_map)
+    ? [...s.attention_risk_map].sort((a, b) => _riskOrder[a.risk] - _riskOrder[b.risk])
+    : [];
 
   const MODE_LABEL: Record<string, string> = {
     quick: "Legacy craft review",
@@ -538,7 +541,7 @@ export default function ResultsPage() {
               </div>
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-gradient-to-b from-background/30 to-background/95 text-center px-6 py-10">
                 <p className="text-text-primary font-bold text-lg max-w-xs">
-                  See why each dimension scored that way, plus timestamped evidence and one experiment to test in your next version.
+                  See why each dimension scored that way, plus timestamped evidence and one editing hypothesis to test in your next version.
                 </p>
                 <Link
                   href={`/signup?next=/results/${analysis.id}`}
@@ -595,7 +598,7 @@ export default function ResultsPage() {
             </div>
 
             <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-6">
-              <h3 className="text-text-primary font-semibold">Recommended experiment</h3>
+              <h3 className="text-text-primary font-semibold">Recommended project</h3>
               <p className="text-text-muted text-xs mt-1 mb-4">A hypothesis for the next version—not a promised outcome.</p>
               <div className="space-y-3 text-sm">
                 <p><span className="text-purple-to font-semibold">Change: </span><span className="text-text-primary">{s.recommended_experiment?.change ?? "Change one editing variable."}</span></p>
@@ -606,7 +609,7 @@ export default function ResultsPage() {
 
             <AttentionRiskMap risks={attentionRisks} />
 
-            <OutcomeTimeline snapshots={snapshots} />
+            {analysis.video_url && <OutcomeTimeline snapshots={snapshots} />}
 
             {/* Score comparison vs previous version */}
             {parentAnalysis && !parentAnalysis.scores_json.locked && (
