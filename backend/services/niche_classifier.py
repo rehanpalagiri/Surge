@@ -14,7 +14,7 @@ import time
 
 from google.genai import types
 
-from services.gemini import client
+from services.gemini import client, _parse_json
 from services.telemetry import record_usage_event, response_token_usage
 
 _CLASSIFIER_SYSTEM_INSTRUCTION = (
@@ -148,7 +148,7 @@ async def classify_niche(raw: str) -> dict:
             ),
             timeout=_CLASSIFY_TIMEOUT_S,
         )
-        data = json.loads(response.text)
+        data = _parse_json(response.text)
         input_tokens, output_tokens = response_token_usage(response)
         await record_usage_event(
             operation="niche_classification", provider="google_gemini",

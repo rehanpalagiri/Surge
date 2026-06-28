@@ -461,10 +461,29 @@ async def analyze(
 
     content_sha256 = sha256_file(file_path)
 
-    # New reviews are intentionally blind to seed outcomes, creator history,
-    # trends, and calibration data. Those legacy sources would confound a craft
-    # critique with public performance.
+    # Pre-create the analysis row to get an ID for usage-event telemetry.
+    # The row stays uncommitted (flushed only) until analyze_video succeeds;
+    # any exception causes the session's context manager to auto-rollback it.
     effective_mode = "craft_review"
+    analysis = UserAnalysis(
+        user_id=user.id if user else None,
+        platform=platform,
+        filename=safe_name,
+        project_name=resolved_project_name,
+        niche=raw_niche,
+        canonical_niche=canonical_niche,
+        caption=caption or None,
+        bio=bio or None,
+        scores_json="{}",
+        verdict="",
+        mode=effective_mode,
+        calibration_version=0,
+        status="processing",
+        parent_id=resolved_parent_id,
+        guest_claim_token=secrets.token_urlsafe(32) if user is None else None,
+    )
+    db.add(analysis)
+    await db.flush()
 
     try:
         result = await analyze_video(
@@ -474,49 +493,31 @@ async def analyze(
             platform=platform,
             niche_raw=raw_niche,
             secondary_niche=secondary_niche or "",
+            analysis_id=analysis.id,
         )
     except _GeminiClientError as e:
         logger.warning("Direct analysis Gemini error (code=%s): %r", getattr(e, "code", "?"), e)
         if e.code in (429, 403):
-            # Gemini quota exhausted or bad API key — return 503 without storing
-            # a broken analysis row and without burning a rate-limit credit.
+            # Gemini quota exhausted or bad API key — return 503. Session
+            # auto-rollback discards the flushed row so no broken record persists.
             raise HTTPException(
                 status_code=503,
                 detail="AI analysis is temporarily unavailable. Please try again in a few minutes.",
             )
         raise
     finally:
-        # Remove the temp upload — the video has already been sent to Gemini,
-        # so we don't need to keep it on the server's disk.
+        # Remove the temp upload — the video has already been sent to Gemini.
         try:
             os.remove(file_path)
         except OSError:
             pass
 
     result["niche_needs_confirmation"] = _needs_niche_confirmation(result, niche_needs_confirmation)
-    analysis = UserAnalysis(
-        user_id=user.id if user else None,
-        platform=platform,
-        filename=safe_name,
-        project_name=resolved_project_name,
-        niche=_display_niche(raw_niche, result, canonical_niche),
-        canonical_niche=_canonical_from_result(result, canonical_niche),
-        caption=caption or None,
-        bio=bio or None,
-        scores_json=json.dumps(result),
-        verdict=result.get("verdict", "Needs revision"),
-        mode=effective_mode,
-        calibration_version=0,
-        parent_id=resolved_parent_id,
-        guest_claim_token=secrets.token_urlsafe(32) if user is None else None,
-    )
-    # One transaction, one commit: flush assigns analysis.id (and the Python-side
-    # created_at default) so the artifact can reference it, then both rows commit
-    # atomically. The previous commit-then-upsert-then-commit-again wrote the same
-    # logical record in two transactions — a row could persist with no artifact if
-    # the process died between them, and it cost an extra round-trip refresh.
-    db.add(analysis)
-    await db.flush()
+    analysis.niche = _display_niche(raw_niche, result, canonical_niche)
+    analysis.canonical_niche = _canonical_from_result(result, canonical_niche)
+    analysis.scores_json = json.dumps(result)
+    analysis.verdict = result.get("verdict", "Needs revision")
+    analysis.status = "complete"
     await upsert_artifact(db, analysis.id, content_sha256=content_sha256)
     await db.commit()
 

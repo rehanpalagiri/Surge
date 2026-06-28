@@ -1,4 +1,5 @@
 import asyncio
+import html as _html
 import logging
 import os
 import re
@@ -509,10 +510,11 @@ async def _send_email(to_email: str, subject: str, html: str, plain: str) -> boo
 
 
 async def _send_reset_email(to_email: str, username: str, code: str) -> None:
+    safe_username = _html.escape(username)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Surge — Password Reset</h2>
-      <p>Hi <strong>{username}</strong>,</p>
+      <p>Hi <strong>{safe_username}</strong>,</p>
       <p>Your password reset code is:</p>
       <p style="margin:24px 0;text-align:center">
         <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#6d28d9">{code}</span>
@@ -534,10 +536,11 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
 
 
 async def _send_verification_email(to_email: str, username: str, code: str) -> None:
+    safe_username = _html.escape(username)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Confirm your email</h2>
-      <p>Hi <strong>{username}</strong>,</p>
+      <p>Hi <strong>{safe_username}</strong>,</p>
       <p>Welcome to Surge! Enter this code to confirm your email address:</p>
       <p style="margin:24px 0;text-align:center">
         <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#6d28d9">{code}</span>
@@ -558,9 +561,10 @@ async def _send_verification_email(to_email: str, username: str, code: str) -> N
 
 
 async def _send_welcome_email(to_email: str, username: str) -> None:
+    safe_username = _html.escape(username)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#6d28d9">Welcome to Surge, {username}!</h2>
+      <h2 style="color:#6d28d9">Welcome to Surge, {safe_username}!</h2>
       <p>You're all set. Upload your first video for an AI-assisted craft review and a clear experiment to test.</p>
       <p style="margin:24px 0">
         <a href="{_FRONTEND_URL}"

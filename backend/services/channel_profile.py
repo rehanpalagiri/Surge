@@ -108,28 +108,7 @@ def build_channel_profile(analyses: list) -> str | None:
         )
 
     # ---- Tier B: self-assessment trends (system's own past scoring) ----
-    overall_scores = [v for (a, s) in parsed if (v := _as_int(s.get("overall_score"))) is not None]
     trend_lines = []
-    if overall_scores:
-        trend_lines.append(
-            f"  Average overall score: {sum(overall_scores) / len(overall_scores):.1f}/10 "
-            f"across {len(overall_scores)} analysis(es)."
-        )
-
-    # Trend: recent 3 vs previous 3 (only with enough samples). `parsed` is newest-first.
-    if n >= MIN_TREND_SAMPLES:
-        recent = [_as_int(s.get("overall_score")) for (a, s) in parsed[:3]]
-        prev = [_as_int(s.get("overall_score")) for (a, s) in parsed[3:6]]
-        recent = [x for x in recent if x is not None]
-        prev = [x for x in prev if x is not None]
-        if recent and prev:
-            r_avg, p_avg = sum(recent) / len(recent), sum(prev) / len(prev)
-            if r_avg - p_avg >= 0.75:
-                trend_lines.append("  Trend: improving (recent uploads scoring higher than earlier ones).")
-            elif p_avg - r_avg >= 0.75:
-                trend_lines.append("  Trend: declining (recent uploads scoring lower than earlier ones).")
-            else:
-                trend_lines.append("  Trend: flat (scores roughly steady over time).")
 
     # Recurring strength / weakness across dimensions.
     for key, label in _DIMENSIONS:
@@ -156,10 +135,7 @@ def build_channel_profile(analyses: list) -> str | None:
     # ---- Recent uploads (predictions excluded on purpose) ----
     history_lines = []
     for (a, s) in parsed[:5]:
-        overall = _as_int(s.get("overall_score"))
-        overall_str = f"{overall}/10" if overall is not None else "unscored"
         views_str = f"{a.actual_views:,} views" if getattr(a, "actual_views", None) is not None else "not logged"
-        # Strongest / weakest dimension for this single analysis.
         dims = [(label, v) for (key, label) in _DIMENSIONS if (v := _as_int(s.get(key))) is not None]
         if dims:
             best = max(dims, key=lambda d: d[1])[0]
@@ -168,7 +144,7 @@ def build_channel_profile(analyses: list) -> str | None:
         else:
             dim_str = ""
         history_lines.append(
-            f"  - {a.niche} · scored {overall_str} · actual: {views_str}{dim_str}"
+            f"  - {a.niche} · actual: {views_str}{dim_str}"
         )
     history_block = (
         "RECENT UPLOADS (most recent first; predictions omitted to avoid anchoring):\n"
