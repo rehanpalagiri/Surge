@@ -79,7 +79,9 @@ Key services and routes:
 - `services/economics.py`: admin operations report with measured reliability, unit coverage, row counts, and explicit unknown cost/margin fields.
 - `services/niche_classifier.py`: canonicalizes niche context; failures use `UNCATEGORIZED` rather than guessing.
 - `services/craft_insights.py`: descriptive craft-vs-verified-outcome aggregation for one creator (`GET /api/me/craft-insights`). Correlational only, gated by justified sample sizes; returns `observed_range`, never a forecast.
-- `auth.py`: JWT helpers and the single canonical `is_minor()` implementation.
+- `auth.py`: JWT helpers and the single canonical `is_minor()` + `is_pro()` implementations. `is_pro` reads `users.subscription_status` (Stripe states active/trialing/past_due).
+- `services/stripe_billing.py` + `routers/billing.py`: Surge Pro ($9.99/mo). Checkout/portal sessions + a SIGNATURE-VERIFIED webhook that is the ONLY writer of subscription state. Never trust the client for Pro status. Stripe `StripeObject` raises on `.get()` — use the `_g()` safe accessor on event data.
+- `services/rate_limit.py`: the analysis allowance. Pro = unlimited; free = 3 analyses/calendar-month (UTC) + the earn-by-linking bonus. `get_rate_limit(user, db)` takes the User (needs `is_pro`). Failed (status="error") analyses never consume the allowance.
 - `routers/settings.py`: account deletion removes analyses, artifacts, snapshots, and usage events in FK-safe order.
 
 TikWM and HikerAPI are operational dependencies with rate-limit, schema-drift, availability, legal/ToS, and cost risks. Provider fields without local real-payload verification must be documented as “documented but not runtime-verified.” Store provenance and fail transparently.
@@ -106,6 +108,8 @@ Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `us
 ## Security, privacy, and reliability
 
 - Rate checks run before Gemini calls. Re-raise Gemini 429/403 so callers receive 503 rather than a fabricated report.
+- Resolve client IPs for rate-limit / brute-force keys ONLY via `services.throttle.client_ip` (honours `TRUSTED_PROXY_HOPS`). Never key a throttle on the leftmost `X-Forwarded-For` entry — it is caller-supplied and lets an attacker rotate the header to mint unlimited buckets.
+- A Gemini failure that returns an error dict (not a 429/403 raise) is stored with `status="error"`, so it is excluded from the upload limiter and the UI shows a failure screen instead of an all-zero scorecard.
 - Never log secrets or raw uploaded media. Provider raw payloads are not retained; a hash may be stored for traceability.
 - Account deletion must delete user-owned review and measurement data, not merely anonymize it.
 - Consent to measurement research never turns observational data into causal evidence.
@@ -118,6 +122,9 @@ Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `us
 - `GEMINI_API_KEY`, `JWT_SECRET`, `ADMIN_PASSWORD`, `ALLOWED_ORIGINS`, `DATABASE_URL`
 - `NEXT_PUBLIC_API_URL`, `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM`, `FRONTEND_URL`
 - `HIKERAPI_KEY`; R2 variables if upload persistence is enabled
+- `TRUSTED_PROXY_HOPS` (default 1): trusted reverse-proxy hops in front of the app, used to read the real client IP from `X-Forwarded-For` for rate limiting. 1 is correct for Railway's single edge proxy; only raise it if you add more trusted proxies.
+- `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (Surge Pro billing): all optional — without them the `/api/billing/*` routes return 503 and the app is unaffected (configured-off, like Google sign-in). The publishable key is not needed (Stripe-hosted Checkout). See `STRIPE_SETUP.md`.
+- `COMP_PRO_EMAILS` (optional): comma-separated, case-insensitive allowlist of emails granted Pro (unlimited) for free with no Stripe. Operator-only (server-side); used for owner/tester comp accounts. `auth.is_comp()` / `is_pro()`.
 
 ## Legal documents
 

@@ -31,8 +31,37 @@ jobs:
 
       - name: Trigger harvest
         run: |
-          curl -s -X POST \
+          # Capture body + status: the previous `curl -s` swallowed every error,
+          # so a rejected trigger (bad admin password, 5xx) showed a green run.
+          RESPONSE=$(curl -sS -w $'\n%{http_code}' -X POST \
             -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
             -H "Content-Type: application/json" \
             -d '{"min_views": ${{ github.event.inputs.min_views || 500000 }}, "max_per_niche": ${{ github.event.inputs.max_per_niche || 3 }}}' \
-            https://surge-production-8973.up.railway.app/api/admin/harvest
+            https://surge-production-8973.up.railway.app/api/admin/harvest)
+          CODE=$(printf '%s' "$RESPONSE" | tail -n1)
+          BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+          echo "HTTP $CODE"
+          echo "Trigger response: $BODY"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            echo "::error::Harvest trigger failed with HTTP $CODE"
+            exit 1
+          fi
+
+      - name: Report harvest outcome
+        run: |
+          # Harvest runs in the background (the trigger only returns "started"),
+          # so poll the status endpoint to surface the real counts in the run log
+          # instead of trusting a silent "+0 seeds". Bounded to ~4 minutes.
+          for i in $(seq 1 24); do
+            sleep 10
+            STATUS_JSON=$(curl -sS \
+              -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
+              https://surge-production-8973.up.railway.app/api/admin/harvest/status)
+            TIKTOK_STATUS=$(printf '%s' "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tiktok',{}).get('status','?'))" 2>/dev/null || echo "?")
+            echo "[$i] tiktok harvest status: $TIKTOK_STATUS"
+            if [ "$TIKTOK_STATUS" != "running" ]; then
+              echo "Final harvest status:"
+              echo "$STATUS_JSON"
+              break
+            fi
+          done

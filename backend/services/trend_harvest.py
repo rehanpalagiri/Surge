@@ -17,6 +17,7 @@ import os
 import tempfile
 import time
 from datetime import datetime
+from services.clock import utc_now_naive
 from typing import Optional
 
 from sqlalchemy import select
@@ -175,7 +176,7 @@ async def harvest_trending(
 ) -> None:
     global _last_trend_harvest
     target = niches or list(NICHE_KEYWORDS.keys())
-    _last_trend_harvest = {"status": "running", "started_at": datetime.utcnow().isoformat()}
+    _last_trend_harvest = {"status": "running", "started_at": utc_now_naive().isoformat()}
     logger.info("Trend harvest started: %d niches min_velocity=%.0f/day", len(target), min_velocity)
 
     try:
@@ -208,7 +209,7 @@ async def harvest_trending(
 
         _last_trend_harvest = {
             "status": "done",
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "niches_processed": len(results),
             "total_added": _running["added"],
             "total_skipped": _running["skipped"],
@@ -225,7 +226,7 @@ async def harvest_trending(
         logger.error("Trend harvest failed: %s", e)
         _last_trend_harvest = {
             "status": "failed",
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "error": str(e),
         }
 

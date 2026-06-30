@@ -6,6 +6,7 @@ stubbed so no real mail goes out and the tests stay hermetic and offline.
 """
 import unittest
 from datetime import datetime, timedelta
+from services.clock import utc_now_naive
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -102,7 +103,7 @@ class AuthFlowTest(unittest.IsolatedAsyncioTestCase):
         token = (await self._signup()).json()["access_token"]
         async with self.Session() as s:
             row = (await s.execute(select(EmailVerificationToken))).scalar_one()
-            row.expires_at = datetime.utcnow() - timedelta(minutes=1)
+            row.expires_at = utc_now_naive() - timedelta(minutes=1)
             await s.commit()
             code = row.token
         v = await self.client.post(

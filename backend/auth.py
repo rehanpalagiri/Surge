@@ -32,6 +32,47 @@ def is_minor(user: User) -> bool:
     return (today.year - user.birth_year) < 18
 
 
+# Stripe subscription statuses that grant Pro access. "past_due" is included as
+# a grace period: Stripe keeps the subscription live while it retries the card,
+# and only emits customer.subscription.deleted once it finally gives up — at
+# which point the webhook flips the status to "canceled" and access ends.
+PRO_STATUSES = frozenset({"active", "trialing", "past_due"})
+
+
+def _comp_emails() -> frozenset[str]:
+    """Operator allowlist of emails that get Pro for free (owner/testers/comps).
+
+    Read live from COMP_PRO_EMAILS (comma-separated) so it can be changed in the
+    Railway dashboard without a code change. SERVER-SIDE ONLY — a user can never
+    add themselves; email uniqueness at signup means only the real holder of a
+    listed address can occupy it. Put only addresses you control here.
+    """
+    raw = os.getenv("COMP_PRO_EMAILS", "")
+    return frozenset(e.strip().lower() for e in raw.split(",") if e.strip())
+
+
+def is_comp(user: "User") -> bool:
+    """True when this user gets Pro via the operator comp allowlist (no Stripe)."""
+    if user is None or not user.email:
+        return False
+    return user.email.strip().lower() in _comp_emails()
+
+
+def is_pro(user: "User") -> bool:
+    """True when the user has Pro access — either a paid Stripe subscription OR an
+    operator comp grant.
+
+    Source of truth for PAID access = the Stripe-webhook-written
+    subscription_status (never client input). Comp access = the COMP_PRO_EMAILS
+    allowlist. Import from here; don't reimplement.
+    """
+    if user is None:
+        return False
+    if is_comp(user):
+        return True
+    return (user.subscription_status or "") in PRO_STATUSES
+
+
 def _secret() -> str:
     return os.getenv("JWT_SECRET", "dev-insecure-secret-change-me")
 

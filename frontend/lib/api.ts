@@ -493,11 +493,11 @@ export async function seedConsentDecision(
   return handleResponse<AnalysisOut>(res);
 }
 
-export async function verifyResetCode(token: string): Promise<{ valid: boolean }> {
+export async function verifyResetCode(token: string, email?: string): Promise<{ valid: boolean }> {
   const res = await fetch(`${BASE}/api/auth/verify-reset-code`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ token, email }),
   });
   return handleResponse<{ valid: boolean }>(res);
 }
@@ -513,12 +513,13 @@ export async function forgotPassword(email: string): Promise<{ ok: boolean }> {
 
 export async function resetPassword(
   token: string,
-  newPassword: string
+  newPassword: string,
+  email?: string
 ): Promise<{ ok: boolean }> {
   const res = await fetch(`${BASE}/api/auth/reset-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, new_password: newPassword }),
+    body: JSON.stringify({ token, new_password: newPassword, email }),
   });
   return handleResponse<{ ok: boolean }>(res);
 }
@@ -717,13 +718,15 @@ export async function triggerHarvest(
 
 export interface RateLimitStatus {
   allowed: boolean;
+  tier: "free" | "pro";
+  unlimited: boolean;
   used: number;
-  base_limit: number;
+  base_limit: number | null;
   bonus: number;
-  effective_limit: number;
-  remaining: number;
+  effective_limit: number | null;
+  remaining: number | null;
   resets_at: string | null;
-  window_hours: number;
+  period: "month";
 }
 
 export async function getRateLimit(): Promise<RateLimitStatus> {
@@ -731,6 +734,41 @@ export async function getRateLimit(): Promise<RateLimitStatus> {
     headers: authHeaders(),
   });
   return handleResponse<RateLimitStatus>(res);
+}
+
+// ── Billing (Surge Pro) ────────────────────────────────────────────────────
+export interface BillingStatus {
+  plan: "free" | "pro";
+  is_pro: boolean;
+  comp: boolean;
+  subscription_status: string | null;
+  current_period_end: string | null;
+  has_customer: boolean;
+  price: string;
+  configured: boolean;
+}
+
+export async function getBillingStatus(): Promise<BillingStatus> {
+  const res = await fetch(`${BASE}/api/billing/status`, { headers: authHeaders() });
+  return handleResponse<BillingStatus>(res);
+}
+
+/** Start a Surge Pro subscription — returns the Stripe hosted-checkout URL. */
+export async function createCheckoutSession(): Promise<{ url: string }> {
+  const res = await fetch(`${BASE}/api/billing/checkout`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<{ url: string }>(res);
+}
+
+/** Open the Stripe billing portal to manage/cancel — returns its URL. */
+export async function createPortalSession(): Promise<{ url: string }> {
+  const res = await fetch(`${BASE}/api/billing/portal`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<{ url: string }>(res);
 }
 
 export interface CraftInsightPost {

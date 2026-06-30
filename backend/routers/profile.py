@@ -1,4 +1,5 @@
 from datetime import datetime
+from services.clock import utc_now_naive
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -57,7 +58,7 @@ async def upsert_profile(
         profile.bio = data.bio
         profile.target_audience = data.target_audience
         profile.niche = data.niche
-        profile.updated_at = datetime.utcnow()
+        profile.updated_at = utc_now_naive()
     else:
         profile = UserProfile(
             user_id=user.id,

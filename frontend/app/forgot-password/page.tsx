@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      await verifyResetCode(code);
+      await verifyResetCode(code, email.trim().toLowerCase());
       setStep("password");
     } catch (err) {
       setError(apiErrorDetail(err, "Invalid or expired code."));
@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      await resetPassword(code, password);
+      await resetPassword(code, password, email.trim().toLowerCase());
       // Auto sign-in with the new password so the user doesn't have to log in again.
       try {
         const token = await login(email, password);

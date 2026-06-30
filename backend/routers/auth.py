@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 from datetime import date, datetime, timedelta
+from services.clock import utc_now_naive
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ from database import get_db
 from models import User, PasswordResetToken, EmailVerificationToken
 from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn, VerifyEmailIn, GoogleAuthIn
 from auth import hash_password, verify_password, create_access_token, require_user, is_minor
-from services.throttle import check_rate
+from services.throttle import check_rate, client_ip
 
 _RESET_TTL = timedelta(hours=1)
 _SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -53,12 +54,11 @@ _VERIFY_PER_EMAIL_HOUR = 5
 
 
 def _client_ip(request: Request) -> str:
-    """Real client IP behind Render's proxy (X-Forwarded-For), falling back to
-    the socket peer. Used as the throttle key for unauthenticated reset endpoints."""
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Throttle key for unauthenticated endpoints. Delegates to the shared,
+    spoof-resistant resolver (trusts only proxy hops we control — see
+    services.throttle.client_ip). Taking the leftmost X-Forwarded-For entry here
+    would let an attacker rotate the header to get unlimited reset/verify guesses."""
+    return client_ip(request)
 
 
 def user_to_out(user: User) -> dict:
@@ -147,14 +147,23 @@ async def _issue_verification_code(user_id: int, db: AsyncSession) -> str:
     db.add(EmailVerificationToken(
         user_id=user_id,
         token=code,
-        expires_at=datetime.utcnow() + _VERIFY_TTL,
+        expires_at=utc_now_naive() + _VERIFY_TTL,
     ))
     await db.commit()
     return code
 
 
 @router.post("/login", response_model=TokenOut)
-async def login(payload: LoginIn, db: AsyncSession = Depends(get_db)):
+async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
+    # Brute-force guard: cap attempts per real client IP. Keyed on IP (not the
+    # submitted username) on purpose — a per-account counter would let an attacker
+    # lock a victim out by spamming failed logins for their name. 10 / 5 min is
+    # well above any human's fumble rate but throttles automated guessing.
+    if not check_rate(f"login-ip:{_client_ip(request)}", max_hits=10, window_seconds=300):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Please wait a few minutes and try again.",
+        )
     ident = payload.username.strip()
     # One field, two identifiers: match against username OR email (v1.24).
     result = await db.execute(
@@ -277,7 +286,7 @@ async def verify_email(
         )
     )
     tok = result.scalar_one_or_none()
-    if not tok or tok.expires_at < datetime.utcnow():
+    if not tok or tok.expires_at < utc_now_naive():
         raise HTTPException(status_code=400, detail="Invalid or expired code. Request a new one.")
 
     user.email_verified = True
@@ -302,7 +311,7 @@ async def resend_verification(
     # Per-IP + per-email caps protect the inbox and the Brevo quota.
     if not check_rate(f"verify-resend-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a few minutes.")
-    recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+    recent_cutoff = utc_now_naive() - timedelta(hours=1)
     recent_q = await db.execute(
         select(func.count()).select_from(EmailVerificationToken).where(
             EmailVerificationToken.user_id == user.id,
@@ -336,7 +345,7 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
     # Per-email cap (persistent across restarts via created_at): silently no-op
     # past the hourly limit so a victim's inbox can't be flooded. Same 200 as the
     # not-found path, so it still leaks nothing about account existence.
-    recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+    recent_cutoff = utc_now_naive() - timedelta(hours=1)
     recent_q = await db.execute(
         select(func.count()).select_from(PasswordResetToken).where(
             PasswordResetToken.user_id == user.id,
@@ -361,7 +370,7 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
     reset = PasswordResetToken(
         user_id=user.id,
         token=token,
-        expires_at=datetime.utcnow() + _RESET_TTL,
+        expires_at=utc_now_naive() + _RESET_TTL,
     )
     db.add(reset)
     await db.commit()
@@ -370,18 +379,34 @@ async def forgot_password(payload: ForgotPasswordIn, background_tasks: Backgroun
     return {"ok": True}
 
 
+async def _find_reset_token(token: str, email: str | None, db: AsyncSession):
+    """Resolve a reset token. When an email is supplied the match is SCOPED to that
+    account — so guessing a 6-digit code blind can't hijack some other user who
+    happens to have an active token (defense in depth on top of the IP rate limit).
+    Without an email (legacy clients) it falls back to a global token match. An
+    email that maps to no account returns None so nothing is leaked about who exists.
+    """
+    conds = [PasswordResetToken.token == token]
+    if email:
+        u = (await db.execute(
+            select(User).where(func.lower(User.email) == email.strip().lower())
+        )).scalar_one_or_none()
+        if u is None:
+            return None
+        conds.append(PasswordResetToken.user_id == u.id)
+    return (await db.execute(select(PasswordResetToken).where(*conds))).scalar_one_or_none()
+
+
 @router.post("/verify-reset-code")
 async def verify_reset_code(payload: VerifyResetCodeIn, request: Request, db: AsyncSession = Depends(get_db)):
-    # Brute-force guard: codes are 6 digits and matched globally, so cap guesses
-    # per IP. 20 / 10 min vs a 1M space inside the 1h TTL = negligible hit chance.
+    # Brute-force guard: cap guesses per real client IP. 20 / 10 min vs a 1M code
+    # space inside the 1h TTL = negligible hit chance; email-scoping (below) closes
+    # the residual "hit any active token" angle.
     if not check_rate(f"reset-verify-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
         raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
 
-    result = await db.execute(
-        select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
-    )
-    reset = result.scalar_one_or_none()
-    if not reset or reset.used or reset.expires_at < datetime.utcnow():
+    reset = await _find_reset_token(payload.token, payload.email, db)
+    if not reset or reset.used or reset.expires_at < utc_now_naive():
         raise HTTPException(status_code=400, detail="Invalid or expired code.")
     return {"valid": True}
 
@@ -395,12 +420,9 @@ async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSe
     if len(payload.new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
 
-    result = await db.execute(
-        select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
-    )
-    reset = result.scalar_one_or_none()
+    reset = await _find_reset_token(payload.token, payload.email, db)
 
-    if not reset or reset.used or reset.expires_at < datetime.utcnow():
+    if not reset or reset.used or reset.expires_at < utc_now_naive():
         raise HTTPException(status_code=400, detail="Invalid or expired code. Please request a new one.")
 
     user_result = await db.execute(select(User).where(User.id == reset.user_id))

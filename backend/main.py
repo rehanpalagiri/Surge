@@ -13,6 +13,7 @@ from models import Base
 from routers.admin import router as admin_router
 from routers.analyze import router as analyze_router
 from routers.auth import router as auth_router
+from routers.billing import router as billing_router
 from routers.profile import router as profile_router
 from routers.settings import router as settings_router
 
@@ -177,6 +178,15 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 1"
         )
+    # --- users: Stripe billing (Surge Pro) ---
+    for col, ddl in (
+        ("stripe_customer_id", "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"),
+        ("stripe_subscription_id", "ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT"),
+        ("subscription_status", "ALTER TABLE users ADD COLUMN subscription_status TEXT"),
+        ("subscription_current_period_end", "ALTER TABLE users ADD COLUMN subscription_current_period_end DATETIME"),
+    ):
+        if col not in user_cols:
+            await conn.exec_driver_sql(ddl)
 
 
 async def _ensure_columns_pg(conn):
@@ -221,6 +231,12 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
         # DEFAULT TRUE grandfathers existing accounts as verified.
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE",
+        # Stripe billing (Surge Pro). Written only by the verified webhook.
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMP",
+        "CREATE INDEX IF NOT EXISTS ix_users_stripe_customer_id ON users (stripe_customer_id)",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'complete'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS correction_json TEXT",
@@ -316,6 +332,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(analyze_router)
+app.include_router(billing_router)
 app.include_router(profile_router)
 app.include_router(settings_router)
 

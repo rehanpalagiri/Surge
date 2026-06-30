@@ -16,6 +16,7 @@ import logging
 import os
 import tempfile
 from datetime import datetime
+from services.clock import utc_now_naive
 from typing import Optional
 
 import httpx
@@ -276,7 +277,7 @@ async def harvest_instagram_all(
     target = niches or list(NICHE_KEYWORDS.keys())
     _last_instagram_harvest = {
         "status": "running",
-        "started_at": datetime.utcnow().isoformat(),
+        "started_at": utc_now_naive().isoformat(),
         "platform": "instagram",
     }
 
@@ -286,7 +287,7 @@ async def harvest_instagram_all(
         _last_instagram_harvest = {
             "status": "failed",
             "platform": "instagram",
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "error": "HIKERAPI_KEY is not set. Add it to your environment variables.",
         }
         return
@@ -370,7 +371,7 @@ async def harvest_instagram_all(
         _last_instagram_harvest = {
             "status": final_status,
             "platform": "instagram",
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "niches_processed": len(results),
             "total_added": total_added,
             "total_skipped": _running["skipped"],
@@ -403,7 +404,7 @@ async def harvest_instagram_all(
         _last_instagram_harvest = {
             "status": "failed",
             "platform": "instagram",
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "error": str(e),
         }
 

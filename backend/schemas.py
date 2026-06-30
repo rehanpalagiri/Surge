@@ -169,10 +169,12 @@ class ForgotPasswordIn(BaseModel):
 class ResetPasswordIn(BaseModel):
     token: str
     new_password: str
+    email: Optional[str] = None  # scopes the code to one account (defense in depth)
 
 
 class VerifyResetCodeIn(BaseModel):
     token: str
+    email: Optional[str] = None  # scopes the code to one account (defense in depth)
 
 
 class VerifyEmailIn(BaseModel):

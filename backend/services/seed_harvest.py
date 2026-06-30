@@ -16,6 +16,7 @@ import logging
 import os
 import tempfile
 from datetime import datetime
+from services.clock import utc_now_naive
 from typing import Optional
 
 import httpx
@@ -307,7 +308,7 @@ async def harvest_all(
 ) -> None:
     global _last_harvest
     target = niches or list(NICHE_KEYWORDS.keys())
-    _last_harvest = {"status": "running", "started_at": datetime.utcnow().isoformat()}
+    _last_harvest = {"status": "running", "started_at": utc_now_naive().isoformat()}
     logger.info("Harvest started: %d niches min_views=%d max_views=%s max_per_niche=%d", len(target), min_views, max_views, max_per_niche)
 
     try:
@@ -388,7 +389,7 @@ async def harvest_all(
 
         _last_harvest = {
             "status": final_status,
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "niches_processed": len(results),
             "total_added": total_added,
             "total_skipped": _running["skipped"],
@@ -420,7 +421,7 @@ async def harvest_all(
         logger.error("Harvest failed: %s", e)
         _last_harvest = {
             "status": "failed",
-            "finished_at": datetime.utcnow().isoformat(),
+            "finished_at": utc_now_naive().isoformat(),
             "error": str(e),
         }
 

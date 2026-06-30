@@ -9,6 +9,7 @@ import { getToken } from "@/lib/auth";
 import { ProjectsSkeleton } from "@/components/Skeleton";
 import PlatformTabs from "@/components/PlatformTabs";
 import { ArrowUpRight, CalendarDays, Link2, RefreshCw, Trash2, Video } from "lucide-react";
+import { createPortal } from "react-dom";
 
 function verdictColor(verdict: string): string {
   if (verdict === "Strong craft" || verdict === "High potential") return "text-success";
@@ -16,48 +17,52 @@ function verdictColor(verdict: string): string {
   return "text-danger";
 }
 
-const CONFETTI_PARTICLES: Array<{ color: string; tx: number; ty: number; r: number; size: number; round: boolean; delay: number }> = [
-  // First burst — centre cluster going up
-  { color: "#a855f7", tx:   0, ty: -140, r: 270, size: 10, round: false, delay:   0 },
-  { color: "#fbbf24", tx: -25, ty: -120, r:  45, size:  7, round: true,  delay:  30 },
-  { color: "#ec4899", tx:  25, ty: -120, r: 180, size:  8, round: false, delay:  60 },
-  { color: "#34d399", tx: -10, ty: -100, r: 315, size:  6, round: false, delay:  20 },
-  { color: "#60a5fa", tx:  10, ty: -100, r:  90, size:  9, round: true,  delay:  50 },
-  // Left spread
-  { color: "#fb923c", tx: -60, ty: -130, r: 200, size:  7, round: false, delay:  40 },
-  { color: "#a855f7", tx: -80, ty:  -90, r: 140, size: 10, round: true,  delay:  80 },
-  { color: "#ec4899", tx:-110, ty: -110, r:  30, size:  6, round: false, delay: 100 },
-  { color: "#fbbf24", tx: -45, ty:  -70, r: 255, size:  8, round: false, delay:  70 },
-  { color: "#34d399", tx:-120, ty:  -50, r: 320, size:  7, round: true,  delay: 120 },
-  // Right spread
-  { color: "#60a5fa", tx:  60, ty: -130, r:  60, size:  9, round: false, delay:  40 },
-  { color: "#fb923c", tx:  80, ty:  -90, r: 220, size:  6, round: true,  delay:  80 },
-  { color: "#a855f7", tx: 110, ty: -110, r: 350, size: 10, round: false, delay: 100 },
-  { color: "#ec4899", tx:  45, ty:  -70, r: 110, size:  7, round: false, delay:  70 },
-  { color: "#fbbf24", tx: 120, ty:  -50, r: 170, size:  8, round: true,  delay: 120 },
-  // Second wave — delayed
-  { color: "#34d399", tx: -90, ty: -160, r:  80, size:  6, round: false, delay: 150 },
-  { color: "#60a5fa", tx:  90, ty: -160, r: 300, size:  7, round: false, delay: 150 },
-  { color: "#fb923c", tx: -50, ty: -150, r: 195, size: 10, round: true,  delay: 180 },
-  { color: "#a855f7", tx:  50, ty: -150, r:  25, size:  8, round: false, delay: 180 },
-  { color: "#ec4899", tx:-100, ty:  -80, r: 145, size:  6, round: false, delay: 200 },
-  { color: "#fbbf24", tx: 100, ty:  -80, r: 265, size:  9, round: true,  delay: 200 },
-  // Falling outward — drift sideways / slightly down for realism
-  { color: "#34d399", tx:-125, ty:  30, r:  50, size:  7, round: false, delay:  60 },
-  { color: "#60a5fa", tx: 125, ty:  30, r: 230, size:  6, round: false, delay:  60 },
-  { color: "#a855f7", tx:-110, ty:  60, r: 100, size:  8, round: true,  delay:  90 },
-  { color: "#fb923c", tx: 110, ty:  60, r: 280, size:  9, round: false, delay:  90 },
-  { color: "#ec4899", tx: -65, ty:  80, r: 170, size:  6, round: false, delay: 110 },
-  { color: "#fbbf24", tx:  65, ty:  80, r:  10, size:  7, round: true,  delay: 110 },
-  { color: "#34d399", tx:   0, ty:  90, r: 310, size: 10, round: false, delay: 140 },
-];
+function seededRand(seed: number): number {
+  const x = Math.sin(seed + 1) * 10000;
+  return x - Math.floor(x);
+}
 
-const FLOAT_EMOJI = [
-  { emoji: "🎉", fx: -90, delay:  60, cls: "text-2xl" },
-  { emoji: "🚀", fx: -30, delay:   0, cls: "text-3xl" },
-  { emoji: "⭐", fx:  20, delay: 130, cls: "text-xl"  },
-  { emoji: "🎊", fx:  75, delay: 220, cls: "text-2xl" },
-  { emoji: "🔥", fx: -55, delay: 310, cls: "text-lg"  },
+const _COLORS8 = ["#a855f7", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
+
+const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
+  const angle = (i / 80) * 2 * Math.PI + seededRand(i * 3) * 0.5;
+  const dist = 160 + seededRand(i * 7) * 380;
+  return {
+    color: _COLORS8[i % 8],
+    tx: Math.round(Math.cos(angle) * dist),
+    ty: Math.round(Math.sin(angle) * dist - 80),
+    r: Math.round(seededRand(i * 13) * 720),
+    size: 8 + Math.round(seededRand(i * 5) * 8),
+    round: i % 3 === 0,
+    delay: Math.round(seededRand(i * 11) * 400),
+  };
+});
+
+const _COLORS6 = ["#a855f7", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
+
+const MINI_BURST = Array.from({ length: 14 }, (_, i) => {
+  const angle = (i / 14) * 2 * Math.PI + seededRand(i * 5) * 0.5;
+  const dist = 30 + seededRand(i * 9) * 60;
+  return {
+    color: _COLORS6[i % 6],
+    tx: Math.round(Math.cos(angle) * dist),
+    ty: Math.round(Math.sin(angle) * dist),
+    r: Math.round(seededRand(i * 7) * 360),
+    size: 4 + Math.round(seededRand(i * 3) * 4),
+    round: i % 2 === 0,
+    delay: Math.round(seededRand(i * 13) * 80),
+  };
+});
+
+const MEGA_FLOAT_EMOJI = [
+  { emoji: "🎉", fx: -180, delay:  80, cls: "text-5xl" },
+  { emoji: "🚀", fx:  -45, delay:   0, cls: "text-6xl" },
+  { emoji: "⭐", fx:   50, delay: 160, cls: "text-4xl" },
+  { emoji: "🎊", fx:  175, delay: 260, cls: "text-5xl" },
+  { emoji: "🔥", fx:  -95, delay: 360, cls: "text-3xl" },
+  { emoji: "✨", fx:  115, delay: 430, cls: "text-4xl" },
+  { emoji: "💜", fx: -145, delay: 210, cls: "text-4xl" },
+  { emoji: "🌟", fx:  205, delay: 110, cls: "text-5xl" },
 ];
 
 const TIKTOK_HOW_TO = [
@@ -91,6 +96,9 @@ function PostLinkRow({
   const [error, setError] = useState("");
   const [showHowTo, setShowHowTo] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [bursting, setBursting] = useState(false);
+  const [burstOrigin, setBurstOrigin] = useState({ x: 0, y: 0 });
   const howTo = platform === "tiktok" ? TIKTOK_HOW_TO : INSTAGRAM_HOW_TO;
 
   // Glow the whole project card during celebration
@@ -108,7 +116,15 @@ function PostLinkRow({
   }, [phase]);
 
   function handlePostedClick() {
-    setPhase("linking");
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setBurstOrigin({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    }
+    setBursting(true);
+    setTimeout(() => {
+      setBursting(false);
+      setPhase("linking");
+    }, 480);
   }
 
   async function fetchStats(url?: string) {
@@ -178,91 +194,105 @@ function PostLinkRow({
     );
   }
 
-  // Celebration burst
+  // Celebration burst — full-screen portal
   if (phase === "celebrate") {
     return (
-      <div ref={containerRef} className="relative overflow-hidden px-5 pb-6 pt-4 flex flex-col items-center gap-3 min-h-[190px]">
-        {/* Radial purple glow bg */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(ellipse 90% 70% at 50% 55%, rgb(168 85 247 / 0.22) 0%, transparent 68%)" }}
-        />
-
-        {/* Shockwave rings — burst from centre */}
-        {[0, 180, 360].map((delay, i) => (
-          <span
-            key={i}
-            className="pointer-events-none absolute rounded-full border-2 border-purple-400/60"
-            style={{
-              width: 36, height: 36,
-              top: "50%", left: "50%",
-              animation: `pulse-ring 0.95s ${delay}ms ease-out forwards`,
-            }}
-          />
-        ))}
-
-        {/* Confetti particles */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          {CONFETTI_PARTICLES.map((p, i) => (
-            <span
-              key={i}
-              className="absolute"
-              style={{
-                width: p.size,
-                height: p.size,
-                borderRadius: p.round ? "50%" : "2px",
-                backgroundColor: p.color,
-                "--tx": `${p.tx}px`,
-                "--ty": `${p.ty}px`,
-                "--r": `${p.r}deg`,
-                animation: `confetti-particle 1.3s ${p.delay}ms cubic-bezier(0.15, 0.8, 0.35, 1) forwards`,
-              } as React.CSSProperties}
-            />
-          ))}
-        </div>
-
-        {/* Floating emoji */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          {FLOAT_EMOJI.map((e, i) => (
-            <span
-              key={i}
-              className={`absolute select-none ${e.cls}`}
-              style={{
-                "--fx": `${e.fx}px`,
-                animation: `float-up-fade 2s ${e.delay}ms ease-out forwards`,
-              } as React.CSSProperties}
-            >
-              {e.emoji}
-            </span>
-          ))}
-        </div>
-
-        {/* Text content */}
-        <div className="relative z-10 flex flex-col items-center gap-2 pt-6">
-          <p
-            className="text-2xl font-extrabold tracking-widest text-white uppercase"
-            style={{ animation: "celebrate-text-in 0.55s 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
-          >
-            You posted it!
-          </p>
-          <p
-            className="text-sm text-zinc-400 text-center"
-            style={{ animation: "celebrate-text-in 0.5s 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
-          >
-            Your video is live. Let&apos;s see how the world responds.
-          </p>
+      <>
+        <div ref={containerRef} className="px-5 pb-4 h-8" />
+        {createPortal(
           <div
-            className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-500/15 px-4 py-1.5 text-xs font-bold text-yellow-300"
-            style={{
-              animation: "achievement-rise 0.45s 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
-              boxShadow: "0 0 18px rgb(234 179 8 / 0.28)",
-            }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
+            style={{ animation: "celebrate-portal-exit 0.5s 2.5s ease-in forwards" }}
           >
-            <span>🏆</span>
-            <span>+1 analysis credit earned</span>
-          </div>
-        </div>
-      </div>
+            {/* Screen flash */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgb(168 85 247 / 0.95), rgb(99 102 241 / 0.65) 45%, transparent 72%)",
+                animation: "screen-flash 0.7s ease-out forwards",
+              }}
+            />
+
+            {/* Dark backdrop */}
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" style={{ zIndex: -1 }} />
+
+            {/* Mega confetti */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              {MEGA_CONFETTI.map((p, i) => (
+                <span
+                  key={i}
+                  className="absolute"
+                  style={{
+                    width: p.size, height: p.size,
+                    borderRadius: p.round ? "50%" : "3px",
+                    backgroundColor: p.color,
+                    "--tx": `${p.tx}px`,
+                    "--ty": `${p.ty}px`,
+                    "--r": `${p.r}deg`,
+                    animation: `confetti-particle 1.6s ${p.delay}ms cubic-bezier(0.15, 0.8, 0.35, 1) forwards`,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+
+            {/* Shockwave rings */}
+            {[0, 160, 320, 520].map((delay, i) => (
+              <span
+                key={i}
+                className="pointer-events-none absolute rounded-full border-2 border-purple-400/50"
+                style={{
+                  width: 48, height: 48,
+                  top: "50%", left: "50%",
+                  animation: `pulse-ring 1.1s ${delay}ms ease-out forwards`,
+                }}
+              />
+            ))}
+
+            {/* Floating emoji */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              {MEGA_FLOAT_EMOJI.map((e, i) => (
+                <span
+                  key={i}
+                  className={`absolute select-none ${e.cls}`}
+                  style={{
+                    "--fx": `${e.fx}px`,
+                    animation: `mega-float-up 2.4s ${e.delay}ms ease-out forwards`,
+                  } as React.CSSProperties}
+                >
+                  {e.emoji}
+                </span>
+              ))}
+            </div>
+
+            {/* Text */}
+            <div className="relative z-10 flex flex-col items-center gap-4 px-6 text-center">
+              <p
+                className="text-5xl sm:text-7xl font-black tracking-[0.1em] text-white uppercase leading-tight"
+                style={{ animation: "big-slam-in 0.7s 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
+              >
+                You<br />posted it!
+              </p>
+              <p
+                className="text-base sm:text-lg text-zinc-300 max-w-xs leading-relaxed"
+                style={{ animation: "celebrate-text-in 0.5s 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
+              >
+                Your video is live. Let&apos;s see how the world responds.
+              </p>
+              <div
+                className="inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-500/15 px-5 py-2 text-sm font-bold text-yellow-300"
+                style={{
+                  animation: "achievement-rise 0.5s 780ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+                  boxShadow: "0 0 30px rgb(234 179 8 / 0.35)",
+                }}
+              >
+                <span>🏆</span>
+                <span>+1 analysis credit earned</span>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+      </>
     );
   }
 
@@ -337,34 +367,68 @@ function PostLinkRow({
 
   // Idle, not yet linked
   return (
-    <div className="px-5 pb-4">
-      <button
-        type="button"
-        onClick={handlePostedClick}
-        className="project-link-cta group w-full text-left"
-      >
-        <span className="relative z-10 flex min-w-0 items-center gap-3">
-          <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-purple-to/25 bg-purple-from/15 text-purple-300 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
-            <Link2 className="h-5 w-5" strokeWidth={1.8} />
+    <div className="px-5 pb-4 relative">
+      {bursting && createPortal(
+        <div className="fixed inset-0 pointer-events-none z-[9998]">
+          <span
+            className="absolute rounded-full border-[1.5px] border-purple-400/80"
+            style={{
+              width: 10, height: 10,
+              left: burstOrigin.x, top: burstOrigin.y,
+              animation: "posted-btn-ring 0.52s ease-out forwards",
+            }}
+          />
+          {MINI_BURST.map((p, i) => (
+            <span
+              key={i}
+              className="absolute"
+              style={{
+                width: p.size, height: p.size,
+                borderRadius: p.round ? "50%" : "2px",
+                backgroundColor: p.color,
+                left: burstOrigin.x,
+                top: burstOrigin.y,
+                "--tx": `${p.tx}px`,
+                "--ty": `${p.ty}px`,
+                "--r": `${p.r}deg`,
+                animation: `mini-burst 0.55s ${p.delay}ms ease-out forwards`,
+              } as React.CSSProperties}
+            />
+          ))}
+        </div>,
+        document.body
+      )}
+      <div style={bursting ? { animation: "posted-btn-scale 0.45s ease-out" } : undefined}>
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={handlePostedClick}
+          disabled={bursting}
+          className="project-link-cta group w-full text-left"
+        >
+          <span className="relative z-10 flex min-w-0 items-center gap-3">
+            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-purple-to/25 bg-purple-from/15 text-purple-300 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+              <Link2 className="h-5 w-5" strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0">
+              <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300">
+                Posted it?
+              </span>
+              <span className="block text-sm font-bold text-white">
+                {platform === "tiktok"
+                  ? "Did you post this? Track real stats"
+                  : "Did you post this Reel? Track real likes"}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-400">
+                Connect the post, start tracking results, and earn +1 analysis
+              </span>
+            </span>
           </span>
-          <span className="min-w-0">
-            <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300">
-              Posted it?
-            </span>
-            <span className="block text-sm font-bold text-white">
-              {platform === "tiktok"
-                ? "Did you post this? Track real stats"
-                : "Did you post this Reel? Track real likes"}
-            </span>
-            <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-400">
-              Connect the post, start tracking results, and earn +1 analysis
-            </span>
+          <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-purple-500 text-white shadow-lg shadow-purple-950/40 transition-transform group-hover:translate-x-1">
+            <ArrowUpRight className="h-4 w-4" />
           </span>
-        </span>
-        <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-purple-500 text-white shadow-lg shadow-purple-950/40 transition-transform group-hover:translate-x-1">
-          <ArrowUpRight className="h-4 w-4" />
-        </span>
-      </button>
+        </button>
+      </div>
     </div>
   );
 }
@@ -559,11 +623,8 @@ export default function ProjectsPage() {
   );
   const filtered = allForPlatform
     ?.filter((a) => !supersededIds.has(a.id))
-    .sort((a, b) => {
-      const linkPriority = Number(Boolean(a.video_url)) - Number(Boolean(b.video_url));
-      if (linkPriority !== 0) return linkPriority;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    }) ?? null;
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    ?? null;
 
   const cfg = PLATFORM_TABS.find((p) => p.id === platform)!;
 
@@ -579,7 +640,7 @@ export default function ProjectsPage() {
             </span>
           </h1>
           <p className="text-text-muted mt-1">
-            Projects waiting for a post link appear first, followed by your newest work.
+            Your newest projects appear at the top.
           </p>
         </div>
 

@@ -11,7 +11,7 @@ function VerifyEmailInner() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next");
-  const dest = next && next.startsWith("/") ? next : "/onboarding";
+  const dest = next && next.startsWith("/") ? next : "/projects";
 
   const [email, setEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");

@@ -6,8 +6,9 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import PasswordInput from "@/components/PasswordInput";
 import { getToken, clearToken } from "@/lib/auth";
-import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus } from "@/lib/api";
+import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus, getBillingStatus, createPortalSession, BillingStatus, apiErrorDetail } from "@/lib/api";
 import { SettingsPrivacySkeleton, SettingsSkeleton } from "@/components/Skeleton";
+import UpgradeButton from "@/components/UpgradeButton";
 
 function ProfileCard() {
   return (
@@ -24,6 +25,85 @@ function ProfileCard() {
           Edit profile
         </Link>
       </div>
+    </div>
+  );
+}
+
+function BillingCard() {
+  const [status, setStatus] = useState<BillingStatus | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getBillingStatus()
+      .then(setStatus)
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  async function openPortal() {
+    setPortalBusy(true);
+    setError("");
+    try {
+      const { url } = await createPortalSession();
+      window.location.href = url;
+    } catch (err) {
+      setError(apiErrorDetail(err, "Couldn't open the billing portal. Please try again."));
+      setPortalBusy(false);
+    }
+  }
+
+  // Until billing is configured (Stripe keys set), show nothing — no half-built UI.
+  if (!loaded || !status || !status.configured) return null;
+
+  const renews = status.current_period_end
+    ? new Date(status.current_period_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg flex items-center gap-2">
+            {status.is_pro ? <>Surge Pro <span className="text-purple-400">✦</span></> : "Plan"}
+          </h2>
+          {status.comp ? (
+            <p className="text-text-muted text-sm mt-0.5">
+              Complimentary Pro — unlimited analyses, no billing.
+            </p>
+          ) : status.is_pro ? (
+            <p className="text-text-muted text-sm mt-0.5">
+              Unlimited analyses.
+              {status.subscription_status === "past_due"
+                ? " ⚠ Last payment failed — please update your card."
+                : renews
+                ? ` Renews ${renews}.`
+                : ""}
+            </p>
+          ) : (
+            <p className="text-text-muted text-sm mt-0.5">
+              Free plan — 3 analyses per month. Upgrade to {status.price} for unlimited.
+            </p>
+          )}
+        </div>
+        {status.comp ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-purple-500/15 px-3 py-1.5 text-xs font-bold text-purple-200">
+            ✦ Complimentary
+          </span>
+        ) : status.is_pro ? (
+          <button
+            onClick={openPortal}
+            disabled={portalBusy}
+            className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-text-muted/60 transition-colors text-sm disabled:opacity-60"
+          >
+            {portalBusy ? "Opening…" : "Manage subscription"}
+          </button>
+        ) : (
+          <UpgradeButton label="Upgrade to Pro" />
+        )}
+      </div>
+      {error && <p className="text-danger text-xs mt-3">{error}</p>}
     </div>
   );
 }
@@ -73,6 +153,7 @@ export default function SettingsPage() {
         {!authReady ? <SettingsSkeleton /> : (
           <>
             <ProfileCard />
+            <BillingCard />
             <ChangeUsernameCard />
             <ChangePasswordCard />
             <DataPrivacyCard />

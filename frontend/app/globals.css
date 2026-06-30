@@ -400,6 +400,39 @@ body {
   0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.8; }
   100% { transform: translate(-50%, -50%) scale(7);   opacity: 0; }
 }
+@keyframes posted-btn-scale {
+  0%   { transform: scale(1);    filter: none; }
+  28%  { transform: scale(1.05); filter: drop-shadow(0 0 18px rgb(168 85 247 / 0.75)); }
+  62%  { transform: scale(1.02); filter: drop-shadow(0 0 8px rgb(168 85 247 / 0.4)); }
+  100% { transform: scale(1);    filter: none; }
+}
+@keyframes mini-burst {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; }
+}
+@keyframes posted-btn-ring {
+  0%   { transform: translate(-50%, -50%) scale(1);  opacity: 0.85; }
+  100% { transform: translate(-50%, -50%) scale(12); opacity: 0; }
+}
+@keyframes screen-flash {
+  0%   { opacity: 0; }
+  8%   { opacity: 0.82; }
+  100% { opacity: 0; }
+}
+@keyframes big-slam-in {
+  0%   { transform: scale(0.2)  translateY(28px); opacity: 0; filter: blur(12px); }
+  55%  { transform: scale(1.1)  translateY(-4px); opacity: 1; filter: blur(0); }
+  80%  { transform: scale(0.97) translateY(2px); }
+  100% { transform: scale(1)    translateY(0);   opacity: 1; }
+}
+@keyframes mega-float-up {
+  0%   { transform: translateX(var(--fx, 0px)) translateY(0)      scale(1.2); opacity: 1; }
+  100% { transform: translateX(var(--fx, 0px)) translateY(-260px) scale(0.3); opacity: 0; }
+}
+@keyframes celebrate-portal-exit {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

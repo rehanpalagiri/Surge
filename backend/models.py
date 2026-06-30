@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base
-from datetime import datetime
+from services.clock import utc_now_naive
 
 Base = declarative_base()
 
@@ -14,7 +14,7 @@ class TrendSummary(Base):
     trend_text = Column(Text, nullable=False)
     recent_seed_count = Column(Integer, nullable=False)
     established_seed_count = Column(Integer, nullable=False)
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    generated_at = Column(DateTime, default=utc_now_naive)
 
     __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_trend"),)
 
@@ -27,7 +27,7 @@ class NicheInsight(Base):
     niche = Column(String, nullable=False)       # canonical niche
     insight = Column(Text, nullable=False)       # synthesized pattern block
     seed_count = Column(Integer, nullable=False) # how many seeds were analyzed
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    generated_at = Column(DateTime, default=utc_now_naive)
 
     __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_insight"),)
 
@@ -46,7 +46,7 @@ class CalibrationNote(Base):
     niche = Column(String, nullable=False)       # canonical niche, or "GLOBAL"
     note_json = Column(Text, nullable=False)     # clamped calibration note (see services/calibration.py)
     sample_count = Column(Integer, nullable=False)  # how many safe corrections fed this note
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    generated_at = Column(DateTime, default=utc_now_naive)
 
     __table_args__ = (UniqueConstraint("platform", "niche", name="uq_platform_niche_calibration"),)
 
@@ -71,7 +71,16 @@ class User(Base):
     # 6-digit code; the migration backfills existing accounts to True so they
     # are never locked out by this feature.
     email_verified = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # ── Billing (Surge Pro via Stripe) ──────────────────────────────────────
+    # subscription_status is Stripe's raw value ("active", "trialing",
+    # "past_due", "canceled", …) and is the single source of truth for Pro
+    # access — see auth.is_pro(). All four fields are written ONLY by the
+    # signature-verified Stripe webhook, never trusted from the client.
+    stripe_customer_id = Column(String, nullable=True, index=True)
+    stripe_subscription_id = Column(String, nullable=True)
+    subscription_status = Column(String, nullable=True)
+    subscription_current_period_end = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class SeedVideo(Base):
@@ -101,7 +110,7 @@ class SeedVideo(Base):
     # the better signal — real outcomes, not a curator's guess — and this column lets
     # the bucketer weight them higher later. Defaults to "admin" for pre-1.20 rows.
     source = Column(String, nullable=True, default="admin")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class UserProfile(Base):
@@ -115,8 +124,8 @@ class UserProfile(Base):
     bio = Column(Text, nullable=True)
     target_audience = Column(Text, nullable=True)      # who they're trying to reach
     niche = Column(String, nullable=True)              # their primary content niche
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive)
 
     __table_args__ = (UniqueConstraint("user_id", "platform", name="uq_user_platform"),)
 
@@ -163,7 +172,7 @@ class UserAnalysis(Base):
     # Update lineage: points to the analysis this version was created to improve.
     # NULL = original upload; non-NULL = user clicked "Update" on an old result.
     parent_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class AnalysisArtifact(Base):
@@ -183,8 +192,8 @@ class AnalysisArtifact(Base):
     creator_key = Column(String, nullable=True, index=True)
     perceptual_hash = Column(String, nullable=True, index=True)
     audio_fingerprint = Column(String, nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
+    updated_at = Column(DateTime, default=utc_now_naive)
 
 
 class OutcomeSnapshot(Base):
@@ -201,7 +210,7 @@ class OutcomeSnapshot(Base):
     analysis_id = Column(Integer, ForeignKey("user_analyses.id"), nullable=False, index=True)
     platform = Column(String, nullable=False)
     source = Column(String, nullable=False)
-    observed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    observed_at = Column(DateTime, nullable=False, default=utc_now_naive)
     posted_at = Column(DateTime, nullable=True)
     post_age_hours = Column(Integer, nullable=True)
     horizon = Column(String, nullable=True, index=True)  # "24h" | "7d" | "30d" | NULL
@@ -214,7 +223,7 @@ class OutcomeSnapshot(Base):
     metric_version = Column(String, nullable=False, default="observed_response_v1")
     provider_payload_hash = Column(String, nullable=True)
     integrity_flags_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class OutcomeCollectionJob(Base):
@@ -231,7 +240,7 @@ class OutcomeCollectionJob(Base):
     attempts = Column(Integer, nullable=False, default=0)
     last_error = Column(Text, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
     __table_args__ = (
         UniqueConstraint("analysis_id", "horizon", name="uq_analysis_outcome_horizon"),
@@ -256,7 +265,7 @@ class UsageEvent(Base):
     output_tokens = Column(Integer, nullable=True)
     estimated_cost_micros = Column(Integer, nullable=True)
     error_code = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class PasswordResetToken(Base):
@@ -267,7 +276,7 @@ class PasswordResetToken(Base):
     token = Column(String, unique=True, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class EmailVerificationToken(Base):
@@ -280,7 +289,7 @@ class EmailVerificationToken(Base):
     token = Column(String, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class FetchStatus(Base):
@@ -291,4 +300,4 @@ class FetchStatus(Base):
     message = Column(Text, nullable=True)
     url = Column(String, nullable=True)
     acknowledged = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)

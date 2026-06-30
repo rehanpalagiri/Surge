@@ -10,6 +10,7 @@ import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation"
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { track } from "@vercel/analytics";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
+import UpgradeButton from "@/components/UpgradeButton";
 
 
 const TIPS = [
@@ -475,39 +476,54 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
           </p>
         )}
 
-        {/* ── Rate limit bar (logged-in only) ── */}
+        {/* ── Plan / monthly allowance (logged-in only) ── */}
         {loggedIn && rateLimit && (
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 space-y-1.5">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-zinc-400">
-                {rateLimit.remaining} of {rateLimit.effective_limit} analyses left
-                <span className="text-zinc-600"> · {rateLimit.window_hours}h window</span>
-              </span>
-              {rateLimit.bonus > 0 && (
-                <span className="text-emerald-400 font-medium">+{rateLimit.bonus} link bonus</span>
-              )}
+          rateLimit.unlimited ? (
+            <div className="bg-gradient-to-r from-purple-600/15 to-fuchsia-600/15 border border-purple-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-semibold text-purple-200">⚡ Surge Pro — unlimited analyses</span>
+              <span className="text-[11px] text-zinc-500">{rateLimit.used} this month</span>
             </div>
-            <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  rateLimit.remaining === 0 ? "bg-red-500" :
-                  rateLimit.remaining <= 3 ? "bg-yellow-400" : "bg-purple-500"
-                }`}
-                style={{ width: `${Math.round((rateLimit.used / rateLimit.effective_limit) * 100)}%` }}
-              />
-            </div>
-            {rateLimit.remaining === 0 ? (
-              <p className="text-red-400 text-[11px]">
-                Limit reached.{" "}
-                {rateLimit.bonus < 10 && "Link a posted video below to earn +1 credit. "}
-                {rateLimit.resets_at && `Resets ${new Date(rateLimit.resets_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`}
-              </p>
-            ) : rateLimit.bonus < 10 ? (
-              <p className="text-zinc-600 text-[11px]">
-                Link a posted video on your results page to earn +1 credit (up to +10 total).
-              </p>
-            ) : null}
-          </div>
+          ) : (() => {
+            const limit = rateLimit.effective_limit ?? 0;
+            const remaining = rateLimit.remaining ?? 0;
+            const pct = limit > 0 ? Math.min(100, Math.round((rateLimit.used / limit) * 100)) : 0;
+            const resetLabel = rateLimit.resets_at
+              ? new Date(rateLimit.resets_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+              : "";
+            return (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 space-y-1.5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-zinc-400">
+                    {remaining} of {limit} analyses left this month
+                  </span>
+                  {rateLimit.bonus > 0 && (
+                    <span className="text-emerald-400 font-medium">+{rateLimit.bonus} link bonus</span>
+                  )}
+                </div>
+                <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      remaining === 0 ? "bg-red-500" : remaining <= 1 ? "bg-yellow-400" : "bg-purple-500"
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  <p className={`text-[11px] ${remaining === 0 ? "text-red-400" : "text-zinc-600"}`}>
+                    {remaining === 0
+                      ? `Monthly limit reached.${resetLabel ? ` Resets ${resetLabel}.` : ""}`
+                      : rateLimit.bonus < 10
+                      ? "Link a posted video to earn +1 analysis (up to +10)."
+                      : `Free plan · resets ${resetLabel}.`}
+                  </p>
+                  <UpgradeButton
+                    label="Go unlimited"
+                    className="flex-shrink-0 text-purple-300 hover:text-purple-200 text-[11px] font-semibold underline underline-offset-2"
+                  />
+                </div>
+              </div>
+            );
+          })()
         )}
 
         {/* ── Error ── */}

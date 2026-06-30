@@ -25,6 +25,7 @@ Inert until corrections accumulate past MIN_CORRECTIONS, the note is generated
 import json
 import logging
 from datetime import datetime, timedelta
+from services.clock import utc_now_naive
 
 from sqlalchemy import select
 from google.genai import types
@@ -151,7 +152,7 @@ Return ONLY valid JSON:
 async def generate_calibration_note(platform: str, niche: str) -> dict:
     """Regenerate FROM SCRATCH each time (FIX hole #2 — never stack). Returns the note or
     raises ValueError if below floor (caller falls back to GLOBAL or skips)."""
-    cutoff = datetime.utcnow() - timedelta(days=RECENCY_WINDOW_DAYS)
+    cutoff = utc_now_naive() - timedelta(days=RECENCY_WINDOW_DAYS)
     async with AsyncSessionLocal() as db:
         stmt = select(UserAnalysis).where(
             UserAnalysis.platform == platform,

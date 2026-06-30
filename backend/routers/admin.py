@@ -3,6 +3,7 @@ import json
 import uuid
 import hmac
 from datetime import datetime, timedelta
+from services.clock import utc_now_naive
 from typing import Optional
 
 import httpx
@@ -37,13 +38,25 @@ def check_admin(x_admin_password: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or missing admin password")
 
 
+class CollectDueRequest(BaseModel):
+    # Daily batch size. The external scheduler (collect-outcomes.yml) and the
+    # in-process APScheduler both intend a full batch; the service clamps to 100.
+    limit: int = 100
+
+
 @router.post("/outcomes/collect-due")
 async def collect_due_outcome_jobs(
-    limit: int = 25,
+    req: CollectDueRequest = CollectDueRequest(),
     _: None = Depends(check_admin),
 ):
-    """Run due maturity jobs. Intended for a trusted external scheduler."""
-    return await collect_due_outcomes(limit)
+    """Run due maturity jobs. Intended for a trusted external scheduler.
+
+    ``limit`` is read from the JSON body so the GitHub Action's
+    ``-d '{"limit": 100}'`` is honoured. (It was previously a query param, so the
+    body was silently ignored and every run collected only the 25-job default —
+    surplus due jobs aged out past tolerance and were lost as "missed".)
+    """
+    return await collect_due_outcomes(req.limit)
 
 
 @router.get("/outcomes/status")
@@ -441,7 +454,7 @@ async def generate_insights(
 
     # Load safe corrections for this platform (all niches at once, filter in Python).
     # Same filtering rules as calibration.py: safe, un-nudged, thinking/deep, ≤120d.
-    corrections_cutoff = datetime.utcnow() - timedelta(days=120)
+    corrections_cutoff = utc_now_naive() - timedelta(days=120)
     corr_rows = (await db.execute(
         select(UserAnalysis).where(
             UserAnalysis.platform == platform,
@@ -494,7 +507,7 @@ async def generate_insights(
         if existing:
             existing.insight = insight_text
             existing.seed_count = len(seeds)
-            existing.generated_at = datetime.utcnow()
+            existing.generated_at = utc_now_naive()
         else:
             db.add(NicheInsight(
                 platform=platform,
@@ -591,7 +604,7 @@ async def generate_calibration(
         if existing:
             existing.note_json = json.dumps(note)
             existing.sample_count = note["sample_count"]
-            existing.generated_at = datetime.utcnow()
+            existing.generated_at = utc_now_naive()
         else:
             db.add(CalibrationNote(
                 platform=platform,
@@ -738,7 +751,7 @@ async def generate_trends(
             existing.trend_text = trend_text
             existing.recent_seed_count = recent_count
             existing.established_seed_count = established_count
-            existing.generated_at = datetime.utcnow()
+            existing.generated_at = utc_now_naive()
         else:
             db.add(TrendSummary(
                 platform=platform,
@@ -785,7 +798,7 @@ async def get_api_usage(
     _: None = Depends(check_admin),
 ):
     """Successful Instagram URL fetches this calendar month vs the 20/month free limit."""
-    now = datetime.utcnow()
+    now = utc_now_naive()
     month_start = datetime(now.year, now.month, 1)
     resets_at = (
         datetime(now.year + 1, 1, 1) if now.month == 12

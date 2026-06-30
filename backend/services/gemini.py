@@ -9,7 +9,13 @@ from google.genai.errors import ClientError as _GeminiClientError
 from services.niche_weights import NICHE_PROFILES, get_dimension_hierarchy_block, get_emotional_target_block
 from services.telemetry import record_usage_event, response_token_usage
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# http_options timeout (ms) caps any single Gemini call so a hung request can't
+# pin a worker forever — a timeout raises, which analyze_video catches and turns
+# into a clean "analysis failed" (status=error) instead of an indefinite hang.
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY"),
+    http_options=types.HttpOptions(timeout=120_000),
+)
 
 def _parse_json(text: str) -> any:
     """Parse JSON from Gemini, tolerating markdown code fences."""

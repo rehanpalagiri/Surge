@@ -14,3 +14,4 @@ passlib[bcrypt]
 PyJWT
 boto3
 apscheduler
+stripe

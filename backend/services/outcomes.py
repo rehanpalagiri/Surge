@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from models import AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot
+from services.clock import utc_now_naive  # re-exported; canonical home is services.clock
 
 
 _HORIZONS = (
@@ -20,11 +21,6 @@ _HORIZONS = (
     ("7d", 24 * 7, 24),
     ("30d", 24 * 30, 72),
 )
-
-
-def utc_now_naive() -> datetime:
-    """Return UTC without tzinfo, matching the existing DateTime columns."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def integrity_flags(

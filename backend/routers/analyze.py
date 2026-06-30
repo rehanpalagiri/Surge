@@ -25,13 +25,13 @@ from google.genai.errors import ClientError as _GeminiClientError
 from services.niche_classifier import classify_niche, _match_canonical
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
 from services.instagram_fetch import fetch_instagram_likes, is_instagram_url
-from services.rate_limit import get_rate_limit
+from services.rate_limit import get_rate_limit, MAX_BONUS
 from services.craft_insights import build_craft_insights
 from services.outcomes import (
     add_outcome_snapshot, post_id_from_url, schedule_outcome_jobs, sha256_file,
     upsert_artifact, utc_now_naive,
 )
-from services.throttle import check_rate
+from services.throttle import check_rate, client_ip
 from auth import optional_user, require_user, is_minor
 import services.r2 as r2
 
@@ -51,6 +51,11 @@ ALLOWED_CONTENT_TYPES = {
     "video/3gpp",                       # .3gp
 }
 MAX_ACTUAL_VIEWS = 500_000_000  # sanity ceiling for feedback (no real video tops this)
+# Caption/bio length caps. TikTok/Instagram captions top out ~2,200 chars; we cap
+# server-side so a direct API caller can't send a megabyte of text and blow up the
+# Gemini prompt (cost + latency + a prompt-injection surface). The UI also caps.
+MAX_CAPTION_CHARS = 2_200
+MAX_BIO_CHARS = 1_000
 REFRESH_COOLDOWN = timedelta(hours=24)  # min gap between video-link count refreshes
 
 logger = logging.getLogger(__name__)
@@ -68,6 +73,23 @@ def _prune_pending() -> None:
     stale = [k for k, (_, _, issued_at) in _pending_uploads.items() if issued_at < cutoff]
     for k in stale:
         del _pending_uploads[k]
+
+
+def _limit_message(rl: dict) -> str:
+    """Friendly 429 copy for a free user who hit the monthly cap, steering them
+    to Surge Pro (and the earn-by-linking bonus). Pro users never see this."""
+    limit = rl.get("effective_limit")
+    bonus_tip = (
+        " Link a posted video to earn +1 analysis."
+        if (rl.get("bonus") or 0) < MAX_BONUS else ""
+    )
+    resets = ""
+    if rl.get("resets_at"):
+        resets = f" Your free analyses reset on {str(rl['resets_at'])[:10]}."
+    return (
+        f"You've used all {limit} free analyses this month. "
+        f"Upgrade to Surge Pro for unlimited analyses.{bonus_tip}{resets}"
+    )
 
 
 def _title_from_caption(caption: str, max_words: int = 3) -> str:
@@ -128,10 +150,7 @@ async def get_upload_presigned_url(
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(optional_user),
 ):
-    requester_ip = (
-        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        or (request.client.host if request.client else "unknown")
-    )
+    requester_ip = client_ip(request)
     if user is None:
         if not check_rate(f"guest-upload-url:{requester_ip}", 10, 24 * 3600):
             raise HTTPException(
@@ -139,11 +158,12 @@ async def get_upload_presigned_url(
                 detail="Too many upload attempts. Sign up free to keep analyzing.",
             )
     else:
-        rl = await get_rate_limit(user.id, db)
+        rl = await get_rate_limit(user, db)
         if not rl["allowed"]:
             raise HTTPException(
                 status_code=429,
-                detail=f"Upload limit reached ({rl['effective_limit']} per {rl['window_hours']}h).",
+                detail=_limit_message(rl),
+                headers={"X-Upgrade-Available": "1"},
             )
     if not os.getenv("R2_ACCOUNT_ID"):
         raise HTTPException(status_code=503, detail="File upload service not configured.")
@@ -215,10 +235,17 @@ async def _run_r2_analysis(
                 row.niche = _display_niche(raw_niche, result, canonical_niche)
                 row.canonical_niche = _canonical_from_result(result, canonical_niche)
                 row.scores_json = json.dumps(result)
-                row.verdict = result.get("verdict", "Needs revision")
                 row.mode = effective_mode
-                row.status = "complete"
                 row.calibration_version = 0
+                # See the direct path: a non-429 Gemini failure returns an error
+                # dict (it doesn't raise), so flag it "error" rather than storing
+                # an all-zero scorecard as a successful, credit-consuming review.
+                if result.get("error"):
+                    row.verdict = "Error"
+                    row.status = "error"
+                else:
+                    row.verdict = result.get("verdict", "Needs revision")
+                    row.status = "complete"
                 await upsert_artifact(db, row.id, content_sha256=content_sha256)
                 await db.commit()
 
@@ -279,6 +306,9 @@ async def analyze(
     user: Optional[User] = Depends(optional_user),
 ):
     platform = platform.lower() if platform.lower() in ("tiktok", "instagram") else "tiktok"
+    # Cap untrusted free-text inputs before they reach storage or the Gemini prompt.
+    caption = (caption or "")[:MAX_CAPTION_CHARS]
+    bio = (bio or "")[:MAX_BIO_CHARS]
 
     has_file = bool(file and file.filename)
     has_url = bool(video_url.strip())
@@ -289,28 +319,21 @@ async def analyze(
     # Rate limits first — before any Gemini calls so we don't burn API quota
     # on requests we're going to reject anyway.
     if user is None:
-        ip = (
-            request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-            or (request.client.host if request.client else "unknown")
-        )
+        ip = client_ip(request)
         if not check_rate(f"guest:{ip}", 5, 24 * 3600):
             raise HTTPException(
                 status_code=429,
-                detail="You've used your 5 free analyses. Sign up free to get 10 analyses every 3 hours.",
+                detail="You've used your 5 free analyses. Sign up free to keep analyzing.",
             )
 
-    # Rate limit authenticated users (DB-backed, resets on a rolling window)
+    # Rate limit authenticated users: free = 3 analyses/month, Pro = unlimited.
     if user:
-        rl = await get_rate_limit(user.id, db)
+        rl = await get_rate_limit(user, db)
         if not rl["allowed"]:
-            bonus_tip = " Link a posted video to earn +1 credit." if rl["bonus"] < 10 else ""
             raise HTTPException(
                 status_code=429,
-                detail=(
-                    f"Upload limit reached ({rl['effective_limit']} per {rl['window_hours']}h)."
-                    f"{bonus_tip}"
-                    + (f" Resets at {rl['resets_at']}." if rl["resets_at"] else "")
-                ),
+                detail=_limit_message(rl),
+                headers={"X-Upgrade-Available": "1"},
             )
 
     # Niche: optional — empty input classifies to Uncategorized (generic rubric),
@@ -365,10 +388,7 @@ async def analyze(
             )
         _issued_user_id, _issued_ip, _ = _upload_entry
         _caller_user_id = user.id if user else None
-        _caller_ip = (
-            request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-            or (request.client.host if request.client else "unknown")
-        )
+        _caller_ip = client_ip(request)
         if _issued_user_id != _caller_user_id or (
             _caller_user_id is None and _issued_ip != _caller_ip
         ):
@@ -436,7 +456,7 @@ async def analyze(
         except (ValueError, Exception) as exc:
             raise HTTPException(status_code=400, detail=f"Could not fetch TikTok video: {exc}")
         if not caption and auto_caption:
-            caption = auto_caption
+            caption = (auto_caption or "")[:MAX_CAPTION_CHARS]
         # The caption may only now be available (auto-pulled from the TikTok URL),
         # so derive the title from it if we still don't have one.
         if not resolved_project_name:
@@ -516,8 +536,17 @@ async def analyze(
     analysis.niche = _display_niche(raw_niche, result, canonical_niche)
     analysis.canonical_niche = _canonical_from_result(result, canonical_niche)
     analysis.scores_json = json.dumps(result)
-    analysis.verdict = result.get("verdict", "Needs revision")
-    analysis.status = "complete"
+    # A non-429 Gemini failure (timeout, file-processing error, 5xx, bad JSON)
+    # comes back as an error dict with all-zero scores rather than raising. Mark
+    # it "error" so (a) the rate limiter doesn't charge the user a credit for a
+    # report they never really got, and (b) the results page shows the failure
+    # screen instead of a bogus 0/10-across-the-board scorecard.
+    if result.get("error"):
+        analysis.verdict = "Error"
+        analysis.status = "error"
+    else:
+        analysis.verdict = result.get("verdict", "Needs revision")
+        analysis.status = "complete"
     await upsert_artifact(db, analysis.id, content_sha256=content_sha256)
     await db.commit()
 
@@ -551,7 +580,7 @@ async def my_rate_limit(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
-    return await get_rate_limit(user.id, db)
+    return await get_rate_limit(user, db)
 
 
 @router.get("/me/craft-insights")
@@ -1047,6 +1076,10 @@ def _to_locked(analysis: UserAnalysis) -> dict:
             **dimension_scores,
             "verdict": scores.get("verdict", analysis.verdict),
             "first_improvement": first_improvement,
+            # Surface failures even in the locked/guest view so a guest whose
+            # analysis errored sees the "Analysis failed" screen instead of a
+            # locked card showing 0/10 across every dimension.
+            **({"error": scores["error"]} if scores.get("error") else {}),
             "locked": True,
         },
         "verdict": analysis.verdict,
