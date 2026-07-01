@@ -8,8 +8,11 @@ import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || "https://surge-chi-khaki.vercel.app";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://surge-chi-khaki.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: "Surge — AI Retention Craft Review",
   description:
     "Find attention risks in your TikTok or Instagram Reel before you post it.",
@@ -26,7 +29,7 @@ export const metadata: Metadata = {
     title: "Surge — Find retention risks before you post",
     description:
       "Review observable retention craft before posting, then track verified results at comparable post ages.",
-    url: "https://surge-chi-khaki.vercel.app",
+    url: SITE_URL,
     siteName: "Surge",
     type: "website",
   },

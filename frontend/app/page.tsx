@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, Target, LineChart, Zap } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
 import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
@@ -48,6 +48,7 @@ function formatBadRequestMessage(msg: string) {
 function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
   const router = useRouter();
 
+  const [platform, setPlatform] = useState<Platform>("tiktok");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -89,7 +90,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
       return;
     }
     setError("");
-    track("upload_started", { platform: "tiktok", niche_count: 0, logged_in: false });
+    track("upload_started", { platform, niche_count: 0, logged_in: false });
     setProcessing(true);
 
     try {
@@ -97,10 +98,10 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
       const { id } = await analyzeVideo(
         file,
         "",
-        "", "", "tiktok", "",
+        "", "", platform, "",
         "",
       );
-      track("analysis_complete", { platform: "tiktok", mode: "direct" });
+      track("analysis_complete", { platform, mode: "direct" });
       router.push(`/results/${id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -172,6 +173,11 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               </p>
             </div>
 
+            {/* ── Platform selector ── */}
+            <div className="flex justify-center">
+              <PlatformTabs value={platform} onChange={setPlatform} />
+            </div>
+
             {/* ── Input zone ── */}
             <form onSubmit={handleSubmit} className="space-y-4 text-left">
 
@@ -213,6 +219,35 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               </Link>
             </div>
 
+          </div>
+        </section>
+
+        {/* ── Feature row ── */}
+        <section className="border-t border-zinc-900 px-4 py-14 sm:py-20">
+          <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+            <div className="space-y-2">
+              <Target className="w-5 h-5 text-purple-400" />
+              <h3 className="text-white font-semibold text-base">Outcome-blind by design</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                We critique the craft, never fake a viral score.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <LineChart className="w-5 h-5 text-purple-400" />
+              <h3 className="text-white font-semibold text-base">Learn from every post</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Compare craft scores against your own verified results.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Zap className="w-5 h-5 text-purple-400" />
+              <h3 className="text-white font-semibold text-base">Private &amp; fast</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Your video is analyzed privately and not stored permanently.
+              </p>
+            </div>
           </div>
         </section>
 
