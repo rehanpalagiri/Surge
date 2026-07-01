@@ -49,11 +49,14 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_free_tier_is_three_per_month(self):
         now = utc_now_naive()
+        # Anchored to month_start rather than now-N-days: now-N-days would land in
+        # the previous calendar month on the 1st/2nd of any month.
+        month_start = _month_start(now)
         async with self.Session() as db:
             user = await self._user(db)
             db.add_all([
-                self._analysis(user.id, "complete", now - timedelta(days=1)),
-                self._analysis(user.id, "complete", now - timedelta(days=2)),
+                self._analysis(user.id, "complete", month_start + timedelta(hours=2)),
+                self._analysis(user.id, "complete", month_start + timedelta(hours=1)),
                 self._analysis(user.id, "error", now - timedelta(hours=1)),  # excluded
             ])
             await db.commit()
@@ -135,13 +138,16 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_verified_link_grants_bonus_credit(self):
         now = utc_now_naive()
+        # Anchored to month_start rather than now-1-day: now-1-day would land in
+        # the previous calendar month on the 1st of any month.
+        anchor = _month_start(now) + timedelta(hours=1)
         async with self.Session() as db:
             user = await self._user(db)
             # A verified linked post (url + counts_fetched_at) = +1 to the cap.
             db.add(self._analysis(
-                user.id, "complete", now - timedelta(days=1),
+                user.id, "complete", anchor,
                 video_url="https://www.tiktok.com/@x/video/123",
-                counts_fetched_at=now - timedelta(days=1),
+                counts_fetched_at=anchor,
             ))
             await db.commit()
             rl = await get_rate_limit(user, db)
