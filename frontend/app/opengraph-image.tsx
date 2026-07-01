@@ -29,7 +29,28 @@ export default function Image() {
         }}
       >
         {/* Icon */}
-        <div style={{ fontSize: 96 }}>🎬</div>
+        <div
+          style={{
+            width: 120,
+            height: 120,
+            borderRadius: 28,
+            background: "#7c3aed",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 68,
+              fontWeight: 800,
+              color: "#ffffff",
+              lineHeight: 1,
+            }}
+          >
+            S
+          </div>
+        </div>
 
         {/* Wordmark */}
         <div

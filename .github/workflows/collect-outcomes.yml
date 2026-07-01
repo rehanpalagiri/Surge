@@ -34,12 +34,20 @@ jobs:
           done
 
       - name: Collect due outcomes
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           # Capture body AND status so failures are loud and the run log shows
           # how many jobs were processed (the endpoint reads `limit` from the
           # JSON body — query params are ignored).
+          # ADMIN_PASSWORD is passed via `env:` rather than interpolated
+          # directly into this script: GitHub splices ${{ secrets.X }} into
+          # the script as literal text before bash runs it, so a password
+          # containing `$something` gets shell-expanded (usually to empty)
+          # instead of sent verbatim. Referencing $ADMIN_PASSWORD as a real
+          # env var avoids that.
           RESPONSE=$(curl -sS -w $'\n%{http_code}' -X POST \
-            -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
+            -H "X-Admin-Password: $ADMIN_PASSWORD" \
             -H "Content-Type: application/json" \
             -d '{"limit": ${{ github.event.inputs.limit || 100 }}}' \
             https://surge-production-8973.up.railway.app/api/admin/outcomes/collect-due)

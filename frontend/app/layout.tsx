@@ -23,6 +23,7 @@ export const metadata: Metadata = {
     title: "Surge",
   },
   icons: {
+    icon: [{ url: "/icon.png", sizes: "192x192", type: "image/png" }],
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {

@@ -94,7 +94,7 @@ function SignupForm() {
       }
       track("signup_complete", { from_results: !!extractAnalysisId(next) });
       // New accounts must confirm their email first. The verify page continues
-      // to `next` (or onboarding) once the 6-digit code checks out.
+      // to `next` (or /projects) once the 6-digit code checks out.
       const dest = next && next !== "/projects" ? next : "/projects";
       router.push(`/verify-email?next=${encodeURIComponent(dest)}`);
     } catch (err: unknown) {

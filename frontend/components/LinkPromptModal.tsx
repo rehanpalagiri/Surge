@@ -11,7 +11,7 @@ const LS_QUESTIONS_KEY = "viraliq_any_questions_shown";
 const SS_SESSION_KEY = "viraliq_session_active";
 
 // Pages where we never interrupt the user
-const AUTH_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password", "/onboarding"];
+const AUTH_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 type ModalState = "idle" | "link" | "questions" | "hidden";
 

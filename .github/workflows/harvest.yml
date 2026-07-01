@@ -30,11 +30,15 @@ jobs:
           done
 
       - name: Trigger harvest
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           # Capture body + status: the previous `curl -s` swallowed every error,
           # so a rejected trigger (bad admin password, 5xx) showed a green run.
+          # ADMIN_PASSWORD is passed via `env:` rather than interpolated
+          # directly into this script — see collect-outcomes.yml for why.
           RESPONSE=$(curl -sS -w $'\n%{http_code}' -X POST \
-            -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
+            -H "X-Admin-Password: $ADMIN_PASSWORD" \
             -H "Content-Type: application/json" \
             -d '{"min_views": ${{ github.event.inputs.min_views || 500000 }}, "max_per_niche": ${{ github.event.inputs.max_per_niche || 3 }}}' \
             https://surge-production-8973.up.railway.app/api/admin/harvest)
@@ -48,6 +52,8 @@ jobs:
           fi
 
       - name: Report harvest outcome
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           # Harvest runs in the background (the trigger only returns "started"),
           # so poll the status endpoint to surface the real counts in the run log
@@ -55,7 +61,7 @@ jobs:
           for i in $(seq 1 24); do
             sleep 10
             STATUS_JSON=$(curl -sS \
-              -H "X-Admin-Password: ${{ secrets.ADMIN_PASSWORD }}" \
+              -H "X-Admin-Password: $ADMIN_PASSWORD" \
               https://surge-production-8973.up.railway.app/api/admin/harvest/status)
             TIKTOK_STATUS=$(printf '%s' "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tiktok',{}).get('status','?'))" 2>/dev/null || echo "?")
             echo "[$i] tiktok harvest status: $TIKTOK_STATUS"

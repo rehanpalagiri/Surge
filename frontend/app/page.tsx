@@ -336,7 +336,7 @@ export default function Home() {
       {/* ── Hero ── */}
       <section className="flex flex-col items-center px-4 pt-10 pb-6 text-center">
         <h1 className="text-3xl font-bold text-white tracking-tight">
-          Analyze your next {PLATFORM_LABEL[platform]} video
+          Review your next {PLATFORM_LABEL[platform]} video
         </h1>
         <p className="text-zinc-400 text-sm mt-2">
           Find attention risks and one editing hypothesis to test in your next version.
