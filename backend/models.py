@@ -80,6 +80,11 @@ class User(Base):
     stripe_subscription_id = Column(String, nullable=True)
     subscription_status = Column(String, nullable=True)
     subscription_current_period_end = Column(DateTime, nullable=True)
+    # Session epoch for stateless-token invalidation. Incremented on password
+    # change/reset so any JWT minted before the change stops validating (a stolen
+    # token cannot outlive a credential reset) — see auth.create_access_token /
+    # auth.require_user. NOT NULL default 0; legacy tokens carry ver=0 and match.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, default=utc_now_naive)
 
 

@@ -4,14 +4,16 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getMe, verifyEmail, resendVerification, apiErrorDetail } from "@/lib/api";
-import { getToken, clearToken } from "@/lib/auth";
+import { getToken, clearToken, safeNext } from "@/lib/auth";
 import OtpInput from "@/components/OtpInput";
 
 function VerifyEmailInner() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next");
-  const dest = next && next.startsWith("/") ? next : "/projects";
+  // safeNext also rejects protocol-relative "//evil.com", which the old
+  // startsWith("/") check let through.
+  const dest = safeNext(next, "/projects");
 
   const [email, setEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");

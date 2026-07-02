@@ -310,7 +310,7 @@ export default function ResultsPage() {
           await new Promise((r) => setTimeout(r, delay));
           if (cancelled) return;
 
-          const { status: pollStatus } = await getAnalysisStatus(Number(id));
+          const { status: pollStatus } = await getAnalysisStatus(Number(id), token);
           if (pollStatus === "complete" || pollStatus === "error") {
             a = await getAnalysis(id, token);
             timedOut = false;

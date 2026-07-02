@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import PasswordInput from "@/components/PasswordInput";
-import { getToken, clearToken } from "@/lib/auth";
+import { getToken, clearToken, setToken } from "@/lib/auth";
 import { changeUsername, changePassword, deleteAccount, getConsent, updateConsent, ConsentStatus, getBillingStatus, createPortalSession, BillingStatus, apiErrorDetail } from "@/lib/api";
 import { SettingsPrivacySkeleton, SettingsSkeleton } from "@/components/Skeleton";
 import UpgradeButton from "@/components/UpgradeButton";
@@ -432,7 +432,10 @@ function ChangePasswordCard() {
     setLoading(true);
     setMsg(null);
     try {
-      await changePassword(currentPassword, newPassword);
+      const res = await changePassword(currentPassword, newPassword);
+      // The server rotated the session epoch (logging out other devices) and
+      // returned a fresh token for THIS device — swap it in so we stay signed in.
+      if (res.access_token) setToken(res.access_token);
       setMsg({ type: "ok", text: "Password updated successfully!" });
       setCurrentPassword("");
       setNewPassword("");

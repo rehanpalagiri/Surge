@@ -92,20 +92,26 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, token_version: int = 0) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
+        # Session epoch. Bumped on password change/reset so any token minted
+        # before the change stops validating (see require_user). Legacy tokens
+        # carry no "ver" claim and are treated as version 0.
+        "ver": int(token_version or 0),
         "iat": now,
         "exp": now + timedelta(days=TOKEN_TTL_DAYS),
     }
     return jwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> Optional[int]:
+def _decode_token(token: str) -> Optional[dict]:
+    """Verify signature + expiry with the algorithm pinned, and return the claims,
+    or None on any failure. An ``alg=none`` / wrong-algorithm / expired / tampered
+    token is rejected here."""
     try:
-        payload = jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
-        return int(payload["sub"])
+        return jwt.decode(token, _secret(), algorithms=[JWT_ALGORITHM])
     except Exception:
         return None
 
@@ -119,16 +125,36 @@ def _extract_token(authorization: Optional[str]) -> Optional[str]:
     return authorization.strip()
 
 
+def _token_matches_user(payload: dict, user: User) -> bool:
+    """The token's session epoch ("ver") must equal the user's current
+    token_version. A password change/reset increments token_version, which
+    invalidates every JWT issued before it."""
+    try:
+        return int(payload.get("ver", 0) or 0) == int(user.token_version or 0)
+    except (TypeError, ValueError):
+        return False
+
+
+async def _user_from_token(authorization: Optional[str], db: AsyncSession) -> Optional[User]:
+    token = _extract_token(authorization)
+    payload = _decode_token(token) if token else None
+    if not payload:
+        return None
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None or not _token_matches_user(payload, user):
+        return None
+    return user
+
+
 async def require_user(
     authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    token = _extract_token(authorization)
-    user_id = decode_access_token(token) if token else None
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await _user_from_token(authorization, db)
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
@@ -138,9 +164,4 @@ async def optional_user(
     authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
-    token = _extract_token(authorization)
-    user_id = decode_access_token(token) if token else None
-    if user_id is None:
-        return None
-    result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+    return await _user_from_token(authorization, db)

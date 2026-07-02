@@ -548,13 +548,13 @@ export async function changeUsername(
 export async function changePassword(
   currentPassword: string,
   newPassword: string
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; access_token?: string }> {
   const res = await fetch(`${BASE}/api/me/password`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
-  return handleResponse<{ ok: boolean }>(res);
+  return handleResponse<{ ok: boolean; access_token?: string }>(res);
 }
 
 export async function deleteAnalysis(
@@ -879,9 +879,13 @@ export async function analyzeFromR2(
 }
 
 export async function getAnalysisStatus(
-  id: number
+  id: number,
+  token?: string | null
 ): Promise<{ id: number; status: string }> {
-  const res = await fetch(`${BASE}/api/analyses/${id}/status`);
+  // Send auth when we have it: the status endpoint now returns 404 to non-owners
+  // of a claimed analysis, so an authenticated owner must identify themselves.
+  // Guests (no token) can still poll their own not-yet-claimed upload.
+  const res = await fetch(`${BASE}/api/analyses/${id}/status`, { headers: authHeaders(token) });
   return handleResponse<{ id: number; status: string }>(res);
 }
 

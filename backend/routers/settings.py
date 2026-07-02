@@ -5,11 +5,11 @@ from sqlalchemy import select, delete
 
 from database import get_db
 from models import (
-    AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot, PasswordResetToken,
-    UsageEvent, User, UserAnalysis, UserProfile,
+    AnalysisArtifact, EmailVerificationToken, OutcomeCollectionJob, OutcomeSnapshot,
+    PasswordResetToken, UsageEvent, User, UserAnalysis, UserProfile,
 )
 from schemas import ConsentIn
-from auth import require_user, hash_password, verify_password, is_minor
+from auth import require_user, hash_password, verify_password, is_minor, create_access_token
 
 router = APIRouter(prefix="/api/me", tags=["settings"])
 
@@ -63,8 +63,12 @@ async def change_password(
         raise HTTPException(status_code=401, detail="Incorrect current password.")
 
     user.password_hash = hash_password(body.new_password)
+    # Invalidate every OTHER session (bump the token epoch), then hand this device
+    # a fresh token so the user who just changed their password stays signed in.
+    user.token_version = (user.token_version or 0) + 1
     await db.commit()
-    return {"ok": True}
+    await db.refresh(user)
+    return {"ok": True, "access_token": create_access_token(user.id, user.token_version)}
 
 
 @router.get("/consent")
@@ -112,6 +116,11 @@ async def delete_account(
     # artifacts; it does not silently retain them as anonymous research data.
     analysis_ids = select(UserAnalysis.id).where(UserAnalysis.user_id == user.id)
     await db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    # Email-verification codes also FK to users.id (NOT NULL). Missing this delete
+    # made db.delete(user) raise a ForeignKeyViolation on Postgres — where FKs are
+    # enforced — so deletion failed and NO data was removed. (SQLite dev hid it:
+    # FK enforcement is off by default there.)
+    await db.execute(delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user.id))
     await db.execute(delete(UsageEvent).where(UsageEvent.analysis_id.in_(analysis_ids)))
     await db.execute(delete(OutcomeCollectionJob).where(OutcomeCollectionJob.analysis_id.in_(analysis_ids)))
     await db.execute(delete(OutcomeSnapshot).where(OutcomeSnapshot.analysis_id.in_(analysis_ids)))

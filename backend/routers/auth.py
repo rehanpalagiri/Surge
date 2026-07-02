@@ -43,6 +43,12 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Precomputed bcrypt hash used to equalize login timing when the submitted
+# identifier matches no account. Always running a real bcrypt verify (against this
+# throwaway hash when there's no user) keeps the not-found path the same cost as
+# the wrong-password path, so response time can't be used to enumerate accounts.
+_DUMMY_PW_HASH = hash_password("surge-login-timing-equalizer")
+
 # Per-email reset cap (persistent, via the token table's created_at): at most this
 # many reset emails per hour to one account — guards a victim's inbox + Brevo quota.
 _RESET_PER_EMAIL_HOUR = 3
@@ -130,7 +136,7 @@ async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: Async
     # is authenticated.
     code = await _issue_verification_code(user.id, db)
     background_tasks.add_task(_send_verification_email, user.email, user.username, code)
-    return TokenOut(access_token=create_access_token(user.id))
+    return TokenOut(access_token=create_access_token(user.id, user.token_version or 0))
 
 
 async def _issue_verification_code(user_id: int, db: AsyncSession) -> str:
@@ -172,9 +178,13 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
         )
     )
     user = result.scalar_one_or_none()
-    if not user or not verify_password(payload.password, user.password_hash):
+    # Constant-work verify: always run bcrypt (against a dummy hash when the account
+    # doesn't exist) so the not-found and wrong-password paths take the same time and
+    # can't be told apart to enumerate registered usernames/emails.
+    password_ok = verify_password(payload.password, user.password_hash if user else _DUMMY_PW_HASH)
+    if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid username or password")
-    return TokenOut(access_token=create_access_token(user.id))
+    return TokenOut(access_token=create_access_token(user.id, user.token_version or 0))
 
 
 @router.post("/google", response_model=TokenOut)
@@ -212,7 +222,7 @@ async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, 
     existing = await db.execute(select(User).where(func.lower(User.email) == email))
     user = existing.scalar_one_or_none()
     if user:
-        return TokenOut(access_token=create_access_token(user.id))
+        return TokenOut(access_token=create_access_token(user.id, user.token_version or 0))
 
     # New account. Enforce the 13+ age gate when a DOB was supplied (signup page);
     # leave it unset otherwise (is_minor treats unknown as adult — see note in PR).
@@ -254,7 +264,7 @@ async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, 
     await db.commit()
     await db.refresh(user)
     background_tasks.add_task(_send_welcome_email, user.email, user.username)
-    return TokenOut(access_token=create_access_token(user.id))
+    return TokenOut(access_token=create_access_token(user.id, user.token_version or 0))
 
 
 @router.get("/me", response_model=UserOut)
@@ -431,6 +441,9 @@ async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSe
         raise HTTPException(status_code=400, detail="User not found.")
 
     user.password_hash = hash_password(payload.new_password)
+    # Invalidate every JWT issued before this reset — if the account was
+    # compromised, the attacker's outstanding token stops working immediately.
+    user.token_version = (user.token_version or 0) + 1
     reset.used = True
     await db.commit()
 

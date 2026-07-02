@@ -7,6 +7,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.datastructures import MutableHeaders
 
 from database import engine
 from models import Base
@@ -187,6 +188,11 @@ async def _ensure_columns(conn):
     ):
         if col not in user_cols:
             await conn.exec_driver_sql(ddl)
+    # Session epoch for token invalidation on password change/reset.
+    if "token_version" not in user_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 async def _ensure_columns_pg(conn):
@@ -237,6 +243,8 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMP",
         "CREATE INDEX IF NOT EXISTS ix_users_stripe_customer_id ON users (stripe_customer_id)",
+        # Session epoch for token invalidation on password change/reset.
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS pending_seed_consent BOOLEAN DEFAULT FALSE",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'complete'",
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS correction_json TEXT",
@@ -307,6 +315,38 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
+class SecurityHeadersMiddleware:
+    """Attach defense-in-depth response headers on every request. Pure ASGI (no
+    per-request task wrapper, unlike BaseHTTPMiddleware) so it adds negligible
+    overhead and doesn't interfere with streaming or BackgroundTasks. Cheap + safe
+    for a JSON API: nosniff blocks content-type confusion, DENY blocks framing
+    (clickjacking), and the referrer policy avoids leaking full URLs cross-origin."""
+
+    _HEADERS = (
+        (b"x-content-type-options", b"nosniff"),
+        (b"x-frame-options", b"DENY"),
+        (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    )
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(raw=message.setdefault("headers", []))
+                for key, value in self._HEADERS:
+                    if key.decode() not in headers:
+                        headers.append(key.decode(), value.decode())
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
 app = FastAPI(title="Surge API", lifespan=lifespan)
 
 # Compress JSON/text responses on the wire. Analysis payloads (scores_json with
@@ -316,6 +356,10 @@ app = FastAPI(title="Surge API", lifespan=lifespan)
 # would cost more than it saves. Added BEFORE CORS so CORS stays the outermost
 # layer and still attaches its headers to the (now compressed) response.
 app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
+
+# Defense-in-depth security headers. Added between GZip and CORS so CORS remains
+# the outermost layer (its headers still attach and preflight is handled first).
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Comma-separated origins from env, e.g. "http://localhost:3000,https://viraliq.vercel.app"
 _origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")

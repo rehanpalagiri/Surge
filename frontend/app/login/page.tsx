@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login, claimAnalysis, getMe, googleAuth } from "@/lib/api";
-import { setToken } from "@/lib/auth";
+import { setToken, safeNext } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
 import GoogleSignInButton, { GOOGLE_ENABLED } from "@/components/GoogleSignInButton";
 
@@ -44,10 +44,10 @@ function LoginForm() {
       // Unverified accounts must confirm their email before continuing.
       const me = await getMe(access_token).catch(() => null);
       if (me && me.email_verified === false) {
-        router.push(`/verify-email?next=${encodeURIComponent(next || "/")}`);
+        router.push(`/verify-email?next=${encodeURIComponent(safeNext(next))}`);
         return;
       }
-      router.push(next || "/");
+      router.push(safeNext(next));
     } catch {
       setError("Invalid username or password.");
       setLoading(false);
@@ -64,7 +64,7 @@ function LoginForm() {
       if (id) {
         try { await claimAnalysis(id, access_token); } catch { /* non-fatal */ }
       }
-      router.push(next || "/");
+      router.push(safeNext(next));
     } catch {
       setError("Google sign-in failed. Please try again.");
       setLoading(false);

@@ -98,9 +98,6 @@ Your reader is another AI. Optimize for information density — every token must
 No prose filler. No hedging. State mechanisms directly.
 
 SUBJECT: {pname} video | Niche: {niche}
-Platform distribution: {ctx["algorithm"]}
-Key signals: {ctx["signals"]}
-{ctx["platform_tips"]}
 
 CRITICAL: You are shown ONLY the video. You have NO view counts, like counts, watch-time, or any
 performance data — and you must NOT guess or reference them. Score the CRAFT of what you observe on

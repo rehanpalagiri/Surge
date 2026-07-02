@@ -28,3 +28,15 @@ export function clearToken(): void {
 export function isLoggedIn(): boolean {
   return !!getToken();
 }
+
+/**
+ * Sanitize a `next` redirect target from the URL. Only same-origin RELATIVE
+ * paths are allowed, so a crafted `?next=https://evil.com` (or the protocol-
+ * relative `//evil.com` / `/\evil.com` variants) can't turn login/signup into an
+ * open redirect used for phishing. Anything else falls back to `fallback`.
+ */
+export function safeNext(next: string | null | undefined, fallback = "/"): string {
+  if (!next || !next.startsWith("/")) return fallback;      // must be relative
+  if (next.startsWith("//") || next.startsWith("/\\")) return fallback; // not protocol-relative
+  return next;
+}

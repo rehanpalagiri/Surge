@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signup, claimAnalysis, apiErrorDetail, googleAuth } from "@/lib/api";
-import { setToken } from "@/lib/auth";
+import { setToken, safeNext } from "@/lib/auth";
 import GoogleSignInButton, { GOOGLE_ENABLED } from "@/components/GoogleSignInButton";
 import PasswordInput from "@/components/PasswordInput";
 import { track } from "@vercel/analytics";
@@ -95,7 +95,7 @@ function SignupForm() {
       track("signup_complete", { from_results: !!extractAnalysisId(next) });
       // New accounts must confirm their email first. The verify page continues
       // to `next` (or /projects) once the 6-digit code checks out.
-      const dest = next && next !== "/projects" ? next : "/projects";
+      const dest = safeNext(next, "/projects");
       router.push(`/verify-email?next=${encodeURIComponent(dest)}`);
     } catch (err: unknown) {
       setError(apiErrorDetail(err, "Could not create your account. Please try again."));
@@ -124,7 +124,7 @@ function SignupForm() {
       }
       track("signup_complete", { from_results: !!extractAnalysisId(next), method: "google" });
       // Google verifies the email, so skip the code step.
-      const dest = next && next !== "/projects" ? next : "/projects";
+      const dest = safeNext(next, "/projects");
       router.push(dest);
     } catch (err: unknown) {
       setError(apiErrorDetail(err, "Google sign-in failed. Please try again."));

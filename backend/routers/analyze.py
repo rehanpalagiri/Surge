@@ -278,12 +278,21 @@ async def _run_r2_analysis(
 async def analysis_status(
     analysis_id: int,
     db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(optional_user),
 ):
     result = await db.execute(
-        select(UserAnalysis.id, UserAnalysis.status).where(UserAnalysis.id == analysis_id)
+        select(UserAnalysis.id, UserAnalysis.status, UserAnalysis.user_id).where(
+            UserAnalysis.id == analysis_id
+        )
     )
     row = result.first()
     if not row:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    # Visibility mirrors GET /analyses/{id}: the owner, or anyone while the analysis
+    # is still an unclaimed guest row (so the guest results page can poll its own
+    # in-flight upload). A logged-in stranger polling someone else's claimed
+    # analysis gets 404 — no cross-tenant status/existence oracle over sequential IDs.
+    if row.user_id is not None and (user is None or row.user_id != user.id):
         raise HTTPException(status_code=404, detail="Analysis not found")
     return {"id": row.id, "status": row.status or "complete"}
 
@@ -472,12 +481,25 @@ async def analyze(
         original_name = os.path.basename(file.filename or "upload")
         safe_name = f"{uuid.uuid4()}_{original_name}"
         file_path = os.path.join(uploads_dir, safe_name)
-        content = await file.read()
-        # Enforce size limit server-side (the 100MB UI check is bypassed by direct API calls)
-        if len(content) > MAX_FILE_BYTES:
-            raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB.")
-        with open(file_path, "wb") as fh:
-            fh.write(content)
+        # Stream to disk in bounded chunks and abort the moment the running total
+        # crosses the cap. Reading the whole body into one bytes object first (the
+        # old approach) let a direct API caller push a multi-GB upload and OOM the
+        # single worker — the size check only ran AFTER the allocation. Now peak
+        # memory is one chunk regardless of how large a body is sent.
+        size = 0
+        try:
+            with open(file_path, "wb") as fh:
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > MAX_FILE_BYTES:
+                        raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB.")
+                    fh.write(chunk)
+        except HTTPException:
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+            raise
 
     content_sha256 = sha256_file(file_path)
 
