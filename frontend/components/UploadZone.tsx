@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FileVideo2 } from "lucide-react";
+import { FileVideo2, Loader2 } from "lucide-react";
 import { getProfile, wakeBackend, getRateLimit, RateLimitStatus, getPresignedUploadUrl, uploadFileToR2, analyzeFromR2, getAnalysisStatus } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation";
@@ -419,7 +419,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         {/* ── Upload / Compression Zone ── */}
         {compressing ? (
           <div className="reactive-transfer-card min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
-            <div className="text-3xl">⚙️</div>
+            <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden="true" />
             <div className="space-y-1">
               <p className="text-text-primary font-semibold text-sm">Compressing your video...</p>
               <p className="text-text-muted text-xs">This may take 30–90 seconds — please keep this tab open</p>

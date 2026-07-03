@@ -338,13 +338,18 @@ function ChangeUsernameCard() {
           autoComplete="username"
           className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
         />
-        <PasswordInput
-          placeholder="Current password (to confirm)"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        <label className="block">
+          <span className="block text-text-muted text-xs font-medium mb-1.5">
+            Confirm with your password
+          </span>
+          <PasswordInput
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </label>
         <Link href="/forgot-password" className="block text-accent text-sm hover:underline">
           Forgot your password?
         </Link>

@@ -228,6 +228,9 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    // An older build persisted the admin password in localStorage — purge the
+    // stale plaintext credential wherever it still lingers.
+    try { localStorage.removeItem("viraliq_admin_pw"); } catch { /* ignore */ }
     const saved = sessionStorage.getItem("viraliq_admin_pw");
     if (saved) {
       setPassword(saved);

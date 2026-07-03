@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import { SearchX } from "lucide-react";
 import VerdictBanner from "@/components/VerdictBanner";
 import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
@@ -255,7 +256,7 @@ function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
 function ErrorScreen({ title, message }: { title: string; message: string }) {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 text-center gap-6">
-      <div className="text-5xl">😕</div>
+      <SearchX className="h-12 w-12 text-text-muted" aria-hidden="true" />
       <h1 className="text-2xl font-bold text-text-primary">{title}</h1>
       <p className="text-text-muted max-w-md">{message}</p>
       <Link
