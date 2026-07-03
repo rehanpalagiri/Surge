@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import { Link2 } from "lucide-react";
 import { getToken } from "@/lib/auth";
 import { getCraftInsights, CraftInsights } from "@/lib/api";
 
@@ -84,20 +85,69 @@ export default function InsightsPage() {
         </header>
 
         {verified === 0 ? (
-          /* ── Empty: drive the loop ── */
-          <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-4">
-            <div className="text-4xl">🔗</div>
-            <h2 className="text-text-primary font-semibold text-lg">Link a posted video to begin</h2>
-            <p className="text-text-muted text-sm max-w-md mx-auto leading-relaxed">
-              Once you link posts and their verified view/like counts, this page shows how your
-              craft scores relate to what actually happened — grounded in your real numbers, never a guess.
-              {data.total_analyses > 0 && (
-                <> You have <strong className="text-text-primary">{data.total_analyses}</strong> {data.total_analyses === 1 ? "analysis" : "analyses"} ready to link.</>
-              )}
-            </p>
-            <Link href="/projects" className="gradient-btn inline-block text-white font-semibold px-6 py-2.5 rounded-xl text-sm">
-              Go to my projects →
-            </Link>
+          /* ── Empty: ghost the real view so linking has a visible payoff ── */
+          <div className="relative">
+            <div className="space-y-6 blur-[3px] opacity-50 pointer-events-none select-none" aria-hidden="true">
+              <div className="bg-accent/5 border border-accent/30 rounded-2xl p-6 space-y-3">
+                <h2 className="text-text-primary font-semibold">What your posts tend to land</h2>
+                <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                  <div>
+                    <p className="text-3xl font-bold text-accent tabular-nums">4.1–6.8%</p>
+                    <p className="text-text-muted text-xs mt-1">middle 50% of your like rates</p>
+                  </div>
+                  <div className="text-sm text-text-muted">
+                    <p>median <span className="text-text-primary font-semibold tabular-nums">5.3%</span></p>
+                    <p>range <span className="text-text-primary tabular-nums">2.9–8.4%</span></p>
+                  </div>
+                </div>
+                <p className="text-text-muted text-xs">
+                  Empirical spread across your verified posts — historical context, not a target or a promise.
+                </p>
+              </div>
+              <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                <h2 className="text-text-primary font-semibold">Which craft dimensions track your results</h2>
+                <div className="space-y-3">
+                  {[
+                    { label: "Hook Velocity", high: "6.4%", low: "4.5%", delta: "1.9%", up: true },
+                    { label: "Ending Strength", high: "6.1%", low: "4.9%", delta: "1.2%", up: true },
+                    { label: "Text Scannability", high: "5.1%", low: "5.5%", delta: "0.4%", up: false },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0">
+                      <div>
+                        <p className="text-text-primary text-sm font-medium">{row.label}</p>
+                        <p className="text-text-muted text-xs">
+                          higher-scoring posts: <span className="text-text-primary tabular-nums">{row.high}</span>{" "}
+                          vs <span className="text-text-primary tabular-nums">{row.low}</span>
+                        </p>
+                      </div>
+                      <span className={`text-sm font-bold tabular-nums ${row.up ? "text-success" : "text-danger"}`}>
+                        {row.up ? "▲" : "▼"}{row.delta}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute inset-0 flex items-center justify-center px-4">
+              <div className="bg-card/95 backdrop-blur-sm border border-border rounded-2xl p-8 text-center space-y-4 max-w-md shadow-xl">
+                <Link2 className="h-8 w-8 mx-auto text-accent" aria-hidden="true" />
+                <h2 className="text-text-primary font-semibold text-lg">Link a posted video to begin</h2>
+                <p className="text-text-muted text-sm leading-relaxed">
+                  Once you link posts and their verified view/like counts, this page shows how your
+                  craft scores relate to what actually happened — grounded in your real numbers, never a guess.
+                  {data.total_analyses > 0 && (
+                    <> You have <strong className="text-text-primary">{data.total_analyses}</strong> {data.total_analyses === 1 ? "analysis" : "analyses"} ready to link.</>
+                  )}
+                </p>
+                <Link href="/projects" className="gradient-btn inline-block text-white font-semibold px-6 py-2.5 rounded-xl text-sm">
+                  Go to my projects →
+                </Link>
+                <p className="text-text-muted/70 text-[11px]">
+                  The blurred numbers behind this are examples — yours will be real.
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <>
