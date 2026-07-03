@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signup, claimAnalysis, apiErrorDetail, googleAuth } from "@/lib/api";
@@ -23,27 +23,49 @@ function SignupForm() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [birthday, setBirthday] = useState("");
+  const [bMonth, setBMonth] = useState("");
+  const [bDay, setBDay] = useState("");
+  const [bYear, setBYear] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleBirthdayChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
-    let formatted = digits;
-    if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    setBirthday(formatted);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
+
+  const dobComplete = bMonth.length >= 1 && bDay.length >= 1 && bYear.length === 4;
+
+  function digitSetter(
+    set: (v: string) => void,
+    max: number,
+    nextRef?: React.RefObject<HTMLInputElement | null>,
+  ) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, max);
+      set(digits);
+      if (digits.length === max) nextRef?.current?.focus();
+    };
   }
 
   function parseBirthday(): Date | null {
-    const parts = birthday.split("/");
-    if (parts.length !== 3) return null;
-    const [mm, dd, yyyy] = parts;
-    if (yyyy.length < 4) return null;
-    const d = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
-    if (isNaN(d.getTime()) || d.getMonth() !== parseInt(mm) - 1) return null;
+    if (!dobComplete) return null;
+    const mm = parseInt(bMonth, 10);
+    const dd = parseInt(bDay, 10);
+    const yyyy = parseInt(bYear, 10);
+    const d = new Date(yyyy, mm - 1, dd);
+    if (isNaN(d.getTime()) || d.getMonth() !== mm - 1 || d.getDate() !== dd) return null;
     return d;
+  }
+
+  function isoBirthday(): string {
+    return `${bYear}-${bMonth.padStart(2, "0")}-${bDay.padStart(2, "0")}`;
+  }
+
+  // Offer a starting username from the email — editable, never forced.
+  function suggestUsername() {
+    if (username.trim() || !email.includes("@")) return;
+    const local = email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 20);
+    if (local) setUsername(local);
   }
 
   function calcAge(bd: Date): number {
@@ -58,13 +80,21 @@ function SignupForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!email.trim() || !email.includes("@")) {
+      setError("Enter your email address.");
+      return;
+    }
+    if (!username.trim()) {
+      setError("Pick a username — we suggested one from your email.");
+      return;
+    }
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
     }
     const bd = parseBirthday();
     if (!bd || bd > new Date() || bd.getFullYear() < 1900) {
-      setError("Please enter a valid date of birth (MM/DD/YYYY).");
+      setError("Please enter a valid date of birth.");
       return;
     }
     if (calcAge(bd) < 13) {
@@ -77,8 +107,7 @@ function SignupForm() {
     }
     setLoading(true);
     setError("");
-    const [mm, dd, yyyy] = birthday.split("/");
-    const isoDate = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    const isoDate = isoBirthday();
     try {
       const { access_token } = await signup(email.trim(), username.trim(), password, isoDate);
       setToken(access_token);
@@ -111,8 +140,7 @@ function SignupForm() {
       setError("Enter your date of birth above first, then continue with Google.");
       return;
     }
-    const [mm, dd, yyyy] = birthday.split("/");
-    const isoDate = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    const isoDate = isoBirthday();
     setLoading(true);
     setError("");
     try {
@@ -146,12 +174,13 @@ function SignupForm() {
             Unlock your full improvement plan
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={suggestUsername}
             required
             autoComplete="email"
             className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
@@ -172,25 +201,59 @@ function SignupForm() {
             required
             autoComplete="new-password"
           />
-          <div>
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="Birthday (MM/DD/YYYY)"
-              value={birthday}
-              onChange={handleBirthdayChange}
-              required
-              maxLength={10}
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
-            />
-            {birthday.length === 10 && (() => {
+          <fieldset>
+            <legend className="text-text-muted text-xs font-medium mb-1.5">Date of birth</legend>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="MM"
+                aria-label="Birth month"
+                value={bMonth}
+                onChange={digitSetter(setBMonth, 2, dayRef)}
+                required
+                maxLength={2}
+                autoComplete="bday-month"
+                className="w-16 text-center bg-surface border border-border rounded-xl px-2 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+              />
+              <input
+                ref={dayRef}
+                type="text"
+                inputMode="numeric"
+                placeholder="DD"
+                aria-label="Birth day"
+                value={bDay}
+                onChange={digitSetter(setBDay, 2, yearRef)}
+                required
+                maxLength={2}
+                autoComplete="bday-day"
+                className="w-16 text-center bg-surface border border-border rounded-xl px-2 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+              />
+              <input
+                ref={yearRef}
+                type="text"
+                inputMode="numeric"
+                placeholder="YYYY"
+                aria-label="Birth year"
+                value={bYear}
+                onChange={digitSetter(setBYear, 4)}
+                required
+                maxLength={4}
+                autoComplete="bday-year"
+                className="flex-1 text-center bg-surface border border-border rounded-xl px-2 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+              />
+            </div>
+            {dobComplete && (() => {
               const bd = parseBirthday();
-              if (bd && calcAge(bd) < 13) {
+              if (!bd) {
+                return <p className="text-danger text-xs mt-1.5">That date doesn&apos;t exist — double-check it.</p>;
+              }
+              if (calcAge(bd) < 13) {
                 return <p className="text-danger text-xs mt-1.5">You must be 13 or older to use Surge.</p>;
               }
               return null;
             })()}
-          </div>
+          </fieldset>
           <label className="flex items-start gap-2.5 cursor-pointer">
             <input
               type="checkbox"
