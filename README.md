@@ -1,10 +1,10 @@
 # Surge
 
-Surge is an outcome-blind AI retention craft reviewer and post-experiment tracker for short-form video.
+Creators post a video, get a view count, and learn nothing. Was it the hook? The pacing? The caption? There's no way to isolate what actually moved the needle — so nobody actually improves, they just keep guessing.
 
-It reviews observable editing choices that help keep attention: hook, pacing, text, curiosity, audio/visual sync, and ending strength. Then it proposes one focused retention experiment for the creator's next post. If the creator links a published post, Surge stores timestamped public metrics separately at comparable 24-hour, 7-day, and 30-day windows.
+Surge turns every post into a controlled experiment. It reviews the editing choices that drive attention — hook, pacing, text, curiosity, audio/visual sync, ending strength — proposes **one** focused change to test next, then tracks the real public metrics of the post at fixed, comparable time windows (24h, 7d, 30d) so a creator can tell, with actual evidence, whether the change worked.
 
-Surge does **not** predict virality, retention, views, or likes. Its craft assessments are AI opinions, and its recommendations are hypotheses for future experiments—not causal prescriptions.
+It's a craft linter plus a split-testing tracker for short-form video — not a virality predictor. We think predicting views is a losing game (platforms are too noisy, too gameable); helping creators run a real feedback loop on their own craft is not.
 
 ## Product flow
 
@@ -68,7 +68,7 @@ npm run build
 
 TikWM and HikerAPI carry availability, rate-limit, schema-drift, pricing, legal/ToS, and platform-policy risk. Fields inferred from documentation but not seen in a local real payload are **documented but not runtime-verified**.
 
-`usage_events` records latency, payload bytes, tokens when available, success, and optional verified cost. The protected `/api/admin/operations/report` endpoint summarizes measured coverage and keeps unknown cost and margin fields explicitly null. Until production telemetry and contracted provider/model pricing are available, per-analysis cost, refresh cost, latency distribution, storage growth, and gross margin are unverified. Surge does not substitute invented round numbers for missing measurements; the calculation model is documented in [BLUEPRINT.md](BLUEPRINT.md).
+`usage_events` records latency, payload bytes, tokens when available, success, and optional verified cost. The protected `/api/admin/operations/report` endpoint summarizes measured coverage and keeps unknown cost and margin fields explicitly null. Until production telemetry and contracted provider/model pricing are available, per-analysis cost, refresh cost, latency distribution, storage growth, and gross margin are unverified. Surge does not substitute invented round numbers for missing measurements.
 
 ## Deployment
 
