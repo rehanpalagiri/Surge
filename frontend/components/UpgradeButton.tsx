@@ -45,7 +45,7 @@ export default function UpgradeButton({
       >
         {loading ? "Starting checkout…" : children ?? label}
       </button>
-      {error && <span className="text-red-400 text-[11px]">{error}</span>}
+      {error && <span className="text-danger text-[11px]">{error}</span>}
     </span>
   );
 }

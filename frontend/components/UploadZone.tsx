@@ -10,7 +10,6 @@ import { isAllowedVideoFile, uploadContentTypeFor } from "@/lib/videoValidation"
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { track } from "@vercel/analytics";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
-import UpgradeButton from "@/components/UpgradeButton";
 
 
 const TIPS = [
@@ -516,10 +515,12 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                       ? "Link a posted video to earn +1 analysis (up to +10)."
                       : `Free plan · resets ${resetLabel}.`}
                   </p>
-                  <UpgradeButton
-                    label="Go unlimited"
+                  <Link
+                    href="/pricing"
                     className="flex-shrink-0 text-accent hover:opacity-80 text-[11px] font-semibold underline underline-offset-2"
-                  />
+                  >
+                    Go unlimited
+                  </Link>
                 </div>
               </div>
             );

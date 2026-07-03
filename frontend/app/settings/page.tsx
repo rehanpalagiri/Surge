@@ -54,8 +54,30 @@ function BillingCard() {
     }
   }
 
-  // Until billing is configured (Stripe keys set), show nothing — no half-built UI.
-  if (!loaded || !status || !status.configured) return null;
+  if (!loaded || !status) return null;
+
+  // Billing not configured yet (Stripe keys unset): show the plan honestly
+  // and point at the pricing page instead of a dead checkout.
+  if (!status.configured) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-text-primary font-semibold text-lg">Plan</h2>
+            <p className="text-text-muted text-sm mt-0.5">
+              Free plan — 3 analyses a month, plus earn-by-linking bonuses.
+            </p>
+          </div>
+          <Link
+            href="/pricing"
+            className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-accent/50 transition-colors text-sm"
+          >
+            See plans →
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const renews = status.current_period_end
     ? new Date(status.current_period_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })

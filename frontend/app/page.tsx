@@ -256,6 +256,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
           <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-text-muted/80">
             <span>© {new Date().getFullYear()} Surge</span>
             <div className="flex gap-4">
+              <Link href="/pricing" className="hover:text-text-primary transition-colors">Pricing</Link>
               <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-text-primary transition-colors">Terms</Link>
             </div>
@@ -359,6 +360,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
           <span>© {new Date().getFullYear()} Surge</span>
           <div className="flex items-center gap-4">
+            <Link href="/pricing" className="hover:text-text-primary transition-colors">Pricing</Link>
             <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy Policy</Link>
             <Link href="/terms"   className="hover:text-text-primary transition-colors">Terms of Service</Link>
           </div>
