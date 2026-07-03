@@ -7,15 +7,10 @@ import Nav from "@/components/Nav";
 import { getMyAnalyses, deleteAnalysis, linkTikTokVideo, apiErrorDetail, AnalysisSummary } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ProjectsSkeleton } from "@/components/Skeleton";
+import { verdictDisplay } from "@/lib/verdicts";
 import PlatformTabs from "@/components/PlatformTabs";
 import { ArrowUpRight, CalendarDays, Link2, RefreshCw, Trash2, Video } from "lucide-react";
 import { createPortal } from "react-dom";
-
-function verdictColor(verdict: string): string {
-  if (verdict === "Strong craft" || verdict === "High potential") return "text-success";
-  if (verdict === "Developing craft" || verdict === "Average potential") return "text-warning";
-  return "text-danger";
-}
 
 function seededRand(seed: number): number {
   const x = Math.sin(seed + 1) * 10000;
@@ -513,8 +508,8 @@ function ProjectCard({
           )}
         </div>
         <div className="mb-1 flex items-center gap-3">
-          <p className={`text-sm font-medium ${verdictColor(a.verdict)}`}>
-            {a.verdict}
+          <p className={`text-sm font-medium ${verdictDisplay(a.verdict).textClass}`}>
+            {verdictDisplay(a.verdict).label}
           </p>
           {a.parent_id != null && (
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">Re-analyzed</span>

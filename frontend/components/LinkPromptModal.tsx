@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getToken } from "@/lib/auth";
+import { verdictDisplay } from "@/lib/verdicts";
 import { getMyAnalyses, AnalysisSummary } from "@/lib/api";
 
 const LS_PROMPT_KEY = "viraliq_link_prompt_shown";
@@ -80,6 +81,17 @@ export default function LinkPromptModal() {
     setState("hidden");
   }
 
+  // The "any questions?" toast is a nicety, not a task — dismiss itself
+  // after a few seconds instead of sitting over the page content.
+  useEffect(() => {
+    if (state !== "questions") return;
+    const timer = setTimeout(() => {
+      localStorage.setItem(LS_QUESTIONS_KEY, "1");
+      setState("hidden");
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [state]);
+
   if (state === "idle" || state === "hidden") return null;
 
   /* ─── "Any questions?" toast — bottom-right, subtle ─── */
@@ -150,15 +162,9 @@ export default function LinkPromptModal() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        a.verdict === "Strong craft" || a.verdict === "High potential"
-                          ? "bg-success/10 text-success"
-                          : a.verdict === "Developing craft" || a.verdict === "Average potential"
-                          ? "bg-warning/10 text-warning"
-                          : "bg-danger/10 text-danger"
-                      }`}
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${verdictDisplay(a.verdict).bannerClass} ${verdictDisplay(a.verdict).textClass}`}
                     >
-                      {a.verdict}
+                      {verdictDisplay(a.verdict).label}
                     </span>
                     <span className="text-text-muted text-xs">
                       {new Date(a.created_at).toLocaleDateString(undefined, {
