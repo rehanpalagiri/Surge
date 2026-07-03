@@ -443,13 +443,14 @@ export default function ResultsPage() {
     );
   }
 
+  const notApplicable = s.not_applicable ?? {};
   const scores = [
-    { label: "Hook Velocity",       score: s.hook_velocity },
-    { label: "Cut Frequency",       score: s.cut_frequency },
-    { label: "Text Scannability",   score: s.text_scannability },
-    { label: "Curiosity Gap",       score: s.curiosity_gap },
-    { label: "Audio-Visual Sync",   score: s.audio_visual_sync },
-    { label: "Ending Strength",     score: s.loop_seamlessness },
+    { label: "Hook Velocity",       score: s.hook_velocity,     naReason: notApplicable["hook_velocity"] },
+    { label: "Cut Frequency",       score: s.cut_frequency,     naReason: notApplicable["cut_frequency"] },
+    { label: "Text Scannability",   score: s.text_scannability, naReason: notApplicable["text_scannability"] },
+    { label: "Curiosity Gap",       score: s.curiosity_gap,     naReason: notApplicable["curiosity_gap"] },
+    { label: "Audio-Visual Sync",   score: s.audio_visual_sync, naReason: notApplicable["audio_visual_sync"] },
+    { label: "Ending Strength",     score: s.loop_seamlessness, naReason: notApplicable["loop_seamlessness"] },
   ];
   const _riskOrder = { high: 0, medium: 1, low: 2 } as const;
   const attentionRisks = Array.isArray(s.attention_risk_map)
@@ -509,6 +510,7 @@ export default function ResultsPage() {
                     key={sc.label}
                     label={sc.label}
                     score={sc.score}
+                    naReason={sc.naReason}
                     animate={true}
                     delay={i * 100}
                   />
@@ -590,6 +592,7 @@ export default function ResultsPage() {
                     key={sc.label}
                     label={sc.label}
                     score={sc.score}
+                    naReason={sc.naReason}
                     animate={true}
                     delay={i * 100}
                   />

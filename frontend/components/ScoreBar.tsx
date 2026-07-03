@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 
 interface ScoreBarProps {
   label: string;
-  score: number;   // 0–10
+  /** 0–10, or null when the review marked this dimension not applicable. */
+  score: number | null;
+  /** Why the dimension wasn't scored (deliberate format choice). */
+  naReason?: string;
   animate?: boolean;
   delay?: number;
 }
@@ -12,21 +15,40 @@ interface ScoreBarProps {
 export default function ScoreBar({
   label,
   score,
+  naReason,
   animate = true,
   delay = 0,
 }: ScoreBarProps) {
   const [displayed, setDisplayed] = useState(0);
+  const numeric = score ?? 0;
 
   useEffect(() => {
+    if (score == null) return;
     if (!animate) {
-      setDisplayed(score);
+      setDisplayed(numeric);
       return;
     }
     const timer = setTimeout(() => {
-      setDisplayed(score);
+      setDisplayed(numeric);
     }, delay);
     return () => clearTimeout(timer);
-  }, [score, animate, delay]);
+  }, [score, numeric, animate, delay]);
+
+  // Not scored — a deliberate format choice, not a failure. Render it calm.
+  if (score == null) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-text-muted font-medium">{label}</span>
+          <span className="text-sm font-semibold text-text-muted">n/a</span>
+        </div>
+        <div className="h-2.5 rounded-full border border-dashed border-border" />
+        <p className="text-xs text-text-muted/80">
+          Not scored{naReason ? ` — ${naReason}` : " — not applicable to this format"}
+        </p>
+      </div>
+    );
+  }
 
   const color =
     score >= 7

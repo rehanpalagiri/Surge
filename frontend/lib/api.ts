@@ -40,11 +40,15 @@ export interface AnalysisOut {
   scores_json: {
     overall_score?: number; // legacy analyses only; never shown as a performance metric
     hook_velocity: number;
-    cut_frequency: number;
-    text_scannability: number;
+    // cut_frequency / text_scannability may be null when the review marked the
+    // dimension not applicable (deliberate format choice, e.g. one-take video).
+    cut_frequency: number | null;
+    text_scannability: number | null;
     curiosity_gap: number;
     audio_visual_sync: number;
     loop_seamlessness: number;
+    // dimension key → ≤12-word reason ("one-take format — the shot is the format")
+    not_applicable?: Record<string, string>;
     strengths: string[];
     improvements: string[];
     verdict: string;
@@ -776,7 +780,8 @@ export interface CraftInsightPost {
   project_name: string | null;
   niche: string;
   created_at: string | null;
-  scores: Record<string, number>;
+  // A dimension is null when the review marked it not applicable.
+  scores: Record<string, number | null>;
   views: number;
   likes: number;
   like_rate: number; // observed likes/views, percent

@@ -70,14 +70,21 @@ def _median(vals: list[float]) -> float:
 
 
 def _craft_scores(scores_json: str) -> dict | None:
-    """Return the six numeric dimension scores, or None if any is missing."""
+    """Return the six dimension scores. A dimension the review marked
+    not_applicable (deliberate format choice, craft_review_version >= 4)
+    comes back as None; any other missing/invalid score voids the row."""
     try:
         data = json.loads(scores_json)
     except (ValueError, TypeError):
         return None
+    na = data.get("not_applicable")
+    na_keys = set(na) if isinstance(na, dict) else set()
     out = {}
     for key in DIMENSIONS:
         v = data.get(key)
+        if v is None and key in na_keys:
+            out[key] = None
+            continue
         if isinstance(v, bool) or not isinstance(v, (int, float)):
             return None
         out[key] = float(v)
@@ -175,9 +182,14 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
     patterns = []
     if n >= PATTERN_MIN:
         for dim in DIMENSIONS:
-            dim_median = _median([p["scores"][dim] for p in posts])
-            high = [p["like_rate"] for p in posts if p["scores"][dim] >= dim_median]
-            low = [p["like_rate"] for p in posts if p["scores"][dim] < dim_median]
+            # Not-applicable dimensions are unscored on some posts; the
+            # per-dimension sample-size floor applies to the scored subset.
+            scored = [p for p in posts if p["scores"][dim] is not None]
+            if len(scored) < PATTERN_MIN:
+                continue
+            dim_median = _median([p["scores"][dim] for p in scored])
+            high = [p["like_rate"] for p in scored if p["scores"][dim] >= dim_median]
+            low = [p["like_rate"] for p in scored if p["scores"][dim] < dim_median]
             # Need both sides populated to compare at all.
             if len(high) < 1 or len(low) < 1:
                 continue

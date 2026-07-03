@@ -45,6 +45,12 @@ _SCORE_KEYS = (
     "loop_seamlessness",
 )
 
+# Dimensions that may be marked not_applicable (deliberate format choices only:
+# one-take formats have no cuts; text-free-by-design formats have no captions).
+# Deliberately narrow — the frontend uses a null hook_velocity as its
+# "analysis still processing" signal, so core dimensions must stay numeric.
+_NA_ALLOWED_KEYS = frozenset({"cut_frequency", "text_scannability"})
+
 _SCORE_LABELS = {
     "hook_velocity": "Hook Velocity",
     "cut_frequency": "Cut Frequency",
@@ -134,20 +140,46 @@ def _validate_analysis_result(result) -> dict:
     """Enforce the public score contract; prompt instructions are not validation."""
     if not isinstance(result, dict):
         return _error_dict("Gemini returned a non-object analysis.")
+
+    # Per-dimension applicability: a dimension may be null ONLY when the model
+    # marked it not_applicable with a reason (a deliberate format choice, e.g.
+    # cut_frequency on a one-take video). Sanitize before score validation.
+    raw_na = result.get("not_applicable")
+    if not isinstance(raw_na, dict):
+        raw_na = {}
+    na = {
+        key: " ".join(str(reason).split())[:80]
+        for key, reason in raw_na.items()
+        if key in _NA_ALLOWED_KEYS and str(reason).strip()
+    }
+    # Overreach guard: half the rubric marked n/a is a scoring dodge, not a
+    # format call — ignore the field entirely and require numbers everywhere.
+    if len(na) > 2:
+        na = {}
+
+    cleaned_na = {}
     for key in _SCORE_KEYS:
         value = result.get(key)
+        if value is None and key in na:
+            cleaned_na[key] = na[key]
+            continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             return _error_dict(f"Gemini returned an invalid {key} score.")
         if value < 0 or value > 10:
             return _error_dict(f"Gemini returned an out-of-range {key} score.")
+    result["not_applicable"] = cleaned_na
 
-    scores = [float(result[key]) for key in _SCORE_KEYS]
+    # Verdict over applicable dimensions only, thresholds scaled to keep the
+    # same "4 of 6" proportion the six-dimension rubric uses.
+    applicable = [key for key in _SCORE_KEYS if key not in cleaned_na]
+    scores = [float(result[key]) for key in applicable]
+    needed = math.ceil(4 * len(scores) / 6)
     strong = sum(score >= 7 for score in scores)
     workable = sum(score >= 5 for score in scores)
     weak = sum(score < 4 for score in scores)
-    if strong >= 4 and weak == 0:
+    if strong >= needed and weak == 0:
         result["verdict"] = "Strong craft"
-    elif workable >= 4:
+    elif workable >= needed:
         result["verdict"] = "Developing craft"
     else:
         result["verdict"] = "Needs revision"
@@ -214,7 +246,7 @@ def _validate_analysis_result(result) -> dict:
         "what_misses": str(emotional.get("what_misses") or ""),
         "how_to_amplify": amplify,
     }
-    result["craft_review_version"] = 3
+    result["craft_review_version"] = 4
     result["evidence_notice"] = (
         "This is an AI assessment of observable craft and attention risk, not a measurement "
         "of this video's retention or a forecast of its views."
@@ -243,8 +275,11 @@ def _fallback_reasoning(perception: dict) -> dict:
         for key in _SCORE_KEYS
         if isinstance(perception.get(key), (int, float)) and not isinstance(perception.get(key), bool)
     }
-    ordered_low = sorted(_SCORE_KEYS, key=lambda k: scores.get(k, 10))
-    ordered_high = [k for k in sorted(_SCORE_KEYS, key=lambda k: scores.get(k, 0), reverse=True) if scores.get(k, 0) >= 7]
+    # Dimensions without a score (marked not_applicable by the perception pass)
+    # are deliberate format choices — never surface them as issues or strengths.
+    scored_keys = [key for key in _SCORE_KEYS if key in scores]
+    ordered_low = sorted(scored_keys, key=lambda k: scores.get(k, 10))
+    ordered_high = [k for k in sorted(scored_keys, key=lambda k: scores.get(k, 0), reverse=True) if scores.get(k, 0) >= 7]
     top_issue = ordered_low[0] if ordered_low else "hook_velocity"
     top_label = _SCORE_LABELS[top_issue]
     problem, fix, pattern = _FALLBACK_FIXES[top_issue]
@@ -359,6 +394,15 @@ For each dimension give one observable evidence note (≤20 words, NO advice):
 5. audio_visual_sync — do cuts land on beats/effects/speech emphasis? note random-feeling cuts.
 6. loop_seamlessness (ENDING STRENGTH) — does the ending earn the finish: a clear payoff, a call to action, or a seamless loop back to the opening? Or does it trail off / hard-cut "done"?
 
+APPLICABILITY — mark a dimension not_applicable ONLY when the format makes it meaningless
+AS A DELIBERATE CREATIVE CHOICE, never because execution is weak:
+- cut_frequency: single-take / one-shot formats where the unbroken shot IS the format.
+- text_scannability: formats that are text-free by design (pure aesthetic, ASMR, ambience)
+  — NOT videos that merely lack captions they would benefit from.
+Marking more than TWO dimensions not_applicable is always wrong. When unsure, SCORE IT.
+A not_applicable dimension gets null instead of a number, plus a ≤12-word reason naming
+the deliberate format choice (e.g. "one-take format — the continuous shot is the format").
+
 STEP 3 — SECTION OBSERVATIONS. For each of "0-2s", "2-5s", "middle", "ending/loop", write one
 observable note (≤20 words) of what LITERALLY happens and any visible attention risk. Do NOT
 assign risk levels or fixes — only observe.
@@ -378,11 +422,12 @@ Return ONLY valid JSON with exactly this structure and nothing else:
     "evidence": ["<observable reason>", "<observable reason>"]
   }},
   "hook_velocity": <0-10>,
-  "cut_frequency": <0-10>,
-  "text_scannability": <0-10>,
+  "cut_frequency": <0-10, or null when listed in not_applicable>,
+  "text_scannability": <0-10, or null when listed in not_applicable>,
   "curiosity_gap": <0-10>,
   "audio_visual_sync": <0-10>,
   "loop_seamlessness": <0-10>,
+  "not_applicable": {{"<dimension_key>": "<≤12-word deliberate-format reason>"}},
   "dimension_evidence": {{
     "hook_velocity": "<≤20 words, observable>",
     "cut_frequency": "<≤20 words>",
@@ -441,6 +486,10 @@ ground truth for what THIS video does:
 {emotional_block}
 
 FEEDBACK RULES — apply to every field:
+- not_applicable dimensions: any dimension listed under "not_applicable" in the observations
+  is a DELIBERATE format choice (e.g. a one-take video has no cuts by design). NEVER propose
+  a fix for it, never name it in improvement_plan, never treat its absence as a problem in
+  strengths, improvements, the summary, or the risk map.
 - strengths: find what the creator genuinely got right — name the dimension and say exactly
   what works. Every video has something worth calling out; if truly nothing stands out, ONE
   honest entry noting the most workable element.
@@ -513,6 +562,7 @@ def _merge_passes(perception: dict, reasoning: dict) -> dict:
         reasoning = _fallback_reasoning(perception)
     er = perception.get("emotional_read") or {}
     merged = {k: perception.get(k) for k in _SCORE_KEYS}
+    merged["not_applicable"] = perception.get("not_applicable")
     merged.update({
         "strengths": reasoning.get("strengths"),
         "improvements": reasoning.get("improvements"),

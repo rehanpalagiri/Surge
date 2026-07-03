@@ -188,10 +188,14 @@ export default function InsightsPage() {
                       </td>
                       {DIMENSION_ORDER.map(([key]) => {
                         const v = post.scores[key];
-                        const color = v >= 7 ? "text-success" : v >= 4 ? "text-warning" : "text-danger";
+                        const color =
+                          v == null ? "text-text-muted"
+                          : v >= 7 ? "text-success"
+                          : v >= 4 ? "text-warning"
+                          : "text-danger";
                         return (
                           <td key={key} className={`text-center px-1.5 tabular-nums ${color}`}>
-                            {v?.toFixed?.(0) ?? "—"}
+                            {v != null ? v.toFixed(0) : "—"}
                           </td>
                         );
                       })}
