@@ -8,9 +8,7 @@ export const alt = "Surge — AI-assisted retention craft review";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://surge-chi-khaki.vercel.app";
-const SITE_HOST = new URL(SITE_URL).host;
+import { SITE_HOST } from "@/lib/site";
 
 export default function Image() {
   return new ImageResponse(

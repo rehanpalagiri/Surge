@@ -19,8 +19,7 @@ const fraunces = Fraunces({
   variable: "--font-display",
 });
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://surge-chi-khaki.vercel.app";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

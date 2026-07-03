@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://surge-chi-khaki.vercel.app";
+import { SITE_URL } from "@/lib/site";
 
 const PUBLIC_ROUTES = ["/", "/sample", "/login", "/signup", "/terms", "/privacy"];
 

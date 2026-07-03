@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SITE_URL, SITE_HOST } from "@/lib/site";
 
 export const metadata = { title: "Terms of Service — Surge" };
 
@@ -70,7 +71,7 @@ export default function TermsPage() {
 
         <Section number="Section 1" title="Acceptance of Terms">
           <p>
-            By accessing or using Surge at withsurge.com (the &quot;Service&quot;), creating an account, uploading
+            By accessing or using Surge at {SITE_HOST} (the &quot;Service&quot;), creating an account, uploading
             content, or clicking any &quot;I agree&quot; button, you agree to be legally bound by these Terms of
             Service (&quot;Terms&quot;). If you do not agree to all of these Terms, you may not access or use the Service.
           </p>
@@ -657,12 +658,12 @@ export default function TermsPage() {
             </a><br />
             Website:{" "}
             <a
-              href="https://withsurge.com"
+              href={SITE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-accent hover:underline"
             >
-              withsurge.com
+              {SITE_HOST}
             </a>
           </p>
           <p>

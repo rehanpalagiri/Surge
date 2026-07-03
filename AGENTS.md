@@ -103,7 +103,7 @@ New tables are created by `create_all`. Existing-column additions require model 
 - `components/ReactiveVideoDropzone.tsx`: shared guest/authenticated upload target with pointer spotlight, drag state, validated-file state, keyboard operation, and matching transfer progress styling from `app/globals.css`.
 - `components/NichePicker.tsx`: optional rubric hint picker; never make it required in the main upload flow.
 
-Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `useSearchParams`, and auth state. The theme is dark-only. PWA assets are under `frontend/public`.
+Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `useSearchParams`, and auth state. The theme is dark-only ("Cutting Room": warm ink black, paper-white type, single timecode-amber accent — all via CSS tokens in `app/globals.css`; no gradients; verdict display labels/colors come from `lib/verdicts.ts`). PWA assets are under `frontend/public`.
 
 ## Security, privacy, and reliability
 
@@ -128,7 +128,7 @@ Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `us
 
 ## Legal documents
 
-The Terms of Service lives at `frontend/app/terms/page.tsx`. If the website URL ever changes from `withsurge.com`, update every occurrence of `withsurge.com` in that file to match the new URL.
+The Terms of Service lives at `frontend/app/terms/page.tsx`. The site URL is env-driven: every consumer (ToS, metadata, OG image, robots, sitemap) reads `SITE_URL`/`SITE_HOST` from `frontend/lib/site.ts`, which falls back to the Vercel URL. When a custom domain goes live, set `NEXT_PUBLIC_SITE_URL` in Vercel (and `FRONTEND_URL`/`ALLOWED_ORIGINS` in Railway) — no code edits needed.
 
 ## Deploy discipline
 
