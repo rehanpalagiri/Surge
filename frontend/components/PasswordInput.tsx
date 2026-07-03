@@ -14,7 +14,7 @@ interface Props {
 }
 
 const DEFAULT_CLASS =
-  "w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to";
+  "w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent";
 
 export default function PasswordInput({
   value,

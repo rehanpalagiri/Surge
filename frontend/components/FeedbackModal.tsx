@@ -129,7 +129,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
               placeholder="https://www.instagram.com/reel/…"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
             <button
               type="submit"
@@ -158,7 +158,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
               placeholder="https://www.tiktok.com/@you/video/…"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
             <button
               type="submit"
@@ -185,12 +185,12 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
             placeholder={isTikTok ? "Optional TikTok link for later refreshes" : "Optional Instagram Reel link for later refreshes"}
             value={link}
             onChange={(e) => setLink(e.target.value)}
-            className="bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+            className="bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
           <select
             value={captureAge}
             onChange={(e) => setCaptureAge(e.target.value)}
-            className="bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
+            className="bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent"
             required
           >
             <option value="">When were these stats captured?</option>
@@ -206,7 +206,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
                 placeholder="Views (e.g. 15000)"
                 value={views}
                 onChange={(e) => setViews(e.target.value)}
-                className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+                className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               />
             )}
             <input
@@ -215,7 +215,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
               placeholder={isTikTok ? "Likes (optional)" : "Likes"}
               value={likes}
               onChange={(e) => setLikes(e.target.value)}
-              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to focus:ring-1 focus:ring-purple-to"
+              className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </div>
           <button

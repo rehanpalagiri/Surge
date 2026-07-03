@@ -71,9 +71,9 @@ export default function SamplePage() {
       <Nav />
 
       {/* Sample banner */}
-      <div className="bg-purple-from/10 border-b border-purple-to/20 px-4 py-3 text-center text-sm text-text-muted">
+      <div className="bg-accent/10 border-b border-accent/20 px-4 py-3 text-center text-sm text-text-muted">
         This is a <span className="text-text-primary font-semibold">sample report</span> — the real thing is generated from your actual video.{" "}
-        <Link href="/" className="text-purple-to hover:underline font-medium">
+        <Link href="/" className="text-accent hover:underline font-medium">
           Try it with your video →
         </Link>
       </div>
@@ -157,7 +157,7 @@ export default function SamplePage() {
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-surface rounded-xl p-3"><p className="text-text-primary font-bold">18,420</p><p className="text-text-muted text-xs">views</p></div>
             <div className="bg-surface rounded-xl p-3"><p className="text-text-primary font-bold">1,326</p><p className="text-text-muted text-xs">likes</p></div>
-            <div className="bg-surface rounded-xl p-3"><p className="text-purple-to font-bold">7.20%</p><p className="text-text-muted text-xs">observed like rate</p></div>
+            <div className="bg-surface rounded-xl p-3"><p className="text-accent font-bold">7.20%</p><p className="text-text-muted text-xs">observed like rate</p></div>
           </div>
           <p className="text-text-muted text-xs">This difference is observational. It does not prove that a recommended edit caused the result.</p>
         </div>
@@ -187,7 +187,7 @@ export default function SamplePage() {
             </Link>
             <p className="text-text-muted/50 text-xs">
               Already have an account?{" "}
-              <Link href="/login" className="text-purple-to hover:underline">
+              <Link href="/login" className="text-accent hover:underline">
                 Log in
               </Link>
             </p>

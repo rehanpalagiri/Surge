@@ -172,7 +172,7 @@ export default function TermsPage() {
             </li>
             <li>
               Notify us immediately at{" "}
-              <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+              <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
                 surgeprivacy@gmail.com
               </a>{" "}
               if you suspect unauthorized access to your account.
@@ -256,7 +256,7 @@ export default function TermsPage() {
           <p>
             You may delete your account at any time, which will remove all stored User Content data associated with
             your account. See our{" "}
-            <Link href="/privacy" className="text-purple-to hover:underline">Privacy Policy</Link> for details.
+            <Link href="/privacy" className="text-accent hover:underline">Privacy Policy</Link> for details.
           </p>
         </Section>
 
@@ -405,7 +405,7 @@ export default function TermsPage() {
                 href="https://policies.google.com/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-purple-to hover:underline"
+                className="text-accent hover:underline"
               >
                 policies.google.com/privacy
               </a>.
@@ -442,7 +442,7 @@ export default function TermsPage() {
           <p>
             <span className="text-text-primary font-medium">DMCA Notice:</span> If you believe that content on the
             Service infringes your copyright, please send a notice to{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>{" "}
             containing: (a) your contact information; (b) identification of the copyrighted work claimed to be
@@ -521,7 +521,7 @@ export default function TermsPage() {
           <p>
             <span className="text-text-primary font-medium">Termination by you:</span> You may stop using the
             Service at any time and may request deletion of your account by emailing{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>. Upon account deletion, we will remove your account data in accordance with our Privacy Policy.
           </p>
@@ -549,7 +549,7 @@ export default function TermsPage() {
           <p>
             <span className="text-text-primary font-medium">Informal resolution:</span> Before filing any formal
             legal claim, you agree to first contact us at{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>{" "}
             with a written description of your dispute. We will attempt to resolve it informally within 30 days.
@@ -578,7 +578,7 @@ export default function TermsPage() {
           <p>
             <span className="text-text-primary font-medium">Opt-out:</span> You may opt out of the arbitration
             agreement within 30 days of first agreeing to these Terms by emailing{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>{" "}
             with the subject line &quot;Arbitration Opt-Out&quot; and your name and account email address.
@@ -631,7 +631,7 @@ export default function TermsPage() {
             <li>
               <span className="text-text-primary font-medium">Notices:</span> Notices to Surge must be sent by email
               to{" "}
-              <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+              <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
                 surgeprivacy@gmail.com
               </a>. We may give notice to you via email to the address associated with your account or via a
               prominent notice on the Service.
@@ -652,7 +652,7 @@ export default function TermsPage() {
           <p className="text-text-primary">
             Surge<br />
             Email:{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a><br />
             Website:{" "}
@@ -660,14 +660,14 @@ export default function TermsPage() {
               href="https://withsurge.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-purple-to hover:underline"
+              className="text-accent hover:underline"
             >
               withsurge.com
             </a>
           </p>
           <p>
             For privacy-specific requests (data access, deletion, CCPA), please reference our{" "}
-            <Link href="/privacy" className="text-purple-to hover:underline">Privacy Policy</Link>.
+            <Link href="/privacy" className="text-accent hover:underline">Privacy Policy</Link>.
           </p>
         </Section>
 
@@ -675,7 +675,7 @@ export default function TermsPage() {
           <p>Surge Terms of Service &nbsp;·&nbsp; Effective June 26, 2026</p>
           <p>
             See also our{" "}
-            <Link href="/privacy" className="text-purple-to hover:underline">Privacy Policy</Link>.
+            <Link href="/privacy" className="text-accent hover:underline">Privacy Policy</Link>.
           </p>
         </div>
       </div>

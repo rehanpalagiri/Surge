@@ -15,15 +15,15 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4 text-center">
-      <Link href="/" className="font-extrabold text-xl text-purple-500 tracking-tight mb-12">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
+      <Link href="/" className="font-extrabold text-xl text-text-primary tracking-tight mb-12 font-display">
         Surge
       </Link>
 
-      <h1 className="mt-4 text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+      <h1 className="mt-4 text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
         Something went wrong
       </h1>
-      <p className="mt-3 text-zinc-400 max-w-sm">
+      <p className="mt-3 text-text-muted max-w-sm">
         An unexpected error occurred. You can try again or head back home.
       </p>
 
@@ -36,7 +36,7 @@ export default function Error({
         </button>
         <Link
           href="/"
-          className="text-zinc-400 hover:text-white font-semibold px-6 py-3 rounded-2xl transition-colors"
+          className="text-text-muted hover:text-text-primary font-semibold px-6 py-3 rounded-2xl transition-colors"
         >
           Back to home
         </Link>

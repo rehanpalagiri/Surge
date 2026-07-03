@@ -126,7 +126,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
         tabIndex={0}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
-        className="w-full flex items-center gap-2 min-h-[48px] bg-surface border border-border rounded-xl px-3 py-2 cursor-pointer hover:border-purple-to/50 focus:outline-none focus:border-purple-to transition-colors"
+        className="w-full flex items-center gap-2 min-h-[48px] bg-surface border border-border rounded-xl px-3 py-2 cursor-pointer hover:border-accent/50 focus:outline-none focus:border-accent transition-colors"
       >
         <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
           {selected.length === 0 ? (
@@ -137,13 +137,13 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                 key={n}
                 className={`inline-flex items-center gap-1.5 text-xs font-medium pl-1.5 pr-1 py-1 rounded-full ${
                   i === 0
-                    ? "bg-purple-from/30 border border-purple-to/60 text-text-primary"
+                    ? "bg-accent/30 border border-accent/60 text-text-primary"
                     : "bg-card border border-border text-text-primary"
                 }`}
               >
                 <span
                   className={`flex items-center justify-center px-1.5 h-4 rounded-full text-[9px] font-bold uppercase tracking-wide ${
-                    i === 0 ? "bg-purple-from text-white" : "bg-border text-text-primary"
+                    i === 0 ? "bg-accent text-white" : "bg-border text-text-primary"
                   }`}
                 >
                   {i === 0 ? "Primary" : "2nd"}
@@ -198,7 +198,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                     onClick={() => toggle(n)}
                     className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                       sel
-                        ? "text-purple-to bg-purple-from/10"
+                        ? "text-accent bg-accent/10"
                         : disabled
                         ? "text-text-muted/50 cursor-not-allowed"
                         : highlighted
@@ -207,7 +207,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                     }`}
                   >
                     {n}
-                    {sel && <Check className="w-4 h-4 text-purple-to shrink-0" />}
+                    {sel && <Check className="w-4 h-4 text-accent shrink-0" />}
                   </button>
                 );
               })}
@@ -225,7 +225,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
                       : "text-text-primary hover:bg-surface"
                   }`}
                 >
-                  Use &ldquo;<span className="text-purple-to font-medium">{query.trim()}</span>&rdquo;
+                  Use &ldquo;<span className="text-accent font-medium">{query.trim()}</span>&rdquo;
                 </button>
               )}
               {filtered.length === 0 && !q && (
@@ -243,7 +243,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
 
       {selected.length === 1 && (
         <p className="text-[11px] text-text-muted">
-          <span className="text-purple-to font-medium">{selected[0]}</span> is the{" "}
+          <span className="text-accent font-medium">{selected[0]}</span> is the{" "}
           <span className="text-text-muted">primary</span> hint. Add a 2nd for a blend.
         </p>
       )}
@@ -251,13 +251,13 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
       {selected.length === 2 && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-text-muted">
-            <span className="text-purple-to font-medium">{selected[0]}</span> leads the review ·{" "}
+            <span className="text-accent font-medium">{selected[0]}</span> leads the review ·{" "}
             <span className="text-text-muted font-medium">{selected[1]}</span> adds nuance
           </p>
           <button
             type="button"
             onClick={swap}
-            className="shrink-0 text-[11px] font-medium text-text-muted hover:text-purple-to transition-colors"
+            className="shrink-0 text-[11px] font-medium text-text-muted hover:text-accent transition-colors"
           >
             ⇄ Swap primary
           </button>

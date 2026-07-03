@@ -37,16 +37,16 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
   }, [menuOpen]);
 
   return (
-    <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-20">
+    <nav className="border-b border-border bg-background/85 backdrop-blur-sm sticky top-0 z-20">
       <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
 
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="font-bold text-xl text-purple-500 tracking-tight">
+          <Link href="/" className="font-bold text-xl text-text-primary tracking-tight font-display">
             Surge
           </Link>
           {subtitle && (
-            <span className="text-zinc-500 text-sm capitalize">{subtitle}</span>
+            <span className="text-text-muted text-sm capitalize">{subtitle}</span>
           )}
         </div>
 
@@ -60,14 +60,14 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             </div>
           ) : loggedIn ? (
             <>
-              <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Dashboard</Link>
-              <Link href="/projects" className="text-zinc-400 hover:text-white transition-colors">Projects</Link>
-              <Link href="/insights" className="text-zinc-400 hover:text-white transition-colors">Insights</Link>
-              <Link href="/settings" className="text-zinc-400 hover:text-white transition-colors">Settings</Link>
+              <Link href="/" className="text-text-muted hover:text-text-primary transition-colors">Dashboard</Link>
+              <Link href="/projects" className="text-text-muted hover:text-text-primary transition-colors">Projects</Link>
+              <Link href="/insights" className="text-text-muted hover:text-text-primary transition-colors">Insights</Link>
+              <Link href="/settings" className="text-text-muted hover:text-text-primary transition-colors">Settings</Link>
             </>
           ) : (
             <>
-              <Link href="/login"  className="text-zinc-400 hover:text-white transition-colors">Log in</Link>
+              <Link href="/login"  className="text-text-muted hover:text-text-primary transition-colors">Log in</Link>
               <Link href="/signup" className="gradient-btn text-white font-semibold px-4 py-1.5 rounded-lg">Sign up</Link>
             </>
           )}
@@ -79,26 +79,26 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             onClick={() => setMenuOpen((o) => !o)}
             disabled={loggedIn === null}
             aria-label="Toggle menu"
-            className="flex flex-col justify-center items-center gap-[5px] w-9 h-9 rounded-lg hover:bg-zinc-800 transition-colors"
+            className="flex flex-col justify-center items-center gap-[5px] w-9 h-9 rounded-lg hover:bg-surface transition-colors"
           >
-            <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${menuOpen ? "rotate-45 translate-y-[7px]" : ""}`} />
-            <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${menuOpen ? "opacity-0" : ""}`} />
-            <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${menuOpen ? "-rotate-45 -translate-y-[7px]" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-text-primary transition-all duration-200 ${menuOpen ? "rotate-45 translate-y-[7px]" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-text-primary transition-all duration-200 ${menuOpen ? "opacity-0" : ""}`} />
+            <span className={`block w-5 h-0.5 bg-text-primary transition-all duration-200 ${menuOpen ? "-rotate-45 -translate-y-[7px]" : ""}`} />
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-12 w-52 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl py-2 flex flex-col text-sm z-50">
+            <div className="absolute right-0 top-12 w-52 bg-card border border-border rounded-2xl shadow-xl py-2 flex flex-col text-sm z-50">
               {loggedIn ? (
                 <>
-                  <Link href="/" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Dashboard</Link>
-                  <Link href="/projects" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Projects</Link>
-                  <Link href="/insights" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Insights</Link>
-                  <Link href="/settings" className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Settings</Link>
+                  <Link href="/" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Dashboard</Link>
+                  <Link href="/projects" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Projects</Link>
+                  <Link href="/insights" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Insights</Link>
+                  <Link href="/settings" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Settings</Link>
                 </>
               ) : (
                 <>
-                  <Link href="/login"  className="px-4 py-3 text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors">Log in</Link>
-                  <Link href="/signup" className="px-4 py-3 text-white font-semibold hover:bg-zinc-800/60 transition-colors">Sign up free</Link>
+                  <Link href="/login"  className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Log in</Link>
+                  <Link href="/signup" className="px-4 py-3 text-text-primary font-semibold hover:bg-surface transition-colors">Sign up free</Link>
                 </>
               )}
             </div>

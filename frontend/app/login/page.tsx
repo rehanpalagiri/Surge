@@ -89,7 +89,7 @@ function LoginForm() {
             onChange={(e) => setUsername(e.target.value)}
             required
             autoComplete="username"
-            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
           />
           <PasswordInput
             placeholder="Password"
@@ -123,13 +123,13 @@ function LoginForm() {
             No account?{" "}
             <Link
               href={`/signup${next ? `?next=${encodeURIComponent(next)}` : ""}`}
-              className="text-purple-to hover:underline"
+              className="text-accent hover:underline"
             >
               Sign up free
             </Link>
           </p>
           <p>
-            <Link href="/forgot-password" className="text-purple-to hover:underline transition-colors">
+            <Link href="/forgot-password" className="text-accent hover:underline transition-colors">
               Forgot your password?
             </Link>
           </p>

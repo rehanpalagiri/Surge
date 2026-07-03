@@ -68,7 +68,7 @@ export default function OtpInput({ value, onChange }: { value: string; onChange:
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}
-          className="w-10 h-14 bg-transparent border-b-2 border-text-primary text-text-primary text-3xl font-bold text-center focus:outline-none focus:border-purple-to caret-transparent"
+          className="w-10 h-14 bg-transparent border-b-2 border-text-primary text-text-primary text-3xl font-bold text-center focus:outline-none focus:border-accent caret-transparent"
         />
       ))}
       <span className="text-text-muted text-2xl pb-2 px-1 select-none">·</span>
@@ -83,7 +83,7 @@ export default function OtpInput({ value, onChange }: { value: string; onChange:
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={handlePaste}
-          className="w-10 h-14 bg-transparent border-b-2 border-text-primary text-text-primary text-3xl font-bold text-center focus:outline-none focus:border-purple-to caret-transparent"
+          className="w-10 h-14 bg-transparent border-b-2 border-text-primary text-text-primary text-3xl font-bold text-center focus:outline-none focus:border-accent caret-transparent"
         />
       ))}
     </div>

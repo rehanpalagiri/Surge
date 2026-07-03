@@ -130,16 +130,16 @@ export function AnalysisProgress({
       <div className="w-full" role="status" aria-live="polite">
         <div className="mb-5 space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-white">Building your review…</span>
-            <span className="tabular-nums font-semibold text-purple-300">{rounded}%</span>
+            <span className="font-semibold text-text-primary">Building your review…</span>
+            <span className="tabular-nums font-semibold text-accent">{rounded}%</span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400"
+              className="h-full rounded-full bg-accent"
               style={{ width: `${pct}%`, transition: "width 400ms cubic-bezier(0.25, 1, 0.5, 1)" }}
             />
           </div>
-          <p className="text-center text-xs text-zinc-500 animate-pulse">{step}</p>
+          <p className="text-center text-xs text-text-muted animate-pulse">{step}</p>
         </div>
         {skeleton}
       </div>
@@ -149,23 +149,23 @@ export function AnalysisProgress({
   return (
     <div className="flex w-full flex-col items-center gap-6 py-6" role="status" aria-live="polite">
       <div className="text-center space-y-1.5">
-        <p className="text-xl font-bold text-white">{title}…</p>
-        <p className="text-sm text-zinc-500">Hang tight — your craft review is being written</p>
+        <p className="text-xl font-bold text-text-primary">{title}…</p>
+        <p className="text-sm text-text-muted">Hang tight — your craft review is being written</p>
       </div>
 
       <div className="w-full max-w-sm space-y-2.5">
-        <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-border">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400"
+            className="h-full rounded-full bg-accent"
             style={{ width: `${pct}%`, transition: "width 400ms cubic-bezier(0.25, 1, 0.5, 1)" }}
           />
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500 animate-pulse">{step}</span>
-          <span className="text-sm font-bold tabular-nums text-purple-300">{rounded}%</span>
+          <span className="text-xs text-text-muted animate-pulse">{step}</span>
+          <span className="text-sm font-bold tabular-nums text-accent">{rounded}%</span>
         </div>
         {/* Live ETA — shown while bar is in the main meter phase */}
-        <p className="text-center text-xs text-zinc-600">
+        <p className="text-center text-xs text-text-muted/80">
           {etaText(elapsed, expectedMs, pct)}
         </p>
       </div>
@@ -178,7 +178,7 @@ export function AnalysisOverlay(props: AnalysisProgressProps & { label?: string 
   const { label = "Preparing your craft review", ...rest } = props;
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/98 backdrop-blur-sm px-4 py-10"
+      className="fixed inset-0 z-50 overflow-y-auto bg-background/95 backdrop-blur-sm px-4 py-10"
       role="dialog"
       aria-modal="true"
       aria-busy="true"

@@ -33,11 +33,11 @@ function SuccessInner() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center bg-zinc-900 border border-purple-500/30 rounded-2xl p-8 shadow-xl shadow-purple-950/20">
+      <div className="max-w-md w-full text-center bg-card border border-accent/30 rounded-2xl p-8 shadow-xl shadow-black/5">
         <div className="text-5xl mb-4">🎉</div>
-        <h1 className="text-2xl font-extrabold text-white mb-2">Welcome to Surge Pro</h1>
-        <p className="text-zinc-400 text-sm mb-6">
-          You now have <span className="text-purple-300 font-semibold">unlimited analyses</span>.
+        <h1 className="text-2xl font-extrabold text-text-primary mb-2">Welcome to Surge Pro</h1>
+        <p className="text-text-muted text-sm mb-6">
+          You now have <span className="text-accent font-semibold">unlimited analyses</span>.
           {confirmed ? " Your account is upgraded and ready." : " We're finalizing your account…"}
         </p>
         <div className="flex flex-col gap-2">
@@ -47,7 +47,7 @@ function SuccessInner() {
           >
             Analyze a video →
           </Link>
-          <Link href="/settings" className="text-zinc-400 hover:text-white text-sm py-1">
+          <Link href="/settings" className="text-text-muted hover:text-text-primary text-sm py-1">
             Manage subscription
           </Link>
         </div>

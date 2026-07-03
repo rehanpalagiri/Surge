@@ -30,7 +30,7 @@ export default function PrivacyPage() {
           <p>
             Surge is a video analysis tool operated as a sole proprietorship in the
             United States. Questions or requests about your data:{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>.
           </p>
@@ -73,7 +73,7 @@ export default function PrivacyPage() {
               href="https://policies.google.com/privacy"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-purple-to hover:underline"
+              className="text-accent hover:underline"
             >
               policies.google.com/privacy
             </a>.
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
           <p>
             Account data is retained until you delete your account. You can request
             full deletion of your account and all associated data by emailing{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>.
           </p>
@@ -125,7 +125,7 @@ export default function PrivacyPage() {
               We do not sell your personal data.
             </span>{" "}
             To exercise any of these rights, email{" "}
-            <a href="mailto:surgeprivacy@gmail.com" className="text-purple-to hover:underline">
+            <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
             </a>.
           </p>
@@ -141,7 +141,7 @@ export default function PrivacyPage() {
 
         <div className="border-t border-border pt-6 text-sm text-text-muted">
           See also our{" "}
-          <Link href="/terms" className="text-purple-to hover:underline">Terms of Service</Link>.
+          <Link href="/terms" className="text-accent hover:underline">Terms of Service</Link>.
         </div>
       </div>
     </main>

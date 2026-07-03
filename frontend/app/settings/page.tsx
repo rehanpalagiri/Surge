@@ -20,7 +20,7 @@ function ProfileCard() {
         </div>
         <Link
           href="/profile"
-          className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-5 py-2 rounded-xl transition-colors text-sm"
+          className="gradient-btn text-white font-semibold px-5 py-2 rounded-xl transition-colors text-sm"
         >
           Edit profile
         </Link>
@@ -66,7 +66,7 @@ function BillingCard() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-text-primary font-semibold text-lg flex items-center gap-2">
-            {status.is_pro ? <>Surge Pro <span className="text-purple-400">✦</span></> : "Plan"}
+            {status.is_pro ? <>Surge Pro <span className="text-accent">✦</span></> : "Plan"}
           </h2>
           {status.comp ? (
             <p className="text-text-muted text-sm mt-0.5">
@@ -88,7 +88,7 @@ function BillingCard() {
           )}
         </div>
         {status.comp ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-purple-500/15 px-3 py-1.5 text-xs font-bold text-purple-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent">
             ✦ Complimentary
           </span>
         ) : status.is_pro ? (
@@ -226,7 +226,7 @@ function DataPrivacyCard() {
           <button
             type="button"
             onClick={() => void loadConsent()}
-            className="border border-border text-text-primary text-sm font-semibold px-4 py-2 rounded-lg hover:border-purple-to/60"
+            className="border border-border text-text-primary text-sm font-semibold px-4 py-2 rounded-lg hover:border-accent/60"
           >
             Try again
           </button>
@@ -246,7 +246,7 @@ function DataPrivacyCard() {
                 key={opt.value}
                 className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                   consent.seed_consent === opt.value
-                    ? "border-purple-to/50 bg-purple-from/5"
+                    ? "border-accent/50 bg-accent/5"
                     : "border-border hover:border-text-muted/40"
                 }`}
               >
@@ -255,7 +255,7 @@ function DataPrivacyCard() {
                   name="seed_consent"
                   checked={consent.seed_consent === opt.value}
                   onChange={() => pick(opt.value)}
-                  className="mt-0.5 accent-purple-500"
+                  className="mt-0.5 accent-[#C74E39]"
                 />
                 <span className="text-text-primary text-sm">{opt.label}</span>
               </label>
@@ -266,7 +266,7 @@ function DataPrivacyCard() {
           <p className="text-text-muted/60 text-xs">
             Research data may include public counts, observation time, post URL, and content niche—never
             your uploaded video. Metrics are not treated as proof that an edit caused an outcome.{" "}
-            <Link href="/privacy#seed-pool" className="text-purple-to hover:underline">
+            <Link href="/privacy#seed-pool" className="text-accent hover:underline">
               Learn more
             </Link>
           </p>
@@ -314,7 +314,7 @@ function ChangeUsernameCard() {
           onChange={(e) => setNewUsername(e.target.value)}
           required
           autoComplete="username"
-          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
         />
         <PasswordInput
           placeholder="Current password (to confirm)"
@@ -323,7 +323,7 @@ function ChangeUsernameCard() {
           required
           autoComplete="current-password"
         />
-        <Link href="/forgot-password" className="block text-purple-to text-sm hover:underline">
+        <Link href="/forgot-password" className="block text-accent text-sm hover:underline">
           Forgot your password?
         </Link>
         {msg && (
@@ -334,7 +334,7 @@ function ChangeUsernameCard() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+          className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           {loading ? "Saving…" : "Save username"}
         </button>
@@ -468,7 +468,7 @@ function ChangePasswordCard() {
           required
           autoComplete="new-password"
         />
-        <Link href="/forgot-password" className="block text-purple-to text-sm hover:underline">
+        <Link href="/forgot-password" className="block text-accent text-sm hover:underline">
           Forgot your current password?
         </Link>
         {msg && (
@@ -479,7 +479,7 @@ function ChangePasswordCard() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+          className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           {loading ? "Saving…" : "Save password"}
         </button>

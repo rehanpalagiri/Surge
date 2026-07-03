@@ -1,12 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 import InstallBanner from "@/components/InstallBanner";
 import LinkPromptModal from "@/components/LinkPromptModal";
 import { Analytics } from "@vercel/analytics/next";
 
-const inter = Inter({ subsets: ["latin"] });
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
+});
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://surge-chi-khaki.vercel.app";
@@ -19,7 +30,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "Surge",
   },
   icons: {
@@ -45,7 +56,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#7c3aed",
+  themeColor: "#FAF7F2",
 };
 
 export default function RootLayout({
@@ -56,7 +67,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.className} antialiased bg-background text-text-primary min-h-screen`}
+        className={`${instrumentSans.variable} ${fraunces.variable} font-sans antialiased bg-background text-text-primary min-h-screen`}
       >
         <RegisterSW />
         {children}

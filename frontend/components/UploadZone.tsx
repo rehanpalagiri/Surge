@@ -352,7 +352,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       {/* ── Analysis loading overlay ── */}
       {loading && (
         <div
-          className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
+          className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
           role="dialog"
           aria-modal="true"
           aria-busy="true"
@@ -362,8 +362,8 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
           {uploadPhase === "uploading" ? (
             <>
               <div className="text-center space-y-1">
-                <p className="text-xl font-bold text-white">Uploading your video...</p>
-                <p className="text-zinc-500 text-sm">Going straight to the cloud — no server in the way</p>
+                <p className="text-xl font-bold text-text-primary">Uploading your video...</p>
+                <p className="text-text-muted text-sm">Going straight to the cloud — no server in the way</p>
               </div>
               <div className="reactive-transfer-card w-full max-w-xl space-y-4" role="status">
                 <div className="relative z-10 flex items-center gap-3 text-left">
@@ -371,10 +371,10 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                     <FileVideo2 className="h-6 w-6" strokeWidth={1.6} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-white">{file?.name ?? "Video file"}</p>
-                    <p className="mt-0.5 text-xs text-zinc-500">Secure direct upload</p>
+                    <p className="truncate text-sm font-semibold text-text-primary">{file?.name ?? "Video file"}</p>
+                    <p className="mt-0.5 text-xs text-text-muted">Secure direct upload</p>
                   </div>
-                  <span className="text-sm font-bold tabular-nums text-purple-300">{uploadProgress}%</span>
+                  <span className="text-sm font-bold tabular-nums text-accent">{uploadProgress}%</span>
                 </div>
                 <div className="transfer-progress-track relative z-10">
                   <div
@@ -382,7 +382,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <div className="relative z-10 flex items-center justify-between text-[11px] text-zinc-500">
+                <div className="relative z-10 flex items-center justify-between text-[11px] text-text-muted">
                   <span>Keep this tab open</span>
                   <span>{uploadProgress < 100 ? "Transferring…" : "Upload complete"}</span>
                 </div>
@@ -391,11 +391,11 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
           ) : waking ? (
             <div className="flex w-full flex-col items-center gap-6 py-6 text-center">
               <div className="space-y-1.5">
-                <p className="text-xl font-bold text-white">Waking up the server…</p>
-                <p className="text-zinc-500 text-sm">First request after a quiet period can take up to 20 seconds</p>
+                <p className="text-xl font-bold text-text-primary">Waking up the server…</p>
+                <p className="text-text-muted text-sm">First request after a quiet period can take up to 20 seconds</p>
               </div>
-              <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-zinc-800">
-                <div className="h-full w-1/4 rounded-full bg-purple-500 animate-pulse" />
+              <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-border">
+                <div className="h-full w-1/4 rounded-full bg-accent animate-pulse" />
               </div>
             </div>
           ) : (
@@ -410,8 +410,8 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
         {/* ── Update banner ── */}
         {parentId != null && (
-          <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-xl px-4 py-3">
-            <p className="text-purple-300 text-sm font-medium">
+          <div className="flex items-center gap-2 bg-accent/10 border border-accent/30 rounded-xl px-4 py-3">
+            <p className="text-accent text-sm font-medium">
               Updating this project — compare the same craft dimensions
             </p>
           </div>
@@ -422,8 +422,8 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
           <div className="reactive-transfer-card min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center gap-4 text-center">
             <div className="text-3xl">⚙️</div>
             <div className="space-y-1">
-              <p className="text-white font-semibold text-sm">Compressing your video...</p>
-              <p className="text-zinc-500 text-xs">This may take 30–90 seconds — please keep this tab open</p>
+              <p className="text-text-primary font-semibold text-sm">Compressing your video...</p>
+              <p className="text-text-muted text-xs">This may take 30–90 seconds — please keep this tab open</p>
             </div>
             <div className="w-full max-w-xs space-y-2.5">
               <div className="transfer-progress-track">
@@ -432,7 +432,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                   style={{ width: `${compressProgress}%` }}
                 />
               </div>
-              <p className="text-zinc-400 text-xs text-center">{compressPhase}</p>
+              <p className="text-text-muted text-xs text-center">{compressPhase}</p>
             </div>
           </div>
         ) : (
@@ -449,9 +449,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
         {/* ── Caption ── */}
         <div>
-          <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
             Caption{" "}
-            <span className="text-zinc-600 font-normal normal-case tracking-normal">— optional, improves accuracy</span>
+            <span className="text-text-muted/70 font-normal normal-case tracking-normal">— optional, improves accuracy</span>
           </label>
           <textarea
             value={caption}
@@ -459,16 +459,16 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
             rows={2}
             maxLength={2200}
             placeholder="The caption you plan to post with this video, including hashtags…"
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors text-sm resize-none"
+            className="w-full bg-card border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted/70 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors text-sm resize-none"
           />
         </div>
 
         {/* ── Sign-in nudge for guests (replaces mode picker) ── */}
         {!loggedIn && (
-          <p className="text-zinc-500 text-xs text-center px-2">
+          <p className="text-text-muted text-xs text-center px-2">
             <Link
               href="/signup"
-              className="text-purple-400 hover:text-purple-300 hover:underline transition-colors"
+              className="text-accent hover:underline transition-colors"
             >
               Sign in
             </Link>{" "}
@@ -479,9 +479,9 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         {/* ── Plan / monthly allowance (logged-in only) ── */}
         {loggedIn && rateLimit && (
           rateLimit.unlimited ? (
-            <div className="bg-gradient-to-r from-purple-600/15 to-fuchsia-600/15 border border-purple-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-purple-200">⚡ Surge Pro — unlimited analyses</span>
-              <span className="text-[11px] text-zinc-500">{rateLimit.used} this month</span>
+            <div className="bg-surface border border-accent/30 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-semibold text-accent">Surge Pro — unlimited analyses</span>
+              <span className="text-[11px] text-text-muted">{rateLimit.used} this month</span>
             </div>
           ) : (() => {
             const limit = rateLimit.effective_limit ?? 0;
@@ -491,25 +491,25 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
               ? new Date(rateLimit.resets_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
               : "";
             return (
-              <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 space-y-1.5">
+              <div className="bg-card border border-border rounded-xl px-4 py-3 space-y-1.5">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-zinc-400">
+                  <span className="text-text-muted">
                     {remaining} of {limit} analyses left this month
                   </span>
                   {rateLimit.bonus > 0 && (
-                    <span className="text-emerald-400 font-medium">+{rateLimit.bonus} link bonus</span>
+                    <span className="text-success font-medium">+{rateLimit.bonus} link bonus</span>
                   )}
                 </div>
-                <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="w-full h-1 bg-border rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      remaining === 0 ? "bg-red-500" : remaining <= 1 ? "bg-yellow-400" : "bg-purple-500"
+                      remaining === 0 ? "bg-danger" : remaining <= 1 ? "bg-warning" : "bg-text-primary"
                     }`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3 pt-0.5">
-                  <p className={`text-[11px] ${remaining === 0 ? "text-red-400" : "text-zinc-600"}`}>
+                  <p className={`text-[11px] ${remaining === 0 ? "text-danger" : "text-text-muted"}`}>
                     {remaining === 0
                       ? `Monthly limit reached.${resetLabel ? ` Resets ${resetLabel}.` : ""}`
                       : rateLimit.bonus < 10
@@ -518,7 +518,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                   </p>
                   <UpgradeButton
                     label="Go unlimited"
-                    className="flex-shrink-0 text-purple-300 hover:text-purple-200 text-[11px] font-semibold underline underline-offset-2"
+                    className="flex-shrink-0 text-accent hover:opacity-80 text-[11px] font-semibold underline underline-offset-2"
                   />
                 </div>
               </div>
@@ -528,7 +528,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
 
         {/* ── Error ── */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+          <div className="bg-danger/10 border border-danger/30 rounded-xl px-4 py-3 text-danger text-sm">
             {error}
           </div>
         )}
@@ -547,7 +547,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         {!loggedIn && (
           guestLimitReached ? (
             <div className="text-center space-y-3 pt-1">
-              <p className="text-zinc-400 text-sm">
+              <p className="text-text-muted text-sm">
                 You&apos;ve used your {GUEST_LIMIT} free analyses today.
               </p>
               <Link
@@ -558,7 +558,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
               </Link>
             </div>
           ) : guestCount > 0 ? (
-            <p className="text-zinc-400 text-xs text-center">
+            <p className="text-text-muted text-xs text-center">
               {guestCount} of {GUEST_LIMIT} free analyses used today
             </p>
           ) : null

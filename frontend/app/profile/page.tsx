@@ -140,7 +140,7 @@ export default function ProfilePage() {
                   placeholder="@yourhandle"
                   value={form.handle}
                   onChange={(e) => update("handle", e.target.value)}
-                  className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+                  className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
                 />
               </div>
               <div>
@@ -152,7 +152,7 @@ export default function ProfilePage() {
                   placeholder="Your name"
                   value={form.display_name}
                   onChange={(e) => update("display_name", e.target.value)}
-                  className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+                  className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
@@ -168,7 +168,7 @@ export default function ProfilePage() {
                 onChange={(e) => update("bio", e.target.value)}
                 rows={3}
                 maxLength={500}
-                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to resize-none"
+                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent resize-none"
               />
             </div>
 
@@ -183,7 +183,7 @@ export default function ProfilePage() {
                 onChange={(e) => update("target_audience", e.target.value)}
                 rows={2}
                 maxLength={300}
-                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to resize-none"
+                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent resize-none"
               />
             </div>
 

@@ -9,7 +9,7 @@ export default function ResetPasswordPage() {
         <Link href="/" className="font-bold text-2xl gradient-text">Surge</Link>
         <p className="text-text-muted text-sm">
           Password reset now uses a 6-digit code.{" "}
-          <Link href="/forgot-password" className="text-purple-to hover:underline">
+          <Link href="/forgot-password" className="text-accent hover:underline">
             Reset your password here.
           </Link>
         </p>

@@ -119,7 +119,7 @@ function OutcomeTimeline({ snapshots }: { snapshots: OutcomeSnapshot[] }) {
                 <div className="mt-2 space-y-1 text-sm">
                   {row.views != null && <p className="text-text-primary">{row.views.toLocaleString()} views</p>}
                   {row.likes != null && <p className="text-text-primary">{row.likes.toLocaleString()} likes</p>}
-                  {likeRate != null && <p className="text-purple-to">{likeRate.toFixed(2)}% observed like rate</p>}
+                  {likeRate != null && <p className="text-accent">{likeRate.toFixed(2)}% observed like rate</p>}
                   {row.source === "manual_unverified" && <p className="text-warning text-xs">Manually entered · unverified</p>}
                   {flags.includes("third_party_metrics") && <p className="text-text-muted text-xs">Third-party public count</p>}
                   {(flags.includes("paid_status_unknown") || flags.includes("automated_activity_unknown")) && (
@@ -217,7 +217,7 @@ function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
       : "real engagement stats";
 
   return (
-    <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-5 space-y-3">
+    <div className="bg-accent/5 border border-accent/30 rounded-2xl p-5 space-y-3">
       <div>
         <p className="text-text-primary font-semibold">Help other creators?</p>
         <p className="text-text-muted text-sm mt-1">
@@ -408,7 +408,7 @@ export default function ResultsPage() {
           ) : (
             // Just fetching an existing review — a brief, quiet load.
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-center" role="status">
-              <span className="pending-spinner text-purple-to" aria-hidden="true" />
+              <span className="pending-spinner text-accent" aria-hidden="true" />
               <p className="text-text-muted text-sm">{loadingText}</p>
             </div>
           )}
@@ -553,7 +553,7 @@ export default function ResultsPage() {
                 <p className="text-text-muted/70 text-xs">Free forever · no credit card</p>
                 <p className="text-text-muted text-xs">
                   Already have an account?{" "}
-                  <Link href={`/login?next=/results/${analysis.id}`} className="text-purple-to hover:underline">
+                  <Link href={`/login?next=/results/${analysis.id}`} className="text-accent hover:underline">
                     Log in
                   </Link>
                 </p>
@@ -597,11 +597,11 @@ export default function ResultsPage() {
               </div>
             </div>
 
-            <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-6">
+            <div className="bg-accent/5 border border-accent/30 rounded-2xl p-6">
               <h3 className="text-text-primary font-semibold">Recommended project</h3>
               <p className="text-text-muted text-xs mt-1 mb-4">A hypothesis for the next version—not a promised outcome.</p>
               <div className="space-y-3 text-sm">
-                <p><span className="text-purple-to font-semibold">Change: </span><span className="text-text-primary">{s.recommended_experiment?.change ?? "Change one editing variable."}</span></p>
+                <p><span className="text-accent font-semibold">Change: </span><span className="text-text-primary">{s.recommended_experiment?.change ?? "Change one editing variable."}</span></p>
                 <p><span className="text-text-muted font-semibold">Keep constant: </span><span className="text-text-primary">{s.recommended_experiment?.keep_constant ?? "Keep the remaining major variables similar."}</span></p>
                 <p><span className="text-text-muted font-semibold">Observe: </span><span className="text-text-primary">{s.recommended_experiment?.observe ?? "Compare verified results at the same post age."}</span></p>
               </div>

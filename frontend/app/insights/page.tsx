@@ -49,7 +49,7 @@ export default function InsightsPage() {
       <main className="min-h-screen bg-background">
         <Nav />
         <div className="max-w-3xl mx-auto px-4 py-24 flex flex-col items-center gap-3" role="status">
-          <span className="pending-spinner text-purple-to" aria-hidden="true" />
+          <span className="pending-spinner text-accent" aria-hidden="true" />
           <p className="text-text-muted text-sm">Gathering your verified results…</p>
         </div>
       </main>
@@ -62,7 +62,7 @@ export default function InsightsPage() {
         <Nav />
         <div className="max-w-3xl mx-auto px-4 py-24 text-center space-y-4">
           <p className="text-text-primary font-semibold">Couldn&apos;t load your insights.</p>
-          <Link href="/projects" className="text-purple-to hover:underline text-sm">Back to projects →</Link>
+          <Link href="/projects" className="text-accent hover:underline text-sm">Back to projects →</Link>
         </div>
       </main>
     );
@@ -108,11 +108,11 @@ export default function InsightsPage() {
 
             {/* ── Observed range (only when enough data) ── */}
             {data.observed_range.available ? (
-              <div className="bg-purple-from/5 border border-purple-to/30 rounded-2xl p-6 space-y-3">
+              <div className="bg-accent/5 border border-accent/30 rounded-2xl p-6 space-y-3">
                 <h2 className="text-text-primary font-semibold">What your posts tend to land</h2>
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
                   <div>
-                    <p className="text-3xl font-bold text-purple-to tabular-nums">
+                    <p className="text-3xl font-bold text-accent tabular-nums">
                       {data.observed_range.p25}–{data.observed_range.p75}%
                     </p>
                     <p className="text-text-muted text-xs mt-1">middle 50% of your like rates</p>
@@ -182,7 +182,7 @@ export default function InsightsPage() {
                   {data.posts.map((post) => (
                     <tr key={post.analysis_id} className="border-t border-border/60">
                       <td className="py-2.5 pr-3">
-                        <Link href={`/results/${post.analysis_id}`} className="text-text-primary hover:text-purple-to">
+                        <Link href={`/results/${post.analysis_id}`} className="text-text-primary hover:text-accent">
                           {post.project_name || `${post.niche} post`}
                         </Link>
                       </td>

@@ -98,7 +98,7 @@ function VerifyEmailInner() {
           ) : (
             <>
               Didn&apos;t get it?{" "}
-              <button type="button" onClick={handleResend} className="text-purple-to hover:underline">
+              <button type="button" onClick={handleResend} className="text-accent hover:underline">
                 Resend code
               </button>
             </>

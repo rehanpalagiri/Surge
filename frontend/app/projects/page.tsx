@@ -22,7 +22,7 @@ function seededRand(seed: number): number {
   return x - Math.floor(x);
 }
 
-const _COLORS8 = ["#a855f7", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
+const _COLORS8 = ["#C74E39", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
 
 const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
   const angle = (i / 80) * 2 * Math.PI + seededRand(i * 3) * 0.5;
@@ -38,7 +38,7 @@ const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
   };
 });
 
-const _COLORS6 = ["#a855f7", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
+const _COLORS6 = ["#C74E39", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
 
 const MINI_BURST = Array.from({ length: 14 }, (_, i) => {
   const angle = (i / 14) * 2 * Math.PI + seededRand(i * 5) * 0.5;
@@ -61,7 +61,7 @@ const MEGA_FLOAT_EMOJI = [
   { emoji: "🎊", fx:  175, delay: 260, cls: "text-5xl" },
   { emoji: "🔥", fx:  -95, delay: 360, cls: "text-3xl" },
   { emoji: "✨", fx:  115, delay: 430, cls: "text-4xl" },
-  { emoji: "💜", fx: -145, delay: 210, cls: "text-4xl" },
+  { emoji: "🧡", fx: -145, delay: 210, cls: "text-4xl" },
   { emoji: "🌟", fx:  205, delay: 110, cls: "text-5xl" },
 ];
 
@@ -106,8 +106,8 @@ function PostLinkRow({
     if (phase !== "celebrate") return;
     const card = containerRef.current?.closest("article") as HTMLElement | null;
     if (!card) return;
-    card.style.borderColor = "rgb(168 85 247 / 0.75)";
-    card.style.boxShadow = "0 0 0 1px rgb(168 85 247 / 0.35), 0 0 50px rgb(168 85 247 / 0.22)";
+    card.style.borderColor = "rgb(199 78 57 / 0.75)";
+    card.style.boxShadow = "0 0 0 1px rgb(199 78 57 / 0.35), 0 0 50px rgb(199 78 57 / 0.22)";
     card.style.transition = "border-color 0.25s, box-shadow 0.25s";
     return () => {
       card.style.borderColor = "";
@@ -170,7 +170,7 @@ function PostLinkRow({
             }
           }}
           disabled={busy}
-          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-purple-from/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+          className="text-xs font-medium text-text-muted hover:text-text-primary border border-border hover:border-accent/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
         >
           {busy && <span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />}
           {busy
@@ -208,7 +208,7 @@ function PostLinkRow({
             <div
               className="pointer-events-none absolute inset-0"
               style={{
-                background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgb(168 85 247 / 0.95), rgb(99 102 241 / 0.65) 45%, transparent 72%)",
+                background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgb(199 78 57 / 0.95), rgb(185 138 47 / 0.65) 45%, transparent 72%)",
                 animation: "screen-flash 0.7s ease-out forwards",
               }}
             />
@@ -239,7 +239,7 @@ function PostLinkRow({
             {[0, 160, 320, 520].map((delay, i) => (
               <span
                 key={i}
-                className="pointer-events-none absolute rounded-full border-2 border-purple-400/50"
+                className="pointer-events-none absolute rounded-full border-2 border-accent/50"
                 style={{
                   width: 48, height: 48,
                   top: "50%", left: "50%",
@@ -273,7 +273,7 @@ function PostLinkRow({
                 You<br />posted it!
               </p>
               <p
-                className="text-base sm:text-lg text-zinc-300 max-w-xs leading-relaxed"
+                className="text-base sm:text-lg text-white/80 max-w-xs leading-relaxed"
                 style={{ animation: "celebrate-text-in 0.5s 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both" }}
               >
                 Your video is live. Let&apos;s see how the world responds.
@@ -317,7 +317,7 @@ function PostLinkRow({
             placeholder={placeholder}
             value={link}
             onChange={(e) => setLink(e.target.value)}
-            className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+            className="flex-1 min-w-0 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
           />
           <button
             type="submit"
@@ -343,7 +343,7 @@ function PostLinkRow({
         <button
           type="button"
           onClick={() => setShowHowTo((v) => !v)}
-          className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors hover:underline underline-offset-2"
+          className="text-[11px] text-text-muted hover:text-text-primary transition-colors hover:underline underline-offset-2"
         >
           {showHowTo
             ? "Hide tutorial ↑"
@@ -353,10 +353,10 @@ function PostLinkRow({
           <ol className="space-y-2 pt-0.5 motion-pop">
             {howTo.map((step, i) => (
               <li key={i} className="flex items-start gap-2.5">
-                <span className="flex-shrink-0 h-5 w-5 grid place-items-center rounded-full bg-purple-from/20 text-purple-300 text-[10px] font-bold">
+                <span className="flex-shrink-0 h-5 w-5 grid place-items-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">
                   {i + 1}
                 </span>
-                <p className="text-[11px] text-zinc-400 leading-relaxed pt-0.5">{step}</p>
+                <p className="text-[11px] text-text-muted leading-relaxed pt-0.5">{step}</p>
               </li>
             ))}
           </ol>
@@ -371,7 +371,7 @@ function PostLinkRow({
       {bursting && createPortal(
         <div className="fixed inset-0 pointer-events-none z-[9998]">
           <span
-            className="absolute rounded-full border-[1.5px] border-purple-400/80"
+            className="absolute rounded-full border-[1.5px] border-accent/80"
             style={{
               width: 10, height: 10,
               left: burstOrigin.x, top: burstOrigin.y,
@@ -407,24 +407,24 @@ function PostLinkRow({
           className="project-link-cta group w-full text-left"
         >
           <span className="relative z-10 flex min-w-0 items-center gap-3">
-            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-purple-to/25 bg-purple-from/15 text-purple-300 transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
+            <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-accent/25 bg-accent/10 text-accent transition-transform group-hover:-translate-y-0.5 group-hover:scale-105">
               <Link2 className="h-5 w-5" strokeWidth={1.8} />
             </span>
             <span className="min-w-0">
-              <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300">
+              <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
                 Posted it?
               </span>
-              <span className="block text-sm font-bold text-white">
+              <span className="block text-sm font-bold text-text-primary">
                 {platform === "tiktok"
                   ? "Did you post this? Track real stats"
                   : "Did you post this Reel? Track real likes"}
               </span>
-              <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-400">
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-text-muted">
                 Connect the post, start tracking results, and earn +1 analysis
               </span>
             </span>
           </span>
-          <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-purple-500 text-white shadow-lg shadow-purple-950/40 transition-transform group-hover:translate-x-1">
+          <span className="relative z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-accent text-white shadow-md transition-transform group-hover:translate-x-1">
             <ArrowUpRight className="h-4 w-4" />
           </span>
         </button>
@@ -437,14 +437,13 @@ type Platform = "tiktok" | "instagram";
 
 const PLATFORM_TABS: {
   id: Platform;
-  // TikTok uses its iconic glitch (white text, offset red+cyan shadow) instead
-  // of the old cyan→red gradient; Instagram keeps its brand gradient.
+  // Solid platform accent colors, legible on paper (gradients/glitch retired).
   textGradient: string;
   btnGradient: string;
 }[] = [
   {
     id: "tiktok",
-    textGradient: "tiktok-glitch",
+    textGradient: "tiktok-red",
     btnGradient: "gradient-btn-tiktok",
   },
   {
@@ -499,16 +498,16 @@ function ProjectCard({
       <Link href={`/results/${a.id}`} className="relative z-10 block p-5 pb-4">
         <div className="mb-4 flex items-start justify-between gap-3 pr-10">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-white/5 bg-white/[0.035] text-purple-300">
+            <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-border bg-surface text-accent">
               <Video className="h-5 w-5" strokeWidth={1.6} />
             </span>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-bold text-white">{projectName}</h2>
-              <p className="mt-0.5 truncate text-xs capitalize text-zinc-500">{a.niche || "General"}</p>
+              <h2 className="truncate text-base font-bold text-text-primary">{projectName}</h2>
+              <p className="mt-0.5 truncate text-xs capitalize text-text-muted">{a.niche || "General"}</p>
             </div>
           </div>
           {needsLink && (
-            <span className="rounded-full border border-purple-to/25 bg-purple-from/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-300">
+            <span className="rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent">
               Needs link
             </span>
           )}
@@ -518,16 +517,16 @@ function ProjectCard({
             {a.verdict}
           </p>
           {a.parent_id != null && (
-            <span className="rounded-full bg-purple-from/10 px-2 py-0.5 text-[10px] font-semibold text-purple-300">Re-analyzed</span>
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">Re-analyzed</span>
           )}
         </div>
         {a.caption_preview && (
-          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-zinc-400">
+          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-text-muted">
             {a.caption_preview}
           </p>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/5 pt-3 text-xs text-zinc-500">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3 text-xs text-text-muted">
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
             {new Date(a.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
@@ -540,7 +539,7 @@ function ProjectCard({
       <div className="relative z-10 px-5 pb-4">
         <Link
           href={updateUrl}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:border-purple-to/50 hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:border-accent/50 hover:text-text-primary"
           onClick={(e) => e.stopPropagation()}
         >
           <RefreshCw className="h-3.5 w-3.5" /> Re-analyze

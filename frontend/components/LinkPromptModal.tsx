@@ -86,7 +86,7 @@ export default function LinkPromptModal() {
   if (state === "questions") {
     return (
       <div className="fixed bottom-20 right-4 z-50 max-w-xs w-full sm:max-w-sm motion-pop">
-        <div className="relative rounded-2xl p-[1.5px] bg-gradient-to-r from-purple-600 to-pink-500 shadow-2xl">
+        <div className="relative rounded-2xl p-[1.5px] bg-accent shadow-xl">
           <div className="rounded-2xl bg-card px-4 py-4">
             <button
               onClick={dismissQuestions}

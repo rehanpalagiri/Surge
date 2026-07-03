@@ -121,12 +121,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
     <>
       {processing && <AnalysisOverlay active={processing} steps={PROCESSING_STEPS} />}
 
-      <main className="min-h-screen flex flex-col bg-zinc-950">
+      <main className="min-h-screen flex flex-col bg-background">
         {/* ── Minimal nav ── */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-900">
-          <span className="text-xl font-extrabold text-purple-500 tracking-tight">Surge</span>
+        <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <span className="text-xl font-extrabold text-text-primary tracking-tight font-display">Surge</span>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-zinc-400 text-sm hover:text-white transition-colors">
+            <Link href="/login" className="text-text-muted text-sm hover:text-text-primary transition-colors">
               Log in
             </Link>
             <Link
@@ -139,11 +139,11 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         </header>
 
         {deleted && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm px-5 py-3 rounded-xl shadow-lg flex items-center gap-3">
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-success/10 border border-success/30 text-success text-sm px-5 py-3 rounded-xl shadow-lg flex items-center gap-3">
             Your account has been deleted.
             <button
               onClick={onDismissDeleted}
-              className="text-emerald-400/60 hover:text-emerald-400 transition-colors leading-none"
+              className="text-success/60 hover:text-success transition-colors leading-none"
               aria-label="Dismiss"
             >
               ×
@@ -156,18 +156,18 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
           <div className="w-full max-w-2xl space-y-6 sm:space-y-8 text-center">
 
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold px-4 py-1.5 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 text-accent text-xs font-semibold px-4 py-1.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
               AI-assisted · Free · Pre-post craft review
             </div>
 
             {/* Headline */}
             <div className="space-y-3 sm:space-y-4">
-              <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
+              <h1 className="text-3xl sm:text-5xl font-extrabold text-text-primary leading-tight tracking-tight">
                 Find Where Viewers{" "}
-                <span className="text-purple-400">Might Drift.</span>
+                <span className="gradient-text">Might Drift.</span>
               </h1>
-              <p className="text-zinc-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
+              <p className="text-text-muted text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
                 Review the hook, pacing, text, tension, sync, and ending before posting, then
                 get one retention-focused editing hypothesis to test in your next version.
               </p>
@@ -190,7 +190,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
               {/* Error */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+                <div className="bg-danger/10 border border-danger/30 rounded-xl px-4 py-3 text-danger text-sm">
                   {error}
                 </div>
               )}
@@ -207,14 +207,14 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             </form>
 
             {/* Trust signals */}
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-zinc-600 text-xs pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-text-muted text-xs pt-2">
               <span className="flex items-center gap-1.5">
                 <Lock className="w-3 h-3" /> Video analyzed privately
               </span>
               <span>·</span>
               <span>No account required</span>
               <span>·</span>
-              <Link href="/sample" className="hover:text-zinc-400 underline transition-colors">
+              <Link href="/sample" className="hover:text-text-primary underline transition-colors">
                 See a sample report →
               </Link>
             </div>
@@ -223,28 +223,28 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         </section>
 
         {/* ── Feature row ── */}
-        <section className="border-t border-zinc-900 px-4 py-14 sm:py-20">
+        <section className="border-t border-border px-4 py-14 sm:py-20">
           <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
             <div className="space-y-2">
-              <Target className="w-5 h-5 text-purple-400" />
-              <h3 className="text-white font-semibold text-base">Outcome-blind by design</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">
+              <Target className="w-5 h-5 text-accent" />
+              <h3 className="text-text-primary font-semibold text-base">Outcome-blind by design</h3>
+              <p className="text-text-muted text-sm leading-relaxed">
                 We critique the craft, never fake a viral score.
               </p>
             </div>
 
             <div className="space-y-2">
-              <LineChart className="w-5 h-5 text-purple-400" />
-              <h3 className="text-white font-semibold text-base">Learn from every post</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">
+              <LineChart className="w-5 h-5 text-accent" />
+              <h3 className="text-text-primary font-semibold text-base">Learn from every post</h3>
+              <p className="text-text-muted text-sm leading-relaxed">
                 Compare craft scores against your own verified results.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Zap className="w-5 h-5 text-purple-400" />
-              <h3 className="text-white font-semibold text-base">Private &amp; fast</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">
+              <Zap className="w-5 h-5 text-accent" />
+              <h3 className="text-text-primary font-semibold text-base">Private &amp; fast</h3>
+              <p className="text-text-muted text-sm leading-relaxed">
                 Your video is analyzed privately and not stored permanently.
               </p>
             </div>
@@ -252,12 +252,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-zinc-900 px-6 py-5">
-          <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-zinc-700">
+        <footer className="border-t border-border px-6 py-5">
+          <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-text-muted/80">
             <span>© {new Date().getFullYear()} Surge</span>
             <div className="flex gap-4">
-              <Link href="/privacy" className="hover:text-zinc-500 transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-zinc-500 transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-text-primary transition-colors">Terms</Link>
             </div>
           </div>
         </footer>
@@ -298,8 +298,8 @@ export default function Home() {
 
   if (showSplash === null) {
     return (
-      <main className="min-h-screen bg-zinc-950" aria-busy="true" aria-label="Checking account session">
-        <header className="border-b border-zinc-900 px-6 py-4">
+      <main className="min-h-screen bg-background" aria-busy="true" aria-label="Checking account session">
+        <header className="border-b border-border px-6 py-4">
           <div className="mx-auto flex max-w-5xl items-center justify-between">
             <Skeleton className="h-6 w-20 rounded-md" />
             <Skeleton className="h-9 w-24 rounded-lg" />
@@ -325,7 +325,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col bg-zinc-950">
+    <main className="min-h-screen flex flex-col bg-background">
       <Nav />
 
       {/* ── Platform toggle ── */}
@@ -335,10 +335,10 @@ export default function Home() {
 
       {/* ── Hero ── */}
       <section className="flex flex-col items-center px-4 pt-10 pb-6 text-center">
-        <h1 className="text-3xl font-bold text-white tracking-tight">
+        <h1 className="text-3xl font-bold text-text-primary tracking-tight">
           Review your next {PLATFORM_LABEL[platform]} video
         </h1>
-        <p className="text-zinc-400 text-sm mt-2">
+        <p className="text-text-muted text-sm mt-2">
           Find attention risks and one editing hypothesis to test in your next version.
         </p>
       </section>
@@ -349,18 +349,18 @@ export default function Home() {
           platform={platform}
           parentId={reanalyzeParentId}
         />
-        <p className="text-zinc-600 text-xs text-center mt-5 max-w-xl mx-auto">
+        <p className="text-text-muted/80 text-xs text-center mt-5 max-w-xl mx-auto">
           Your video is analyzed privately and not stored permanently.
         </p>
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-zinc-800 px-4 py-8">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-600">
+      <footer className="border-t border-border px-4 py-8">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
           <span>© {new Date().getFullYear()} Surge</span>
           <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-zinc-400 transition-colors">Privacy Policy</Link>
-            <Link href="/terms"   className="hover:text-zinc-400 transition-colors">Terms of Service</Link>
+            <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy Policy</Link>
+            <Link href="/terms"   className="hover:text-text-primary transition-colors">Terms of Service</Link>
           </div>
         </div>
       </footer>

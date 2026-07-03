@@ -460,7 +460,7 @@ export default function AdminPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
             />
             {authError && <p className="text-danger text-sm">{authError}</p>}
             <button type="submit" disabled={authPending} aria-busy={authPending} className="w-full gradient-btn text-white font-semibold py-3 rounded-xl disabled:opacity-50">
@@ -487,7 +487,7 @@ export default function AdminPage() {
                 onClick={() => setMainTab(t)}
                 className={`px-5 py-4 text-sm font-semibold capitalize transition-colors border-b-2 ${
                   mainTab === t
-                    ? "text-text-primary border-purple-to"
+                    ? "text-text-primary border-accent"
                     : "text-text-muted border-transparent hover:text-text-primary"
                 }`}
               >
@@ -506,7 +506,7 @@ export default function AdminPage() {
                     onClick={() => setActivePlatform(p)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       activePlatform === p
-                        ? "bg-purple-from/15 border border-purple-to/40 text-text-primary"
+                        ? "bg-accent/15 border border-accent/40 text-text-primary"
                         : "text-text-muted hover:text-text-primary"
                     }`}
                   >
@@ -556,7 +556,7 @@ export default function AdminPage() {
                     onClick={() => setTab(t)}
                     className={`flex-1 py-3 text-sm font-medium transition-colors ${
                       tab === t
-                        ? "text-text-primary border-b-2 border-purple-to bg-card"
+                        ? "text-text-primary border-b-2 border-accent bg-card"
                         : "text-text-muted hover:text-text-primary bg-surface/40"
                     }`}
                   >
@@ -601,7 +601,7 @@ export default function AdminPage() {
                           value={fetchUrl}
                           onChange={(e) => setFetchUrl(e.target.value)}
                           required
-                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
                         />
                       </div>
                       <div>
@@ -609,7 +609,7 @@ export default function AdminPage() {
                         <select
                           value={fetchNiche}
                           onChange={(e) => setFetchNiche(e.target.value)}
-                          className="w-full md:w-48 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
+                          className="w-full md:w-48 bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent"
                         >
                           {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
                         </select>
@@ -655,7 +655,7 @@ export default function AdminPage() {
                           <select
                             value={niche}
                             onChange={(e) => setNiche(e.target.value)}
-                            className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-purple-to"
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-accent"
                           >
                             {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
                           </select>
@@ -671,7 +671,7 @@ export default function AdminPage() {
                               value={viewCount}
                               onChange={(e) => setViewCount(e.target.value)}
                               required
-                              className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+                              className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
                             />
                           </div>
                         )}
@@ -690,7 +690,7 @@ export default function AdminPage() {
                             value={likeCount}
                             onChange={(e) => setLikeCount(e.target.value)}
                             required
-                            className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
                           />
                         </div>
                       </div>
@@ -708,7 +708,7 @@ export default function AdminPage() {
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           rows={2}
-                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to resize-none"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent resize-none"
                         />
                       </div>
 
@@ -775,7 +775,7 @@ export default function AdminPage() {
                                     {seed.platform}
                                   </span>
                                   {seed.source === "user" && (
-                                    <span title="Auto-promoted from a verified user-posted video" className="text-[10px] font-semibold text-purple-to bg-purple-to/10 px-1.5 py-0.5 rounded-full">
+                                    <span title="Auto-promoted from a verified user-posted video" className="text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
                                       👤 user
                                     </span>
                                   )}
@@ -807,7 +807,7 @@ export default function AdminPage() {
                               </td>
                               <td className="py-2.5 pr-4">
                                 {summary ? (
-                                  <button onClick={() => setExpandedId(isOpen ? null : seed.id)} className="text-purple-to hover:underline text-xs">
+                                  <button onClick={() => setExpandedId(isOpen ? null : seed.id)} className="text-accent hover:underline text-xs">
                                     {isOpen ? "Hide" : "View"}
                                   </button>
                                 ) : (
@@ -882,7 +882,7 @@ export default function AdminPage() {
                       <label className="block text-xs text-text-muted mb-1">Min views</label>
                       <input type="number" value={harvestMinViews}
                         onChange={(e) => setHarvestMinViews(e.target.value)}
-                        className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+                        className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent" />
                     </div>
                     <div>
                       <label className="block text-xs text-text-muted mb-1">
@@ -892,7 +892,7 @@ export default function AdminPage() {
                       <input type="number" value={harvestMaxViews}
                         placeholder="e.g. 50000"
                         onChange={(e) => setHarvestMaxViews(e.target.value)}
-                        className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm placeholder-text-muted/40 focus:outline-none focus:border-purple-to" />
+                        className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm placeholder-text-muted/40 focus:outline-none focus:border-accent" />
                     </div>
                   </>
                 ) : (
@@ -900,14 +900,14 @@ export default function AdminPage() {
                     <label className="block text-xs text-text-muted mb-1">Min likes</label>
                     <input type="number" value={harvestMinLikes}
                       onChange={(e) => setHarvestMinLikes(e.target.value)}
-                      className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+                      className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent" />
                   </div>
                 )}
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Max per niche</label>
                   <input type="number" min="1" max="10" value={harvestMaxPer}
                     onChange={(e) => setHarvestMaxPer(e.target.value)}
-                    className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+                    className="w-28 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent" />
                 </div>
                 <div className="w-full">
                   <div className="flex items-center justify-between mb-1.5">
@@ -933,7 +933,7 @@ export default function AdminPage() {
                         )}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                           harvestNiches.includes(n)
-                            ? "bg-purple-from/20 border border-purple-to/50 text-text-primary"
+                            ? "bg-accent/20 border border-accent/50 text-text-primary"
                             : "bg-card border border-border text-text-muted hover:text-text-primary hover:border-border/60"
                         }`}
                       >
@@ -1047,7 +1047,7 @@ export default function AdminPage() {
 
                         {s.detail && s.detail.length > 0 && (
                           <div className="mt-1">
-                            <button onClick={() => setHarvestDetailExpanded(prev => ({ ...prev, [p]: !detailOpen }))} className="text-xs text-purple-to hover:underline">
+                            <button onClick={() => setHarvestDetailExpanded(prev => ({ ...prev, [p]: !detailOpen }))} className="text-xs text-accent hover:underline">
                               {detailOpen ? "Hide" : "Show"} per-niche detail ({s.detail.length})
                             </button>
                             {detailOpen && (
@@ -1105,13 +1105,13 @@ export default function AdminPage() {
                   <label className="block text-xs text-text-muted mb-1">Max video age (days)</label>
                   <input type="number" min="7" max="90" value={trendMaxAge}
                     onChange={(e) => setTrendMaxAge(e.target.value)}
-                    className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+                    className="w-36 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent" />
                 </div>
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Min velocity (views/day)</label>
                   <input type="number" min="1000" value={trendMinVelocity}
                     onChange={(e) => setTrendMinVelocity(e.target.value)}
-                    className="w-40 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to" />
+                    className="w-40 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent" />
                 </div>
                 <button onClick={handleTrendHarvest} disabled={trendHarvesting}
                   className="gradient-btn text-white font-semibold px-6 py-2 rounded-xl disabled:opacity-50 text-sm">
@@ -1188,7 +1188,7 @@ export default function AdminPage() {
                   <select
                     value={insightNiche}
                     onChange={(e) => setInsightNiche(e.target.value)}
-                    className="w-52 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to"
+                    className="w-52 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="">All niches with ≥3 seeds</option>
                     {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
@@ -1273,7 +1273,7 @@ export default function AdminPage() {
                 <div>
                   <label className="block text-xs text-text-muted mb-1">Niche (optional — blank = all)</label>
                   <select value={trendNiche} onChange={(e) => setTrendNiche(e.target.value)}
-                    className="w-52 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-purple-to">
+                    className="w-52 bg-surface border border-border rounded-xl px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent">
                     <option value="">All niches with recent seeds</option>
                     {NICHES.map((n) => <option key={n} value={n} className="bg-card">{n}</option>)}
                   </select>

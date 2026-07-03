@@ -106,8 +106,8 @@ export default function ReactiveVideoDropzone({
             <UploadCloud className="h-9 w-9" strokeWidth={1.6} />
           </div>
           <div>
-            <p className="text-lg font-bold text-white">Release to add your video</p>
-            <p className="mt-1 text-sm text-purple-200/70">We&apos;ll validate it immediately</p>
+            <p className="text-lg font-bold text-text-primary">Release to add your video</p>
+            <p className="mt-1 text-sm text-text-muted">We&apos;ll validate it immediately</p>
           </div>
         </div>
       ) : file ? (
@@ -116,7 +116,7 @@ export default function ReactiveVideoDropzone({
             <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
               <CheckCircle2 className="h-3.5 w-3.5" /> Ready
             </span>
-            <span className="text-xs text-zinc-500">Tap anywhere to replace</span>
+            <span className="text-xs text-text-muted">Tap anywhere to replace</span>
           </div>
 
           <div className="flex items-center gap-4 text-left">
@@ -124,8 +124,8 @@ export default function ReactiveVideoDropzone({
               <FileVideo2 className="h-7 w-7" strokeWidth={1.6} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold text-white">{file.name}</p>
-              <div className="mt-1 text-xs text-zinc-400">{selectedDetail}</div>
+              <p className="truncate text-base font-semibold text-text-primary">{file.name}</p>
+              <div className="mt-1 text-xs text-text-muted">{selectedDetail}</div>
             </div>
           </div>
 
@@ -133,8 +133,8 @@ export default function ReactiveVideoDropzone({
             <div className="dropzone-ready-fill" />
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px]">
-            <span className="text-zinc-500">File checked</span>
-            <span className="font-medium text-purple-300">Ready for craft review</span>
+            <span className="text-text-muted">File checked</span>
+            <span className="font-medium text-success">Ready for craft review</span>
           </div>
         </div>
       ) : (
@@ -142,11 +142,11 @@ export default function ReactiveVideoDropzone({
           <div className="dropzone-icon-shell">
             <UploadCloud className="h-8 w-8" strokeWidth={1.6} />
           </div>
-          <p className="mt-5 text-base font-bold text-white sm:text-lg">
+          <p className="mt-5 text-base font-bold text-text-primary sm:text-lg">
             <span className="sm:hidden">Tap to choose your video</span>
             <span className="hidden sm:inline">Drop your video here</span>
           </p>
-          <p className="mt-1.5 text-sm text-zinc-400">
+          <p className="mt-1.5 text-sm text-text-muted">
             <span className="hidden sm:inline">or click to browse</span>
             <span className="sm:hidden">Choose a video from your device</span>
           </p>

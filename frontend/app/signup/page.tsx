@@ -154,7 +154,7 @@ function SignupForm() {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
           />
           <input
             type="text"
@@ -163,7 +163,7 @@ function SignupForm() {
             onChange={(e) => setUsername(e.target.value)}
             required
             autoComplete="username"
-            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
           />
           <PasswordInput
             placeholder="Password (8+ chars)"
@@ -181,7 +181,7 @@ function SignupForm() {
               onChange={handleBirthdayChange}
               required
               maxLength={10}
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-purple-to"
+              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
             />
             {birthday.length === 10 && (() => {
               const bd = parseBirthday();
@@ -197,15 +197,15 @@ function SignupForm() {
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
               required
-              className="mt-0.5 accent-purple-500"
+              className="mt-0.5 accent-[#C74E39]"
             />
             <span className="text-text-muted text-xs leading-relaxed">
               I agree to Surge&apos;s{" "}
-              <Link href="/terms" target="_blank" className="text-purple-to hover:underline">
+              <Link href="/terms" target="_blank" className="text-accent hover:underline">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" target="_blank" className="text-purple-to hover:underline">
+              <Link href="/privacy" target="_blank" className="text-accent hover:underline">
                 Privacy Policy
               </Link>
             </span>
@@ -234,7 +234,7 @@ function SignupForm() {
           Already have an account?{" "}
           <Link
             href={`/login${next ? `?next=${encodeURIComponent(next)}` : ""}`}
-            className="text-purple-to hover:underline"
+            className="text-accent hover:underline"
           >
             Log in
           </Link>

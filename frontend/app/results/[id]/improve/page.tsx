@@ -368,7 +368,7 @@ export default function ImprovePage() {
                           key={i}
                           className="flex items-start gap-2 text-text-primary text-sm"
                         >
-                          <span className="text-purple-to mt-0.5">→</span>
+                          <span className="text-accent mt-0.5">→</span>
                           {t}
                         </li>
                       ))}
@@ -382,7 +382,7 @@ export default function ImprovePage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2 pb-4">
           <Link
             href={`/results/${analysis.id}`}
-            className="text-center bg-card border border-border text-text-primary font-semibold px-6 py-3 rounded-xl hover:border-purple-to transition-colors"
+            className="text-center bg-card border border-border text-text-primary font-semibold px-6 py-3 rounded-xl hover:border-accent transition-colors"
           >
             ← Back to results
           </Link>
