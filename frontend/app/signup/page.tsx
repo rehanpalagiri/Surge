@@ -201,7 +201,7 @@ function SignupForm() {
             required
             autoComplete="new-password"
           />
-          <fieldset>
+          <fieldset className="min-w-0 [min-inline-size:0]">
             <legend className="text-text-muted text-xs font-medium mb-1.5">Date of birth</legend>
             <div className="flex gap-2">
               <input
@@ -240,7 +240,7 @@ function SignupForm() {
                 required
                 maxLength={4}
                 autoComplete="bday-year"
-                className="flex-1 text-center bg-surface border border-border rounded-xl px-2 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+                className="flex-1 min-w-0 text-center bg-surface border border-border rounded-xl px-2 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
               />
             </div>
             {dobComplete && (() => {

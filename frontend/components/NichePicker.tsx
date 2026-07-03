@@ -143,7 +143,7 @@ export default function NichePicker({ selected, onChange, max = 2 }: Props) {
               >
                 <span
                   className={`flex items-center justify-center px-1.5 h-4 rounded-full text-[9px] font-bold uppercase tracking-wide ${
-                    i === 0 ? "bg-accent text-white" : "bg-border text-text-primary"
+                    i === 0 ? "bg-accent text-background" : "bg-border text-text-primary"
                   }`}
                 >
                   {i === 0 ? "Primary" : "2nd"}

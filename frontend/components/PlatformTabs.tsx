@@ -32,7 +32,7 @@ export default function PlatformTabs({
       {/* Sliding indicator — snaps between the two equal-width cells. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-accent shadow-[0_2px_12px_-2px_rgba(168,85,247,0.6)] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+        className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-accent shadow-[0_2px_12px_-2px_rgba(245,166,35,0.45)] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         style={{
           width: "calc((100% - 0.5rem) / 2)",
           transform: `translateX(${activeIndex * 100}%)`,
@@ -46,7 +46,7 @@ export default function PlatformTabs({
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
           className={`relative z-10 rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors ${
-            value === t.id ? "text-white" : "text-text-muted hover:text-text-primary"
+            value === t.id ? "text-background" : "text-text-muted hover:text-text-primary"
           }`}
         >
           {t.label}

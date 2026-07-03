@@ -25,8 +25,8 @@ export default function GlobalError({
           justifyContent: "center",
           padding: "0 16px",
           textAlign: "center",
-          background: "#09090b",
-          color: "#ffffff",
+          background: "#121014",
+          color: "#F2EFE9",
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }}
@@ -35,7 +35,7 @@ export default function GlobalError({
           style={{
             fontWeight: 800,
             fontSize: 20,
-            color: "#a855f7",
+            color: "#F2EFE9",
             letterSpacing: "-0.02em",
             marginBottom: 48,
           }}
@@ -48,7 +48,7 @@ export default function GlobalError({
             marginTop: 16,
             fontSize: 28,
             fontWeight: 800,
-            color: "#ffffff",
+            color: "#F2EFE9",
             letterSpacing: "-0.02em",
           }}
         >
@@ -57,7 +57,7 @@ export default function GlobalError({
         <p
           style={{
             marginTop: 12,
-            color: "#a1a1aa",
+            color: "#A29B91",
             maxWidth: 384,
           }}
         >
@@ -68,8 +68,8 @@ export default function GlobalError({
           <button
             onClick={() => reset()}
             style={{
-              background: "linear-gradient(135deg, #7c3aed, #a855f7)",
-              color: "#ffffff",
+              background: "#F5A623",
+              color: "#121014",
               fontWeight: 600,
               padding: "12px 24px",
               borderRadius: 16,
@@ -84,7 +84,7 @@ export default function GlobalError({
           <a
             href="/"
             style={{
-              color: "#a1a1aa",
+              color: "#A29B91",
               fontWeight: 600,
               padding: "12px 24px",
               borderRadius: 16,
