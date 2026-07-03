@@ -7,6 +7,7 @@ import Nav from "@/components/Nav";
 import { getAnalysis, AnalysisOut, AttentionRiskItem, ImprovementItem, RubricContext } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ImproveSkeleton } from "@/components/Skeleton";
+import CopyButton from "@/components/CopyButton";
 
 function scoreColor(score: number): string {
   if (score >= 7) return "text-success";
@@ -24,12 +25,6 @@ function scoreBarBg(score: number): string {
   if (score >= 7) return "bg-success";
   if (score >= 4) return "bg-warning";
   return "bg-danger";
-}
-
-function riskClass(risk: AttentionRiskItem["risk"]): string {
-  if (risk === "high") return "border-danger/30 text-danger";
-  if (risk === "medium") return "border-warning/30 text-warning";
-  return "border-success/30 text-success";
 }
 
 export default function ImprovePage() {
@@ -154,33 +149,12 @@ export default function ImprovePage() {
         </div>
 
         {attentionRisks.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-            <div>
-              <h2 className="text-text-primary font-semibold text-lg">
-                Retention risk map
-              </h2>
-              <p className="text-text-muted text-xs mt-1">
-                AI-estimated attention risks, not measured retention data.
-              </p>
-            </div>
-            <div className="space-y-3">
-              {attentionRisks.map((item, i) => (
-                <div key={`${item.section}-${i}`} className={`border bg-surface rounded-xl px-4 py-3 ${riskClass(item.risk)}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-text-primary font-semibold text-sm">{item.section}</p>
-                    <span className="text-xs uppercase tracking-wide font-bold">{item.risk}</span>
-                  </div>
-                  <p className="text-text-muted text-sm mt-2">{item.reason}</p>
-                  {item.fix && (
-                    <p className="text-text-primary text-sm mt-2">
-                      <span className="font-semibold">Try: </span>
-                      {item.fix}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <p className="text-text-muted text-sm text-center">
+            Section-by-section breakdown?{" "}
+            <Link href={`/results/${analysis.id}#risk-map`} className="text-accent hover:underline">
+              The full retention risk map is on your results page →
+            </Link>
+          </p>
         )}
 
         {/* Prioritized action list */}
@@ -266,23 +240,27 @@ export default function ImprovePage() {
         {/* Rewrites — only when the richer data exists */}
         {hasPlan && s.hook_rewrite && (
           <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-text-primary font-semibold mb-2">
-              Rewrite your hook
-            </h3>
-            <p className="text-text-primary text-sm whitespace-pre-wrap bg-surface border border-border rounded-xl px-4 py-3">
-              {s.hook_rewrite}
-            </p>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <h3 className="text-text-primary font-semibold">Rewrite your hook</h3>
+              <CopyButton text={s.hook_rewrite} />
+            </div>
+            <div className="bg-surface border border-dashed border-border rounded-xl px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Suggested hook</p>
+              <p className="text-text-primary text-sm whitespace-pre-wrap">{s.hook_rewrite}</p>
+            </div>
           </div>
         )}
 
         {hasPlan && s.caption_rewrite && (
           <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-text-primary font-semibold mb-2">
-              Rewrite your caption
-            </h3>
-            <p className="text-text-primary text-sm whitespace-pre-wrap bg-surface border border-border rounded-xl px-4 py-3">
-              {s.caption_rewrite}
-            </p>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <h3 className="text-text-primary font-semibold">Rewrite your caption</h3>
+              <CopyButton text={s.caption_rewrite} />
+            </div>
+            <div className="bg-surface border border-dashed border-border rounded-xl px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Suggested caption</p>
+              <p className="text-text-primary text-sm whitespace-pre-wrap">{s.caption_rewrite}</p>
+            </div>
           </div>
         )}
 

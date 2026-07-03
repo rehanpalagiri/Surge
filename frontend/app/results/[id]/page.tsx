@@ -151,7 +151,7 @@ function AttentionRiskMap({ risks }: { risks: AttentionRiskItem[] }) {
   if (!Array.isArray(risks) || risks.length === 0) return null;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+    <div id="risk-map" className="bg-card border border-border rounded-2xl p-6 space-y-4 scroll-mt-20">
       <div>
         <h3 className="text-text-primary font-semibold">Retention risk map</h3>
         <p className="text-text-muted text-xs mt-1">
