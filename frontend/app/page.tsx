@@ -14,6 +14,8 @@ import { Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/componen
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import PlatformTabs from "@/components/PlatformTabs";
 import { track } from "@vercel/analytics";
+import ScoreBar from "@/components/ScoreBar";
+import { SAMPLE_SCORES, SAMPLE_RISK } from "@/lib/sampleReport";
 
 type Platform = "tiktok" | "instagram";
 
@@ -163,7 +165,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
 
             {/* Headline */}
             <div className="space-y-3 sm:space-y-4">
-              <h1 className="text-3xl sm:text-5xl font-extrabold text-text-primary leading-tight tracking-tight">
+              <h1 className="text-3xl sm:text-5xl font-extrabold text-text-primary leading-tight tracking-tight [text-wrap:balance]">
                 Find Where Viewers{" "}
                 <span className="gradient-text">Might Drift.</span>
               </h1>
@@ -204,6 +206,12 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               >
                 Review My Video →
               </button>
+              <Link
+                href="/sample"
+                className="btn-soft block w-full text-center text-text-primary font-semibold py-3 rounded-2xl text-sm"
+              >
+                See a sample review
+              </Link>
             </form>
 
             {/* Trust signals */}
@@ -214,9 +222,39 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
               <span>·</span>
               <span>No account required</span>
               <span>·</span>
-              <Link href="/sample" className="hover:text-text-primary underline transition-colors">
-                See a sample report →
+              <Link href="/pricing" className="hover:text-text-primary underline transition-colors">
+                3 free reviews a month — no card required
               </Link>
+            </div>
+
+            {/* Proof: a miniature of the actual product output */}
+            <div className="pt-6 text-left">
+              <div className="max-w-md mx-auto">
+                <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                      What a review looks like
+                    </span>
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-success/10 text-success border border-success/30">
+                      Strong craft
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {SAMPLE_SCORES.map((sc) => (
+                      <ScoreBar key={sc.label} label={sc.label} score={sc.score} animate={false} />
+                    ))}
+                  </div>
+                  <div className="border border-danger/30 bg-danger/5 rounded-xl px-3.5 py-3">
+                    <p className="text-[11px] font-bold text-danger uppercase tracking-wide">
+                      High risk · {SAMPLE_RISK.section}
+                    </p>
+                    <p className="text-text-muted text-xs mt-1 leading-relaxed">{SAMPLE_RISK.reason}</p>
+                  </div>
+                </div>
+                <p className="text-text-muted/80 text-xs text-center mt-3">
+                  From the sample review — yours is generated from your actual video.
+                </p>
+              </div>
             </div>
 
           </div>
