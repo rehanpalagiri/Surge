@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 /* ─── Design tokens: "Cutting Room" — dark edit-bay editorial theme ────────
-   Warm ink-black base, paper-white type, ONE timecode-amber accent (the
-   color of edit-bay counters and record lights). Status colors are sage /
+   Warm ink-black base, paper-white type, ONE waveform-teal accent (the
+   color of an editing suite's scope/monitor glow). Status colors are sage /
    ochre / warm red — no neon, no gradients, hairline borders throughout. */
 :root {
   --color-background: #121014;   /* ink black, warm */
@@ -13,13 +13,13 @@
   --color-border:     #2E2A31;   /* hairline */
   --color-text-primary: #F2EFE9; /* warm paper-white */
   --color-text-muted:   #A29B91; /* warm gray */
-  --color-accent:  #F5A623;      /* timecode amber */
+  --color-accent:  #2DD4BF;      /* waveform teal */
   --color-success: #55B380;      /* sage, lifted for dark */
   --color-warning: #D9A036;      /* ochre */
   --color-danger:  #E0604C;      /* warm signal red */
   /* Legacy gradient stops — kept only so stragglers render on-palette. */
-  --color-purple-from:  #F5A623;
-  --color-purple-to:    #F5A623;
+  --color-purple-from:  #2DD4BF;
+  --color-purple-to:    #2DD4BF;
   --color-blue-from:    #F2EFE9;
   --color-blue-to:      #F2EFE9;
 }
@@ -127,7 +127,7 @@ select:-webkit-autofill {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(360px circle at var(--drop-x) var(--drop-y), rgb(245 166 35 / 0.07), transparent 48%),
+    radial-gradient(360px circle at var(--drop-x) var(--drop-y), rgb(45 212 191 / 0.07), transparent 48%),
     linear-gradient(145deg, #1A181D, #141216);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 14px 40px rgb(0 0 0 / 0.35);
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
@@ -139,15 +139,15 @@ select:-webkit-autofill {
   inset: 0;
   z-index: -1;
   opacity: 0;
-  background: radial-gradient(240px circle at var(--drop-x) var(--drop-y), rgb(245 166 35 / 0.1), transparent 68%);
+  background: radial-gradient(240px circle at var(--drop-x) var(--drop-y), rgb(45 212 191 / 0.1), transparent 68%);
   transition: opacity 180ms ease;
   pointer-events: none;
 }
 
 .reactive-dropzone:hover,
 .reactive-dropzone:focus-visible {
-  border-color: rgb(245 166 35 / 0.55);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 16px 44px rgb(245 166 35 / 0.08), 0 0 0 1px rgb(245 166 35 / 0.08);
+  border-color: rgb(45 212 191 / 0.55);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 16px 44px rgb(45 212 191 / 0.08), 0 0 0 1px rgb(45 212 191 / 0.08);
 }
 
 .reactive-dropzone:hover::before,
@@ -156,11 +156,11 @@ select:-webkit-autofill {
 
 .reactive-dropzone.is-dragging {
   border-style: solid;
-  border-color: rgb(245 166 35 / 0.8);
+  border-color: rgb(45 212 191 / 0.8);
   background:
-    radial-gradient(420px circle at var(--drop-x) var(--drop-y), rgb(245 166 35 / 0.13), transparent 52%),
+    radial-gradient(420px circle at var(--drop-x) var(--drop-y), rgb(45 212 191 / 0.13), transparent 52%),
     linear-gradient(145deg, #221C10, #141216);
-  box-shadow: 0 0 0 4px rgb(245 166 35 / 0.08), 0 18px 55px rgb(245 166 35 / 0.14);
+  box-shadow: 0 0 0 4px rgb(45 212 191 / 0.08), 0 18px 55px rgb(45 212 191 / 0.14);
   transform: translateY(-2px) scale(1.008);
   animation: dropzone-pulse 1.15s ease-in-out infinite;
 }
@@ -195,8 +195,8 @@ select:-webkit-autofill {
   top: -2px;
   height: 1px;
   opacity: 0;
-  background: linear-gradient(90deg, transparent, rgb(245 166 35 / 0.8), transparent);
-  box-shadow: 0 0 14px rgb(245 166 35 / 0.5);
+  background: linear-gradient(90deg, transparent, rgb(45 212 191 / 0.8), transparent);
+  box-shadow: 0 0 14px rgb(45 212 191 / 0.5);
 }
 
 .reactive-dropzone.is-dragging .dropzone-scan {
@@ -223,15 +223,15 @@ select:-webkit-autofill {
 
 .reactive-dropzone:hover .dropzone-icon-shell {
   color: var(--color-accent);
-  border-color: rgb(245 166 35 / 0.3);
+  border-color: rgb(45 212 191 / 0.3);
   transform: translateY(-3px) scale(1.04);
-  box-shadow: 0 10px 26px rgb(245 166 35 / 0.15), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  box-shadow: 0 10px 26px rgb(45 212 191 / 0.15), inset 0 1px 0 rgb(255 255 255 / 0.06);
 }
 
 .dropzone-icon-shell.is-active {
   color: var(--color-accent);
-  border-color: rgb(245 166 35 / 0.4);
-  background: rgb(245 166 35 / 0.1);
+  border-color: rgb(45 212 191 / 0.4);
+  background: rgb(45 212 191 / 0.1);
   animation: dropzone-icon-float 1.15s ease-in-out infinite;
 }
 
@@ -241,8 +241,8 @@ select:-webkit-autofill {
   flex: 0 0 auto;
   border-radius: 1rem;
   color: var(--color-accent);
-  border-color: rgb(245 166 35 / 0.25);
-  background: rgb(245 166 35 / 0.08);
+  border-color: rgb(45 212 191 / 0.25);
+  background: rgb(45 212 191 / 0.08);
 }
 
 .dropzone-ready-track {
@@ -274,11 +274,11 @@ select:-webkit-autofill {
 .reactive-transfer-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgb(245 166 35 / 0.3);
+  border: 1px solid rgb(45 212 191 / 0.3);
   border-radius: 1.25rem;
   padding: 1.1rem;
   background:
-    radial-gradient(280px circle at 15% 10%, rgb(245 166 35 / 0.07), transparent 62%),
+    radial-gradient(280px circle at 15% 10%, rgb(45 212 191 / 0.07), transparent 62%),
     var(--color-card);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 14px 40px rgb(0 0 0 / 0.35);
 }
@@ -317,7 +317,7 @@ select:-webkit-autofill {
   border: 1px solid var(--color-border);
   border-radius: 1.25rem;
   background:
-    radial-gradient(340px circle at 12% 0%, rgb(245 166 35 / 0.05), transparent 62%),
+    radial-gradient(340px circle at 12% 0%, rgb(45 212 191 / 0.05), transparent 62%),
     var(--color-card);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03), 0 12px 32px rgb(0 0 0 / 0.3);
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
@@ -338,13 +338,13 @@ select:-webkit-autofill {
 }
 
 .project-card-reactive:hover {
-  border-color: rgb(245 166 35 / 0.45);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 16px 42px rgb(245 166 35 / 0.1);
+  border-color: rgb(45 212 191 / 0.45);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 16px 42px rgb(45 212 191 / 0.1);
   transform: translateY(-2px);
 }
 
 .project-card-reactive.needs-link {
-  border-color: rgb(245 166 35 / 0.35);
+  border-color: rgb(45 212 191 / 0.35);
 }
 
 .project-link-cta {
@@ -355,11 +355,11 @@ select:-webkit-autofill {
   justify-content: space-between;
   gap: 0.75rem;
   overflow: hidden;
-  border: 1px solid rgb(245 166 35 / 0.35);
+  border: 1px solid rgb(45 212 191 / 0.35);
   border-radius: 1rem;
   padding: 0.9rem;
   background:
-    radial-gradient(220px circle at 12% 10%, rgb(245 166 35 / 0.12), transparent 64%),
+    radial-gradient(220px circle at 12% 10%, rgb(45 212 191 / 0.12), transparent 64%),
     linear-gradient(135deg, #241D11, var(--color-card));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03), 0 8px 24px rgb(0 0 0 / 0.3);
 }
@@ -376,8 +376,8 @@ select:-webkit-autofill {
 }
 
 .project-link-cta:hover {
-  border-color: rgb(245 166 35 / 0.6);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 12px 32px rgb(245 166 35 / 0.14);
+  border-color: rgb(45 212 191 / 0.6);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 12px 32px rgb(45 212 191 / 0.14);
 }
 
 .project-link-cta:hover::after { transform: translateX(110%); }
@@ -387,7 +387,7 @@ select:-webkit-autofill {
 @keyframes motion-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes skeleton-reveal { from { visibility: hidden; } to { visibility: visible; } }
 @keyframes dropzone-pulse {
-  50% { box-shadow: 0 0 0 7px rgb(245 166 35 / 0.06), 0 22px 70px rgb(245 166 35 / 0.18); }
+  50% { box-shadow: 0 0 0 7px rgb(45 212 191 / 0.06), 0 22px 70px rgb(45 212 191 / 0.18); }
 }
 @keyframes dropzone-scan {
   0% { top: 4%; opacity: 0; }
@@ -427,8 +427,8 @@ select:-webkit-autofill {
 }
 @keyframes posted-btn-scale {
   0%   { transform: scale(1);    filter: none; }
-  28%  { transform: scale(1.05); filter: drop-shadow(0 0 18px rgb(245 166 35 / 0.55)); }
-  62%  { transform: scale(1.02); filter: drop-shadow(0 0 8px rgb(245 166 35 / 0.3)); }
+  28%  { transform: scale(1.05); filter: drop-shadow(0 0 18px rgb(45 212 191 / 0.55)); }
+  62%  { transform: scale(1.02); filter: drop-shadow(0 0 8px rgb(45 212 191 / 0.3)); }
   100% { transform: scale(1);    filter: none; }
 }
 @keyframes mini-burst {
@@ -484,9 +484,9 @@ select:-webkit-autofill {
     font-style: italic;
   }
   /* ── Tier 1: high-intent conversion CTAs (Analyze, link video, signup) ──
-     Timecode-amber "record button": solid accent with ink text. No gradient,
+     Waveform-teal "record button": solid accent with ink text. No gradient,
      no sweep. The !important defeats the text-white utility that ~40 call
-     sites pair with this class (white-on-amber would fail contrast). */
+     sites pair with this class (white-on-teal would fail contrast). */
   .gradient-btn {
     background: var(--color-accent);
     color: var(--color-background) !important;
@@ -494,7 +494,7 @@ select:-webkit-autofill {
   }
   .gradient-btn:hover {
     background: #FFB640;
-    box-shadow: 0 8px 22px -6px rgb(245 166 35 / 0.45);
+    box-shadow: 0 8px 22px -6px rgb(45 212 191 / 0.45);
     transform: translateY(-2px);
   }
 

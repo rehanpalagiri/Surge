@@ -32,7 +32,7 @@ export default function Image() {
             width: 120,
             height: 120,
             borderRadius: 28,
-            background: "#F5A623",
+            background: "#2DD4BF",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -90,7 +90,7 @@ export default function Image() {
               style={{
                 background: "#1E1B21",
                 border: "1px solid #2E2A31",
-                color: "#F5A623",
+                color: "#2DD4BF",
                 fontSize: 20,
                 fontWeight: 600,
                 padding: "10px 22px",

@@ -29,7 +29,7 @@ export default function Image() {
             width: 96,
             height: 96,
             borderRadius: 24,
-            background: "#F5A623",
+            background: "#2DD4BF",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -68,8 +68,8 @@ export default function Image() {
 
         <div
           style={{
-            background: "#F5A623",
-            border: "1px solid #F5A623",
+            background: "#2DD4BF",
+            border: "1px solid #2DD4BF",
             color: "#121014",
             fontSize: 24,
             fontWeight: 600,

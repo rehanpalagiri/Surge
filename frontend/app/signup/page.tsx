@@ -260,7 +260,7 @@ function SignupForm() {
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
               required
-              className="mt-0.5 accent-[#F5A623]"
+              className="mt-0.5 accent-[#2DD4BF]"
             />
             <span className="text-text-muted text-xs leading-relaxed">
               I agree to Surge&apos;s{" "}

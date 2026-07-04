@@ -17,7 +17,7 @@ function seededRand(seed: number): number {
   return x - Math.floor(x);
 }
 
-const _COLORS8 = ["#F5A623", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
+const _COLORS8 = ["#2DD4BF", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
 
 const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
   const angle = (i / 80) * 2 * Math.PI + seededRand(i * 3) * 0.5;
@@ -33,7 +33,7 @@ const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
   };
 });
 
-const _COLORS6 = ["#F5A623", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
+const _COLORS6 = ["#2DD4BF", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
 
 const MINI_BURST = Array.from({ length: 14 }, (_, i) => {
   const angle = (i / 14) * 2 * Math.PI + seededRand(i * 5) * 0.5;
@@ -101,8 +101,8 @@ function PostLinkRow({
     if (phase !== "celebrate") return;
     const card = containerRef.current?.closest("article") as HTMLElement | null;
     if (!card) return;
-    card.style.borderColor = "rgb(245 166 35 / 0.75)";
-    card.style.boxShadow = "0 0 0 1px rgb(245 166 35 / 0.35), 0 0 50px rgb(245 166 35 / 0.22)";
+    card.style.borderColor = "rgb(45 212 191 / 0.75)";
+    card.style.boxShadow = "0 0 0 1px rgb(45 212 191 / 0.35), 0 0 50px rgb(45 212 191 / 0.22)";
     card.style.transition = "border-color 0.25s, box-shadow 0.25s";
     return () => {
       card.style.borderColor = "";
@@ -203,7 +203,7 @@ function PostLinkRow({
             <div
               className="pointer-events-none absolute inset-0"
               style={{
-                background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgb(245 166 35 / 0.95), rgb(224 96 76 / 0.6) 45%, transparent 72%)",
+                background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgb(45 212 191 / 0.95), rgb(224 96 76 / 0.6) 45%, transparent 72%)",
                 animation: "screen-flash 0.7s ease-out forwards",
               }}
             />
