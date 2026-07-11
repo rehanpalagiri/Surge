@@ -675,3 +675,65 @@ select:-webkit-autofill {
 .reactive-dropzone:hover .dropzone-icon-shell { color:var(--color-accent); border-color:rgb(199 243 107 / .3); box-shadow:0 10px 26px rgb(199 243 107 / .12),inset 0 1px 0 rgb(255 255 255 / .05); }
 .dropzone-icon-shell.is-active { border-color:rgb(199 243 107 / .4); background:rgb(199 243 107 / .1); }
 .dropzone-file-icon { border-color:rgb(199 243 107 / .25); background:rgb(199 243 107 / .08); }
+
+/* ═══════ Landing interactive layer: platform wordmarks · buttons · scroll ═══════ */
+
+/* Scroll progress bar */
+.surge-progress { position:fixed; top:0; left:0; right:0; height:2px; transform:scaleX(0); transform-origin:0 50%; background:linear-gradient(90deg,var(--color-accent),#E4FF9E); box-shadow:0 0 12px rgb(199 243 107 / .5); z-index:60; }
+
+/* TikTok glitch wordmark (cyan/red chromatic split) */
+.surge-glitch { position:relative; display:inline-block; isolation:isolate; color:var(--color-text-primary); }
+.surge-glitch::before, .surge-glitch::after { content:attr(data-text); position:absolute; left:0; top:0; width:100%; pointer-events:none; }
+.surge-glitch::before { color:#25F4EE; transform:translate(-1.5px,0); z-index:-1; }
+.surge-glitch::after  { color:#FE2C55; transform:translate(1.5px,0);  z-index:-2; }
+
+/* Instagram gradient wordmark (purple → yellow, mirrored so the full range shows and loops) */
+.surge-ig-gradient { background:linear-gradient(120deg,#4f5bd5,#962fbf,#d62976,#fa7e1e,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; font-weight:inherit; }
+
+/* Magnetic + gloss + ripple + press on the landing CTAs */
+.surge-primary, .surge-nav-cta, .surge-submit { position:relative; overflow:hidden; isolation:isolate; }
+.surge-primary, .surge-nav-cta { transform:translate(var(--mx,0),var(--my,0)); transition:transform .4s cubic-bezier(.2,.9,.25,1.25), box-shadow .25s ease, background .25s ease; }
+.surge-submit:not(:disabled) { transform:translate(var(--mx,0),var(--my,0)); transition:transform .4s cubic-bezier(.2,.9,.25,1.25), box-shadow .25s ease, filter .25s ease; }
+.surge-primary:hover { transform:translate(var(--mx,0),var(--my,0)); box-shadow:0 18px 44px rgb(199 243 107 / .3); }
+.surge-primary:active, .surge-nav-cta:active, .surge-submit:not(:disabled):active { transform:translate(var(--mx,0),var(--my,0)) scale(.96); }
+.surge-primary::after, .surge-nav-cta::after, .surge-submit:not(:disabled)::after { content:""; position:absolute; inset:0; z-index:2; pointer-events:none; background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%); transform:translateX(-140%); transition:transform .6s ease; }
+.surge-primary:hover::after, .surge-nav-cta:hover::after, .surge-submit:not(:disabled):hover::after { transform:translateX(140%); }
+.surge-primary svg, .surge-nav-cta svg, .surge-submit svg, .surge-analysis button svg, .surge-report-card > a svg { transition:transform .25s ease; }
+.surge-primary:hover svg, .surge-nav-cta:hover svg, .surge-submit:not(:disabled):hover svg, .surge-analysis button:hover svg, .surge-report-card > a:hover svg { transform:translateX(4px); }
+.surge-ripple { position:absolute; z-index:1; border-radius:50%; background:currentColor; opacity:.28; transform:scale(0); pointer-events:none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* TikTok glitch bursts — subtle idle, faster on hover / when the tab is active */
+  .surge-glitch::before { animation:surge-glitch-a 4.2s steps(1) infinite; }
+  .surge-glitch::after  { animation:surge-glitch-b 4.2s steps(1) infinite; }
+  .surge-glitch:hover::before, .surge-platform-tabs button.active .surge-glitch::before { animation-duration:1.5s; }
+  .surge-glitch:hover::after,  .surge-platform-tabs button.active .surge-glitch::after  { animation-duration:1.5s; }
+  @keyframes surge-glitch-a {
+    0%,88%,100%{ transform:translate(-1.5px,0); clip-path:inset(0 0 0 0); }
+    90%{ transform:translate(-4px,-1px); clip-path:inset(12% 0 58% 0); }
+    94%{ transform:translate(-2px,1px);  clip-path:inset(46% 0 18% 0); }
+  }
+  @keyframes surge-glitch-b {
+    0%,86%,100%{ transform:translate(1.5px,0); clip-path:inset(0 0 0 0); }
+    89%{ transform:translate(4px,1px);  clip-path:inset(52% 0 16% 0); }
+    93%{ transform:translate(2px,-1px); clip-path:inset(16% 0 54% 0); }
+  }
+  /* Instagram shimmer */
+  .surge-ig-gradient { animation:surge-ig-shimmer 6s linear infinite; }
+  .surge-ig-gradient:hover, .surge-platform-tabs button.active .surge-ig-gradient { animation-duration:2.2s; filter:saturate(1.25) brightness(1.08); }
+  @keyframes surge-ig-shimmer { to { background-position:200% 0; } }
+  /* ripple */
+  .surge-ripple { animation:surge-ripple .6s ease-out forwards; }
+  @keyframes surge-ripple { to { transform:scale(2.4); opacity:0; } }
+  /* scroll reveal */
+  .surge-reveal { opacity:0; transform:translateY(26px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
+  .surge-reveal.in { opacity:1; transform:none; }
+  .surge-step-grid article.surge-reveal { transition-delay:.05s; }
+  .surge-step-grid article:nth-child(2).surge-reveal { transition-delay:.13s; }
+  .surge-step-grid article:nth-child(3).surge-reveal { transition-delay:.21s; }
+  /* retention chart wipes in when the monitor scrolls into view */
+  .surge-chart-line { clip-path:inset(0 100% 0 0); }
+  .surge-monitor.in .surge-chart-line { animation:surge-chart-wipe 1.1s .35s ease forwards; }
+  @keyframes surge-chart-wipe { to { clip-path:inset(0 0 0 0); } }
+  .surge-float { will-change:transform; }
+}

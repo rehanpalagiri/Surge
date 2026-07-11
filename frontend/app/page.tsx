@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Eye, Lock, Play, Sparkles, Target, LineChart, Upload, Zap } from "lucide-react";
@@ -46,6 +46,51 @@ function formatBadRequestMessage(msg: string) {
     // Plain-text API errors are already suitable for display.
   }
   return detail || "Analysis failed. Please try again.";
+}
+
+// ── Landing-only platform wordmarks + interactive button helpers ──
+// TikTok cyan/red glitch wordmark (see .surge-glitch in globals.css).
+function Glitch({ text }: { text: string }) {
+  return <span className="surge-glitch" data-text={text}>{text}</span>;
+}
+// Instagram purple→yellow gradient wordmark (.surge-ig-gradient).
+function Gradient({ text }: { text: string }) {
+  return <span className="surge-ig-gradient">{text}</span>;
+}
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Magnetic cursor-pull + click ripple; returns props to spread onto a button/anchor.
+function useInteractive<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const onPointerMove = (e: React.PointerEvent<T>) => {
+    const el = ref.current;
+    if (!el || prefersReducedMotion()) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${(e.clientX - r.left - r.width / 2) * 0.28}px`);
+    el.style.setProperty("--my", `${(e.clientY - r.top - r.height / 2) * 0.28}px`);
+  };
+  const onPointerLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.setProperty("--mx", "0px");
+    el.style.setProperty("--my", "0px");
+  };
+  const onPointerDown = (e: React.PointerEvent<T>) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const size = Math.max(r.width, r.height);
+    const ripple = document.createElement("span");
+    ripple.className = "surge-ripple";
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${e.clientX - r.left - size / 2}px`;
+    ripple.style.top = `${e.clientY - r.top - size / 2}px`;
+    el.appendChild(ripple);
+    ripple.addEventListener("animationend", () => ripple.remove());
+  };
+  return { ref, onPointerMove, onPointerLeave, onPointerDown };
 }
 
 // Kept as a rollback reference while the anonymous landing is iterated.
@@ -317,6 +362,55 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
 
+  const navCta = useInteractive<HTMLAnchorElement>();
+  const heroCta = useInteractive<HTMLAnchorElement>();
+  const finalCta = useInteractive<HTMLAnchorElement>();
+  const submitBtn = useInteractive<HTMLButtonElement>();
+  const progressRef = useRef<HTMLDivElement>(null);
+
+  // Scroll progress bar + subtle parallax on the floating badges (rAF-throttled).
+  useEffect(() => {
+    const progress = progressRef.current;
+    const floats = Array.from(document.querySelectorAll<HTMLElement>(".surge-float"));
+    const reduce = prefersReducedMotion();
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        if (progress) progress.style.transform = `scaleX(${max > 0 ? Math.min(y / max, 1) : 0})`;
+        if (!reduce) floats.forEach((g, i) => (g.style.transform = `translateY(${y * (i % 2 ? -0.05 : 0.04)}px)`));
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // Reveal sections (and trigger the chart wipe) as they scroll into view.
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll(".surge-reveal, .surge-monitor"));
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.12, rootMargin: "0px 0px -6% 0px" }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   const handleFile = async (f: File) => {
     setError("");
     if (!isAllowedVideoFile(f)) {
@@ -367,9 +461,10 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
     <>
       {processing && <AnalysisOverlay active={processing} steps={PROCESSING_STEPS} />}
       <main className="surge-landing min-h-screen bg-background">
+        <div className="surge-progress" ref={progressRef} aria-hidden />
         <header className="surge-nav">
           <Link href="/" className="surge-brand" aria-label="Surge home"><span className="surge-brand-mark">↯</span> surge</Link>
-          <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><Link className="surge-nav-cta" href="/signup">Sign up free <ArrowRight size={15}/></Link></nav>
+          <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
         </header>
 
         {deleted && <div className="surge-toast">Your account has been deleted.<button onClick={onDismissDeleted} aria-label="Dismiss">×</button></div>}
@@ -379,7 +474,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <div className="surge-eyebrow"><Sparkles size={14}/> BUILT FOR SHORT-FORM CREATORS</div>
             <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
             <p>Surge finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
-            <div className="surge-actions"><a className="surge-primary" href="#upload">Analyze my video <ArrowRight size={18}/></a><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
+            <div className="surge-actions"><a className="surge-primary" href="#upload" {...heroCta}>Analyze my video <ArrowRight size={18}/></a><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
             <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Tooltip label="Your uploaded video is analyzed privately"><Lock size={13}/></Tooltip> Videos stay private</span><span>No card</span></div>
           </div>
 
@@ -393,24 +488,24 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
           </div>
         </section>
 
-        <div className="surge-platforms"><span>BUILT FOR THE FEEDS YOU CARE ABOUT</span><div><b>♪ TikTok</b><b>◎ Instagram Reels</b></div></div>
+        <div className="surge-platforms surge-reveal"><span>BUILT FOR THE FEEDS YOU CARE ABOUT</span><div><b>♪ <Glitch text="TikTok"/></b><b>◎ <Gradient text="Instagram Reels"/></b></div></div>
 
         <section className="surge-upload-wrap" id="upload">
-          <div className="surge-section-heading"><span>YOUR FIRST WIN</span><h2>See what your viewers see.</h2><p>No dashboards. No guesswork. Drop a draft and get a clear edit list in under a minute.</p></div>
-          <form onSubmit={handleSubmit} className="surge-upload-card">
-            <div className="surge-platform-tabs"><button type="button" className={platform === "tiktok" ? "active" : ""} onClick={() => setPlatform("tiktok")}>♪ TikTok</button><button type="button" className={platform === "instagram" ? "active" : ""} onClick={() => setPlatform("instagram")}>◎ Instagram</button></div>
+          <div className="surge-section-heading surge-reveal"><span>YOUR FIRST WIN</span><h2>See what your viewers see.</h2><p>No dashboards. No guesswork. Drop a draft and get a clear edit list in under a minute.</p></div>
+          <form onSubmit={handleSubmit} className="surge-upload-card surge-reveal">
+            <div className="surge-platform-tabs"><button type="button" className={platform === "tiktok" ? "active" : ""} onClick={() => setPlatform("tiktok")}>♪ <Glitch text="TikTok"/></button><button type="button" className={platform === "instagram" ? "active" : ""} onClick={() => setPlatform("instagram")}>◎ <Gradient text="Instagram"/></button></div>
             <ReactiveVideoDropzone file={file} onFileSelected={handleFile} selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}/>
             {error && <div className="surge-error">{error}</div>}
-            <button type="submit" disabled={processing} className="surge-submit">{file ? "Find my attention leaks" : "Choose a video to continue"}<ArrowRight size={18}/></button>
+            <button type="submit" disabled={processing} className="surge-submit" {...submitBtn}>{file ? "Find my attention leaks" : "Choose a video to continue"}<ArrowRight size={18}/></button>
             <div className="surge-privacy"><Tooltip label="Your upload is encrypted in transit and deleted after analysis"><Lock size={13}/></Tooltip> Encrypted in transit · Automatically deleted after analysis</div>
           </form>
         </section>
 
-        <section className="surge-how" id="how"><div className="surge-section-heading surge-left"><span>HOW IT WORKS</span><h2>From rough cut to<br/><em>ready to post.</em></h2></div><div className="surge-step-grid"><article><b>01</b><div className="surge-step-art"><Upload size={25}/><i/><i/><i/></div><h3>Drop your draft</h3><p>Upload the version sitting in your camera roll. No account needed.</p></article><article><b>02</b><div className="surge-step-art scan"><span>Scanning hook</span><i/></div><h3>Surge reads the edit</h3><p>We review hook, pacing, captions, tension, sync, and ending.</p></article><article><b>03</b><div className="surge-step-art fix"><Check size={25}/><i/><i/><i/></div><h3>Fix what matters</h3><p>Get timestamped changes you can make before your next post.</p></article></div></section>
+        <section className="surge-how" id="how"><div className="surge-section-heading surge-left surge-reveal"><span>HOW IT WORKS</span><h2>From rough cut to<br/><em>ready to post.</em></h2></div><div className="surge-step-grid"><article className="surge-reveal"><b>01</b><div className="surge-step-art"><Upload size={25}/><i/><i/><i/></div><h3>Drop your draft</h3><p>Upload the version sitting in your camera roll. No account needed.</p></article><article className="surge-reveal"><b>02</b><div className="surge-step-art scan"><span>Scanning hook</span><i/></div><h3>Surge reads the edit</h3><p>We review hook, pacing, captions, tension, sync, and ending.</p></article><article className="surge-reveal"><b>03</b><div className="surge-step-art fix"><Check size={25}/><i/><i/><i/></div><h3>Fix what matters</h3><p>Get timestamped changes you can make before your next post.</p></article></div></section>
 
-        <section className="surge-report" id="report"><div className="surge-report-inner"><div className="surge-report-copy"><span>AN ACTUAL SURGE REPORT</span><h2>Feedback that speaks<br/>creator, <em>not corporate.</em></h2><p>Every review turns six craft signals into one clear next experiment.</p><div className="surge-score-list">{SAMPLE_SCORES.slice(0, 4).map((sc) => <div key={sc.label}><span>{sc.label}</span><b>{sc.score}/10</b><i><em style={{ width: `${sc.score * 10}%` }}/></i></div>)}</div></div><div className="surge-report-card"><div><span>BIGGEST ATTENTION LEAK · {SAMPLE_RISK.section}</span><h3>Make the moment easier to read.</h3><p>{SAMPLE_RISK.reason}</p></div><a href="/sample">Explore the full sample report <ArrowRight size={16}/></a></div></div></section>
+        <section className="surge-report" id="report"><div className="surge-report-inner"><div className="surge-report-copy surge-reveal"><span>AN ACTUAL SURGE REPORT</span><h2>Feedback that speaks<br/>creator, <em>not corporate.</em></h2><p>Every review turns six craft signals into one clear next experiment.</p><div className="surge-score-list">{SAMPLE_SCORES.slice(0, 4).map((sc) => <div key={sc.label}><span>{sc.label}</span><b>{sc.score}/10</b><i><em style={{ width: `${sc.score * 10}%` }}/></i></div>)}</div></div><div className="surge-report-card surge-reveal"><div><span>BIGGEST ATTENTION LEAK · {SAMPLE_RISK.section}</span><h3>Make the moment easier to read.</h3><p>{SAMPLE_RISK.reason}</p></div><a href="/sample">Explore the full sample report <ArrowRight size={16}/></a></div></div></section>
 
-        <section className="surge-final"><span className="surge-brand-mark large">↯</span><h2>Your better edit is<br/><em>one upload away.</em></h2><p>Find the moment they&apos;ll scroll—before they do.</p><a className="surge-primary" href="#upload">Analyze my first video <ArrowRight size={18}/></a><small>Free · no card · under 60 seconds</small></section>
+        <section className="surge-final"><span className="surge-brand-mark large">↯</span><h2 className="surge-reveal">Your better edit is<br/><em>one upload away.</em></h2><p>Find the moment they&apos;ll scroll—before they do.</p><a className="surge-primary" href="#upload" {...finalCta}>Analyze my first video <ArrowRight size={18}/></a><small>Free · no card · under 60 seconds</small></section>
         <footer className="surge-footer"><Link href="/" className="surge-brand"><span className="surge-brand-mark">↯</span> surge</Link><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} Surge</small></footer>
       </main>
     </>
