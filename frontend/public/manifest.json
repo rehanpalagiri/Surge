@@ -4,8 +4,8 @@
   "description": "AI-assisted retention craft review and post experiment tracking",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#7c3aed",
+  "background_color": "#0B0D0B",
+  "theme_color": "#C7F36B",
   "orientation": "portrait-primary",
   "icons": [
     {

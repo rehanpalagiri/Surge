@@ -277,7 +277,7 @@ function DataPrivacyCard() {
                   name="seed_consent"
                   checked={consent.seed_consent === opt.value}
                   onChange={() => pick(opt.value)}
-                  className="mt-0.5 accent-[#2DD4BF]"
+                  className="mt-0.5 accent-[#C7F36B]"
                 />
                 <span className="text-text-primary text-sm">{opt.label}</span>
               </label>

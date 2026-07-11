@@ -25,7 +25,7 @@ export default function GlobalError({
           justifyContent: "center",
           padding: "0 16px",
           textAlign: "center",
-          background: "#121014",
+          background: "#0B0D0B",
           color: "#F2EFE9",
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -68,8 +68,8 @@ export default function GlobalError({
           <button
             onClick={() => reset()}
             style={{
-              background: "#2DD4BF",
-              color: "#121014",
+              background: "#C7F36B",
+              color: "#0B0D0B",
               fontWeight: 600,
               padding: "12px 24px",
               borderRadius: 16,

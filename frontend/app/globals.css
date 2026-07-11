@@ -7,22 +7,42 @@
    color of an editing suite's scope/monitor glow). Status colors are sage /
    ochre / warm red — no neon, no gradients, hairline borders throughout. */
 :root {
-  --color-background: #121014;   /* ink black, warm */
-  --color-surface:    #1A181D;   /* raised wells */
-  --color-card:       #1E1B21;   /* cards */
-  --color-border:     #2E2A31;   /* hairline */
-  --color-text-primary: #F2EFE9; /* warm paper-white */
-  --color-text-muted:   #A29B91; /* warm gray */
-  --color-accent:  #2DD4BF;      /* waveform teal */
-  --color-success: #55B380;      /* sage, lifted for dark */
-  --color-warning: #D9A036;      /* ochre */
-  --color-danger:  #E0604C;      /* warm signal red */
+  --color-background: #0B0D0B;   /* graphite */
+  --color-surface:    #121510;   /* moss-black well */
+  --color-card:       #181C16;   /* raised graphite */
+  --color-border:     #2B3128;   /* olive hairline */
+  --color-text-primary: #F3F5ED; /* warm bone */
+  --color-text-muted:   #98A091; /* sage gray */
+  --color-accent:  #C7F36B;      /* controlled citron */
+  --color-success: #6FC694;      /* fresh sage */
+  --color-warning: #EABF57;      /* warm amber */
+  --color-danger:  #F06A5B;      /* coral signal */
+  --font-display: Georgia, "Times New Roman", serif;
   /* Legacy gradient stops — kept only so stragglers render on-palette. */
-  --color-purple-from:  #2DD4BF;
-  --color-purple-to:    #2DD4BF;
-  --color-blue-from:    #F2EFE9;
-  --color-blue-to:      #F2EFE9;
+  --color-purple-from:  #C7F36B;
+  --color-purple-to:    #C7F36B;
+  --color-blue-from:    #F3F5ED;
+  --color-blue-to:      #F3F5ED;
 }
+
+/* Landing UX utilities: quiet typography, accessible explanations, and a stable CSS-only chart. */
+.surge-chart-line { position:absolute; inset:0; }
+.surge-chart-line i { position:absolute; display:block; height:2px; transform-origin:left center; background:var(--color-accent); box-shadow:0 0 6px rgb(45 212 191 / .3); }
+.surge-chart-line .seg-one { left:0; top:17%; width:27%; transform:rotate(10deg); }
+.surge-chart-line .seg-two { left:26%; top:22%; width:26%; transform:rotate(13deg); }
+.surge-chart-line .seg-three { left:51%; top:36%; width:17%; transform:rotate(42deg); }
+.surge-chart-line .seg-four { left:66%; top:54%; width:33%; transform:rotate(12deg); }
+.surge-chart-line b { position:absolute; left:66%; top:51%; width:10px; height:10px; border:3px solid var(--color-danger); border-radius:50%; background:#1c1a1e; transform:translate(-50%,-50%); }
+.surge-help { display:inline-grid; place-items:center; width:14px; height:14px; margin-left:5px; border:1px solid currentColor; border-radius:50%; font-size:9px; line-height:1; }
+.tooltip-wrap { position:relative; display:inline-flex; align-items:center; vertical-align:middle; }
+.tooltip-trigger { display:inline-flex; align-items:center; justify-content:center; border-radius:4px; }
+.tooltip-content { position:absolute; z-index:30; left:50%; bottom:calc(100% + 8px); width:max-content; max-width:220px; padding:7px 9px; border:1px solid var(--color-border); border-radius:7px; background:#252229; color:var(--color-text-primary); box-shadow:0 10px 26px rgb(0 0 0 / .35); font-size:10px; line-height:1.35; opacity:0; pointer-events:none; transform:translate(-50%, 3px); transition:opacity 140ms ease, transform 140ms ease; }
+.tooltip-content::after { content:""; position:absolute; left:50%; top:100%; width:7px; height:7px; border-right:1px solid var(--color-border); border-bottom:1px solid var(--color-border); background:#252229; transform:translate(-50%,-4px) rotate(45deg); }
+.tooltip-wrap:hover .tooltip-content, .tooltip-trigger:focus-visible + .tooltip-content { opacity:1; transform:translate(-50%,0); }
+.surge-skeleton-nav { width:min(1180px,calc(100% - 48px)); height:76px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--color-border); }
+.surge-skeleton-hero { width:min(1180px,calc(100% - 48px)); min-height:560px; margin:0 auto; padding:80px 0; display:grid; grid-template-columns:1fr 1.1fr; gap:55px; align-items:center; }
+.surge-skeleton-upload { width:min(700px,calc(100% - 48px)); margin:0 auto; padding:80px 0; display:grid; gap:18px; }
+@media (max-width:720px){.surge-skeleton-nav,.surge-skeleton-hero,.surge-skeleton-upload{width:calc(100% - 28px)}.surge-skeleton-hero{grid-template-columns:1fr;min-height:auto;padding:60px 0}.surge-skeleton-hero>div:last-child{min-height:250px}.surge-skeleton-upload{padding:60px 0}}
 
 /* ── Anonymous landing refresh: an editorial edit-bay with one waveform accent ── */
 .surge-landing { color: var(--color-text-primary); overflow: hidden; }
@@ -588,3 +608,70 @@ select:-webkit-autofill {
     background: #D63A96;
   }
 }
+
+/* Volt Graphite colorway — youthful energy without the default AI-purple palette. */
+.surge-landing { background:#0B0D0B; }
+.surge-brand-mark,
+.surge-nav-cta,
+.surge-primary,
+.surge-submit,
+.surge-analysis button { background:var(--color-accent); color:#0B0D0B!important; }
+.surge-primary { box-shadow:0 12px 28px rgb(199 243 107 / .12); }
+.surge-primary:hover { background:#D8FA91; }
+.surge-monitor { background:#11150F; border-color:#30382D; }
+.surge-monitor-bar { border-color:#252B23; color:#7D8677; }
+.surge-dots { color:#475043; }
+.surge-video-frame { background:#2B3328; border-color:#3A4436; }
+.surge-video-frame::before { background:#151914; }
+.surge-person { background:#697565; }
+.surge-person::before { background:#A1AA9C; }
+.surge-person::after { background:#20261E; }
+.surge-analysis { background:#171B15; border-color:#30382D; }
+.surge-analysis-head { color:#A0A99A; }
+.surge-analysis-head b { color:var(--color-text-primary); }
+.surge-chart { border-color:#384034; }
+.surge-chart::before,
+.surge-chart::after { border-color:#252B23; }
+.surge-chart-line i { box-shadow:0 0 6px rgb(199 243 107 / .28); }
+.surge-chart-line b { background:#171B15; border-color:var(--color-danger); }
+.surge-finding { background:#1E1B16; border-color:rgb(240 106 91 / .35); }
+.surge-finding span,
+.surge-report-card span { color:#F28A7E; }
+.surge-float { background:#1B2018; border-color:#374031; color:#B5BDAE; }
+.surge-platforms { color:#737C6E; }
+.surge-platforms b { color:#A6AEA0; }
+.surge-upload-card,
+.surge-step-grid article,
+.surge-report { background:#121510; border-color:#2B3128; }
+.surge-platform-tabs { background:#0B0D0B; }
+.surge-platform-tabs button { color:#7D8578; }
+.surge-platform-tabs button.active { background:#22271F; color:var(--color-text-primary); box-shadow:inset 0 0 0 1px #3A4236; }
+.surge-submit:disabled { background:#242A21; color:#71796C; }
+.surge-error { background:#211816; color:#F1978C; border-color:rgb(240 106 91 / .35); }
+.surge-privacy,
+.surge-footer { color:#6F786A; }
+.surge-step-art { background:#0E110D; border-color:#282E25; }
+.surge-step-art svg { background:#1A1F18; border-color:#3A4236; }
+.surge-step-art.scan { background:#20251E; }
+.surge-step-art.scan span { background:#26301B; color:var(--color-accent); }
+.surge-step-art.scan i { background:#64705F; }
+.surge-step-art.fix i,
+.surge-score-list i { background:#292F26; }
+.surge-score-list,
+.surge-score-list > div { border-color:#30372D; }
+.surge-score-list > div { color:#A0A99A; }
+.surge-report-card { background:#1A1F18; border-color:#394235; }
+.surge-report-card > div { background:#211B17; border-color:rgb(240 106 91 / .35); }
+.surge-report-card p { color:#9CA596; }
+.tooltip-content,
+.tooltip-content::after { background:#1A1F18; border-color:#343C30; }
+.reactive-dropzone { background:#10140F; border-color:rgb(152 160 145 / .35); }
+.reactive-dropzone::before { background:#171D12; }
+.reactive-dropzone:hover,
+.reactive-dropzone:focus-visible { border-color:rgb(199 243 107 / .55); box-shadow:inset 0 1px 0 rgb(255 255 255 / .04),0 16px 44px rgb(199 243 107 / .08),0 0 0 1px rgb(199 243 107 / .08); }
+.reactive-dropzone.is-dragging { border-color:rgb(199 243 107 / .8); background:#182014; box-shadow:0 0 0 4px rgb(199 243 107 / .08),0 18px 55px rgb(199 243 107 / .14); }
+.reactive-dropzone.has-file { background:#152017; border-color:rgb(111 198 148 / .5); }
+.dropzone-scan { background:var(--color-accent); box-shadow:0 0 14px rgb(199 243 107 / .45); }
+.reactive-dropzone:hover .dropzone-icon-shell { color:var(--color-accent); border-color:rgb(199 243 107 / .3); box-shadow:0 10px 26px rgb(199 243 107 / .12),inset 0 1px 0 rgb(255 255 255 / .05); }
+.dropzone-icon-shell.is-active { border-color:rgb(199 243 107 / .4); background:rgb(199 243 107 / .1); }
+.dropzone-file-icon { border-color:rgb(199 243 107 / .25); background:rgb(199 243 107 / .08); }

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Instrument_Sans } from "next/font/google";
+import { Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 import InstallBanner from "@/components/InstallBanner";
@@ -10,13 +10,6 @@ const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
-});
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-display",
 });
 
 import { SITE_URL } from "@/lib/site";
@@ -55,7 +48,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#121014",
+  themeColor: "#0B0D0B",
 };
 
 export default function RootLayout({
@@ -65,9 +58,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${instrumentSans.variable} ${fraunces.variable} font-sans antialiased bg-background text-text-primary min-h-screen`}
-      >
+      <body className={`${instrumentSans.variable} font-sans antialiased bg-background text-text-primary min-h-screen`}>
         <RegisterSW />
         {children}
         <LinkPromptModal />

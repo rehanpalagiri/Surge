@@ -98,6 +98,31 @@ export function SkeletonMedia({ className = "" }: { className?: string }) {
   return <Skeleton className={`aspect-video w-full rounded-2xl ${className}`} />;
 }
 
+export function LandingSkeleton() {
+  return (
+    <main className="surge-skeleton min-h-screen bg-background" aria-busy="true" aria-label="Loading Surge">
+      <header className="surge-skeleton-nav">
+        <Skeleton className="h-8 w-28 rounded-lg" />
+        <Skeleton className="h-9 w-24 rounded-lg" />
+      </header>
+      <section className="surge-skeleton-hero">
+        <div className="space-y-5">
+          <Skeleton className="h-3 w-44 rounded-md" />
+          <Skeleton className="h-16 w-full max-w-xl rounded-xl" />
+          <Skeleton className="h-4 w-10/12 rounded-md" />
+          <Skeleton className="h-12 w-44 rounded-xl" />
+        </div>
+        <Skeleton className="aspect-[1.35] w-full rounded-2xl" />
+      </section>
+      <section className="surge-skeleton-upload">
+        <SkeletonTitle width="45%" className="mx-auto" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <SkeletonButton className="w-full" />
+      </section>
+    </main>
+  );
+}
+
 export function LoadingRegion({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
     <section className={`skeleton-delay ${className}`} aria-busy="true" aria-label={label}>

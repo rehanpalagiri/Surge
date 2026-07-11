@@ -10,7 +10,8 @@ import { getToken } from "@/lib/auth";
 import { analyzeVideo, wakeBackend } from "@/lib/api";
 import { isAllowedVideoFile } from "@/lib/videoValidation";
 import { AnalysisOverlay } from "@/components/AnalysisProgress";
-import { Skeleton, SkeletonCard, SkeletonMedia, SkeletonTitle } from "@/components/Skeleton";
+import { LandingSkeleton } from "@/components/Skeleton";
+import { Tooltip } from "@/components/Tooltip";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import PlatformTabs from "@/components/PlatformTabs";
 import { track } from "@vercel/analytics";
@@ -47,6 +48,8 @@ function formatBadRequestMessage(msg: string) {
   return detail || "Analysis failed. Please try again.";
 }
 
+// Kept as a rollback reference while the anonymous landing is iterated.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
   const router = useRouter();
 
@@ -377,14 +380,14 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
             <p>Surge finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
             <div className="surge-actions"><a className="surge-primary" href="#upload">Analyze my video <ArrowRight size={18}/></a><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
-            <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Lock size={13}/> Videos stay private</span><span>No card</span></div>
+            <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Tooltip label="Your uploaded video is analyzed privately"><Lock size={13}/></Tooltip> Videos stay private</span><span>No card</span></div>
           </div>
 
           <div className="surge-monitor" aria-label="Example Surge craft review">
             <div className="surge-monitor-bar"><span className="surge-dots">● ● ●</span><span>surge / craft review</span><span className="surge-live"><b/> Review ready</span></div>
             <div className="surge-monitor-body">
-              <div className="surge-video-frame"><div className="surge-video-copy">3 editing tricks<br/><b>nobody tells you</b></div><div className="surge-person"/><div className="surge-timeline"><span>0:09</span><i/></div><label><Eye size={11}/> Attention risk</label></div>
-              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map</span><b>0:08–0:12</b></div><div className="surge-chart"><i/><i/><i/><svg viewBox="0 0 360 120" preserveAspectRatio="none" aria-hidden><path d="M0 15 C40 20 65 25 96 31 S145 45 172 45 S205 42 226 72 S270 81 300 91 S330 98 360 108"/><circle cx="226" cy="72" r="5"/></svg></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
+              <div className="surge-video-frame"><div className="surge-video-copy">3 editing tricks<br/><b>nobody tells you</b></div><div className="surge-person"/><div className="surge-timeline"><span>0:09</span><i/></div><label><Tooltip label="AI-estimated craft issue"><Eye size={11}/></Tooltip> Attention risk</label></div>
+              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map <Tooltip label="AI-estimated craft diagnostic, not measured audience retention"><span className="surge-help">?</span></Tooltip></span><b>0:08–0:12</b></div><div className="surge-chart" aria-label="Attention risk drops around 0:09"><div className="surge-chart-line" aria-hidden><i className="seg-one"/><i className="seg-two"/><i className="seg-three"/><i className="seg-four"/><b/></div></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
             </div>
             <div className="surge-float surge-float-a"><Sparkles size={14}/> AI craft analysis</div><div className="surge-float surge-float-b"><b>+24%</b> clearer hook</div>
           </div>
@@ -399,7 +402,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <ReactiveVideoDropzone file={file} onFileSelected={handleFile} selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}/>
             {error && <div className="surge-error">{error}</div>}
             <button type="submit" disabled={processing} className="surge-submit">{file ? "Find my attention leaks" : "Choose a video to continue"}<ArrowRight size={18}/></button>
-            <div className="surge-privacy"><Lock size={13}/> Encrypted in transit · Automatically deleted after analysis</div>
+            <div className="surge-privacy"><Tooltip label="Your upload is encrypted in transit and deleted after analysis"><Lock size={13}/></Tooltip> Encrypted in transit · Automatically deleted after analysis</div>
           </form>
         </section>
 
@@ -445,27 +448,7 @@ export default function Home() {
   }, []);
 
   if (showSplash === null) {
-    return (
-      <main className="min-h-screen bg-background" aria-busy="true" aria-label="Checking account session">
-        <header className="border-b border-border px-6 py-4">
-          <div className="mx-auto flex max-w-5xl items-center justify-between">
-            <Skeleton className="h-6 w-20 rounded-md" />
-            <Skeleton className="h-9 w-24 rounded-lg" />
-          </div>
-        </header>
-        <div className="skeleton-delay mx-auto max-w-2xl space-y-6 px-4 py-10">
-          <div className="space-y-3 text-center">
-            <SkeletonTitle width="62%" className="mx-auto h-9" />
-            <Skeleton className="mx-auto h-4 rounded-md" width="78%" />
-          </div>
-          <SkeletonCard className="space-y-5">
-            <SkeletonMedia className="border border-dashed border-border" />
-            <Skeleton className="h-12 w-full rounded-xl" />
-            <Skeleton className="h-12 w-full rounded-xl" />
-          </SkeletonCard>
-        </div>
-      </main>
-    );
+    return <LandingSkeleton />;
   }
 
   if (showSplash) {
