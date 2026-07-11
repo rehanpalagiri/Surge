@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Target, LineChart, Zap } from "lucide-react";
+import { ArrowRight, Check, Eye, Lock, Play, Sparkles, Target, LineChart, Upload, Zap } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
 import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
@@ -47,7 +47,7 @@ function formatBadRequestMessage(msg: string) {
   return detail || "Analysis failed. Please try again.";
 }
 
-function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
+function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
   const router = useRouter();
 
   const [platform, setPlatform] = useState<Platform>("tiktok");
@@ -300,6 +300,115 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             </div>
           </div>
         </footer>
+      </main>
+    </>
+  );
+}
+
+// ─── Premium anonymous landing page ──────────────────────────────────────────
+
+function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
+  const router = useRouter();
+  const [platform, setPlatform] = useState<Platform>("tiktok");
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState("");
+  const [processing, setProcessing] = useState(false);
+
+  const handleFile = async (f: File) => {
+    setError("");
+    if (!isAllowedVideoFile(f)) {
+      setError("Please upload a supported video file (MP4, MOV, WEBM, AVI & more).");
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      setError("Your video is too large. Maximum size is 100 MB — try exporting at 720p from your camera app.");
+      return;
+    }
+    const duration = await new Promise<number>((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      const url = URL.createObjectURL(f);
+      video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(video.duration); };
+      video.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+      video.src = url;
+    });
+    if (duration > 600) {
+      setError("Your video is over 10 minutes. Please trim it before uploading.");
+      return;
+    }
+    setFile(f);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) { setError("Upload a video to get started — MP4, MOV, WEBM, AVI & more."); return; }
+    setError("");
+    track("upload_started", { platform, niche_count: 0, logged_in: false });
+    setProcessing(true);
+    try {
+      await wakeBackend();
+      const { id } = await analyzeVideo(file, "", "", "", platform, "", "");
+      track("analysis_complete", { platform, mode: "direct" });
+      router.push(`/results/${id}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      track("upload_error", { error_type: msg.includes("429") ? "rate_limit" : msg.includes("400") ? "validation" : "other" });
+      setProcessing(false);
+      if (msg.includes("429")) setError("You've used your free analyses for today. Sign up free to get more.");
+      else if (msg.includes("400")) setError(formatBadRequestMessage(msg));
+      else setError(msg || "Analysis failed. Please try again.");
+    }
+  };
+
+  return (
+    <>
+      {processing && <AnalysisOverlay active={processing} steps={PROCESSING_STEPS} />}
+      <main className="surge-landing min-h-screen bg-background">
+        <header className="surge-nav">
+          <Link href="/" className="surge-brand" aria-label="Surge home"><span className="surge-brand-mark">↯</span> surge</Link>
+          <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><Link className="surge-nav-cta" href="/signup">Sign up free <ArrowRight size={15}/></Link></nav>
+        </header>
+
+        {deleted && <div className="surge-toast">Your account has been deleted.<button onClick={onDismissDeleted} aria-label="Dismiss">×</button></div>}
+
+        <section className="surge-hero">
+          <div className="surge-hero-copy">
+            <div className="surge-eyebrow"><Sparkles size={14}/> BUILT FOR SHORT-FORM CREATORS</div>
+            <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
+            <p>Surge finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
+            <div className="surge-actions"><a className="surge-primary" href="#upload">Analyze my video <ArrowRight size={18}/></a><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
+            <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Lock size={13}/> Videos stay private</span><span>No card</span></div>
+          </div>
+
+          <div className="surge-monitor" aria-label="Example Surge craft review">
+            <div className="surge-monitor-bar"><span className="surge-dots">● ● ●</span><span>surge / craft review</span><span className="surge-live"><b/> Review ready</span></div>
+            <div className="surge-monitor-body">
+              <div className="surge-video-frame"><div className="surge-video-copy">3 editing tricks<br/><b>nobody tells you</b></div><div className="surge-person"/><div className="surge-timeline"><span>0:09</span><i/></div><label><Eye size={11}/> Attention risk</label></div>
+              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map</span><b>0:08–0:12</b></div><div className="surge-chart"><i/><i/><i/><svg viewBox="0 0 360 120" preserveAspectRatio="none" aria-hidden><path d="M0 15 C40 20 65 25 96 31 S145 45 172 45 S205 42 226 72 S270 81 300 91 S330 98 360 108"/><circle cx="226" cy="72" r="5"/></svg></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
+            </div>
+            <div className="surge-float surge-float-a"><Sparkles size={14}/> AI craft analysis</div><div className="surge-float surge-float-b"><b>+24%</b> clearer hook</div>
+          </div>
+        </section>
+
+        <div className="surge-platforms"><span>BUILT FOR THE FEEDS YOU CARE ABOUT</span><div><b>♪ TikTok</b><b>◎ Instagram Reels</b></div></div>
+
+        <section className="surge-upload-wrap" id="upload">
+          <div className="surge-section-heading"><span>YOUR FIRST WIN</span><h2>See what your viewers see.</h2><p>No dashboards. No guesswork. Drop a draft and get a clear edit list in under a minute.</p></div>
+          <form onSubmit={handleSubmit} className="surge-upload-card">
+            <div className="surge-platform-tabs"><button type="button" className={platform === "tiktok" ? "active" : ""} onClick={() => setPlatform("tiktok")}>♪ TikTok</button><button type="button" className={platform === "instagram" ? "active" : ""} onClick={() => setPlatform("instagram")}>◎ Instagram</button></div>
+            <ReactiveVideoDropzone file={file} onFileSelected={handleFile} selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}/>
+            {error && <div className="surge-error">{error}</div>}
+            <button type="submit" disabled={processing} className="surge-submit">{file ? "Find my attention leaks" : "Choose a video to continue"}<ArrowRight size={18}/></button>
+            <div className="surge-privacy"><Lock size={13}/> Encrypted in transit · Automatically deleted after analysis</div>
+          </form>
+        </section>
+
+        <section className="surge-how" id="how"><div className="surge-section-heading surge-left"><span>HOW IT WORKS</span><h2>From rough cut to<br/><em>ready to post.</em></h2></div><div className="surge-step-grid"><article><b>01</b><div className="surge-step-art"><Upload size={25}/><i/><i/><i/></div><h3>Drop your draft</h3><p>Upload the version sitting in your camera roll. No account needed.</p></article><article><b>02</b><div className="surge-step-art scan"><span>Scanning hook</span><i/></div><h3>Surge reads the edit</h3><p>We review hook, pacing, captions, tension, sync, and ending.</p></article><article><b>03</b><div className="surge-step-art fix"><Check size={25}/><i/><i/><i/></div><h3>Fix what matters</h3><p>Get timestamped changes you can make before your next post.</p></article></div></section>
+
+        <section className="surge-report" id="report"><div className="surge-report-inner"><div className="surge-report-copy"><span>AN ACTUAL SURGE REPORT</span><h2>Feedback that speaks<br/>creator, <em>not corporate.</em></h2><p>Every review turns six craft signals into one clear next experiment.</p><div className="surge-score-list">{SAMPLE_SCORES.slice(0, 4).map((sc) => <div key={sc.label}><span>{sc.label}</span><b>{sc.score}/10</b><i><em style={{ width: `${sc.score * 10}%` }}/></i></div>)}</div></div><div className="surge-report-card"><div><span>BIGGEST ATTENTION LEAK · {SAMPLE_RISK.section}</span><h3>Make the moment easier to read.</h3><p>{SAMPLE_RISK.reason}</p></div><a href="/sample">Explore the full sample report <ArrowRight size={16}/></a></div></div></section>
+
+        <section className="surge-final"><span className="surge-brand-mark large">↯</span><h2>Your better edit is<br/><em>one upload away.</em></h2><p>Find the moment they&apos;ll scroll—before they do.</p><a className="surge-primary" href="#upload">Analyze my first video <ArrowRight size={18}/></a><small>Free · no card · under 60 seconds</small></section>
+        <footer className="surge-footer"><Link href="/" className="surge-brand"><span className="surge-brand-mark">↯</span> surge</Link><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} Surge</small></footer>
       </main>
     </>
   );
