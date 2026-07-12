@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Sans } from "next/font/google";
+import { Instrument_Sans, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
 import InstallBanner from "@/components/InstallBanner";
@@ -10,6 +10,13 @@ const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
+});
+
+// Display face for headings and brand moments (--font-display in globals.css).
+const schibstedGrotesk = Schibsted_Grotesk({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-schibsted",
 });
 
 import { SITE_URL } from "@/lib/site";
@@ -48,7 +55,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0B0D0B",
+  themeColor: "#0B0C10",
 };
 
 export default function RootLayout({
@@ -58,7 +65,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${instrumentSans.variable} font-sans antialiased bg-background text-text-primary min-h-screen`}>
+      <body className={`${instrumentSans.variable} ${schibstedGrotesk.variable} font-sans antialiased bg-background text-text-primary min-h-screen`}>
         <RegisterSW />
         {children}
         <LinkPromptModal />

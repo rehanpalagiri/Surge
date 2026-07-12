@@ -17,13 +17,14 @@ const config: Config = {
         "text-primary": "var(--color-text-primary)",
         "text-muted":   "var(--color-text-muted)",
         accent:         "var(--color-accent)",
+        "accent-2":     "var(--color-accent-2)",
         success:        "var(--color-success)",
         warning:        "var(--color-warning)",
         danger:         "var(--color-danger)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "Georgia", "serif"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",

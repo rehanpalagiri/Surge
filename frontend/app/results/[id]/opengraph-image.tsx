@@ -13,7 +13,7 @@ export default function Image() {
     (
       <div
         style={{
-          background: "#0B0D0B",
+          background: "#0B0C10",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -29,13 +29,13 @@ export default function Image() {
             width: 96,
             height: 96,
             borderRadius: 24,
-            background: "#C7F36B",
+            background: "#CDF54A",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 54,
             fontWeight: 800,
-            color: "#0B0D0B",
+            color: "#0B0C10",
           }}
         >
           S
@@ -68,9 +68,9 @@ export default function Image() {
 
         <div
           style={{
-            background: "#C7F36B",
-            border: "1px solid #C7F36B",
-            color: "#0B0D0B",
+            background: "#CDF54A",
+            border: "1px solid #CDF54A",
+            color: "#0B0C10",
             fontSize: 24,
             fontWeight: 600,
             padding: "14px 36px",

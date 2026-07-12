@@ -15,7 +15,7 @@ export default function Image() {
     (
       <div
         style={{
-          background: "#0B0D0B",
+          background: "#0B0C10",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -32,7 +32,7 @@ export default function Image() {
             width: 120,
             height: 120,
             borderRadius: 28,
-            background: "#C7F36B",
+            background: "#CDF54A",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -42,7 +42,7 @@ export default function Image() {
             style={{
               fontSize: 68,
               fontWeight: 800,
-              color: "#0B0D0B",
+              color: "#0B0C10",
               lineHeight: 1,
             }}
           >
@@ -90,7 +90,7 @@ export default function Image() {
               style={{
                 background: "#1E1B21",
                 border: "1px solid #2E2A31",
-                color: "#C7F36B",
+                color: "#CDF54A",
                 fontSize: 20,
                 fontWeight: 600,
                 padding: "10px 22px",
