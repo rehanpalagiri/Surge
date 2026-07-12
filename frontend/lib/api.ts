@@ -807,7 +807,14 @@ export interface CraftInsights {
   patterns: CraftPattern[];
   pattern_min: number;
   observed_range:
-    | { available: false; need: number; have: number }
+    | {
+        available: false;
+        need: number;
+        have: number;
+        // Present when 1 ≤ have < need: plain descriptive stats of the
+        // creator's own like rates (median/min/max only — never a band).
+        preliminary?: { n: number; horizon: string; median: number; min: number; max: number };
+      }
     | { available: true; n: number; horizon: string; p25: number; median: number; p75: number; min: number; max: number };
   notice: string;
 }

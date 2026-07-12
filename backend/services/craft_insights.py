@@ -221,7 +221,21 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
             "max": round(s[-1], 2),
         }
     else:
+        # Below the IQR floor we still surface plain descriptive stats —
+        # median/min/max of what actually happened — explicitly labeled
+        # preliminary. At n=1 all three collapse to the single observation;
+        # never percentiles, never a band, so nothing here pretends to be
+        # a predictive range.
+        s = sorted(like_rates)
         observed_range = {"available": False, "need": FORECAST_MIN, "have": n}
+        if n >= 1:
+            observed_range["preliminary"] = {
+                "n": n,
+                "horizon": horizon,
+                "median": round(_quantile(s, 0.5), 2),
+                "min": round(s[0], 2),
+                "max": round(s[-1], 2),
+            }
 
     return {
         "total_analyses": total_analyses,

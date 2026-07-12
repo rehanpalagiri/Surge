@@ -146,6 +146,29 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(f["median"], f["p75"])
         self.assertLessEqual(f["p75"], f["max"])
 
+    async def test_preliminary_stats_below_forecast_min(self):
+        # A single verified post yields descriptive stats (all collapsed to
+        # the one observation), explicitly not the predictive band.
+        async with self.Session() as db:
+            await self._add_post(db, 7, views=1000, likes=53)  # 5.3%
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+        r = out["observed_range"]
+        self.assertFalse(r["available"])
+        self.assertEqual(r["have"], 1)
+        self.assertEqual(r["preliminary"], {
+            "n": 1, "horizon": "7d", "median": 5.3, "min": 5.3, "max": 5.3,
+        })
+        # No percentile keys sneak in below the floor.
+        self.assertNotIn("p25", r)
+
+    async def test_preliminary_absent_when_no_verified_posts(self):
+        async with self.Session() as db:
+            await self._add_post(db, 7, views=None, likes=None)  # analysis, no outcome
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+        self.assertNotIn("preliminary", out["observed_range"])
+
     async def test_other_users_data_excluded(self):
         async with self.Session() as db:
             await self._add_post(db, 8, views=1000, likes=100, user_id=USER)

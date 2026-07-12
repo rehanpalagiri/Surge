@@ -29,6 +29,33 @@ function Notice({ text }: { text: string }) {
   );
 }
 
+/* Small "n of N" progress toward the next honesty threshold. Informational,
+   so it wears the ice-blue secondary accent — never the action citron. */
+function ThresholdProgress({ have, need, label }: { have: number; need: number; label: string }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="h-1.5 rounded-full bg-border/60 overflow-hidden" role="presentation">
+        <div
+          className="h-full rounded-full bg-accent-2"
+          style={{ width: `${Math.min(100, Math.round((have / need) * 100))}%` }}
+        />
+      </div>
+      <p className="text-text-muted text-xs">{label}</p>
+    </div>
+  );
+}
+
+function ConfidenceChip({ text }: { text: string }) {
+  return (
+    <span className="shrink-0 text-[11px] font-semibold px-2.5 py-0.5 rounded-full text-accent-2 bg-accent-2/10 border border-accent-2/30">
+      {text}
+    </span>
+  );
+}
+
+const scoreColor = (v: number | null) =>
+  v == null ? "text-text-muted" : v >= 7 ? "text-success" : v >= 4 ? "text-warning" : "text-danger";
+
 export default function InsightsPage() {
   const router = useRouter();
   const [data, setData] = useState<CraftInsights | null>(null);
@@ -176,12 +203,84 @@ export default function InsightsPage() {
                   Empirical spread across your {data.observed_range.n} verified posts — historical context, not a target or a promise.
                 </p>
               </div>
-            ) : (
-              <div className="bg-card border border-border rounded-2xl p-5 text-sm text-text-muted">
-                Link <strong className="text-text-primary">{Math.max(0, data.observed_range.need - data.observed_range.have)}</strong> more
-                verified {Math.max(0, data.observed_range.need - data.observed_range.have) === 1 ? "post" : "posts"} to unlock your historical like-rate band.
+            ) : data.observed_range.preliminary && verified === 1 ? (
+              /* ── n = 1: the single-post comparison, honestly labeled ── */
+              <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-text-primary font-semibold">Your first data point</h2>
+                  <ConfidenceChip text="based on 1 post" />
+                </div>
+                <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                  <div>
+                    <p className="text-3xl font-bold text-accent tabular-nums">
+                      {data.observed_range.preliminary.median}%
+                    </p>
+                    <p className="text-text-muted text-xs mt-1">observed like rate at the {horizonLabel} mark</p>
+                  </div>
+                </div>
+                {/* Craft snapshot of that post, next to its real result */}
+                {data.posts[0] && (
+                  <div className="flex flex-wrap gap-2">
+                    {DIMENSION_ORDER.map(([key, label]) => {
+                      const v = data.posts[0].scores[key];
+                      return (
+                        <span
+                          key={key}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-surface border border-border/60 text-text-muted"
+                        >
+                          {label}{" "}
+                          <strong className={`tabular-nums ${scoreColor(v)}`}>
+                            {v != null ? v.toFixed(0) : "—"}
+                          </strong>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-text-muted text-xs">
+                  A single data point, not a pattern — historical context, never a promise.
+                  This becomes your personal range as more posts link.
+                </p>
+                <ThresholdProgress
+                  have={1}
+                  need={data.observed_range.need}
+                  label={`1 of ${data.observed_range.need} posts toward your reliable like-rate range`}
+                />
               </div>
-            )}
+            ) : data.observed_range.preliminary ? (
+              /* ── 2 ≤ n < 8: preliminary spread, low confidence ── */
+              <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-text-primary font-semibold">What your posts land so far</h2>
+                  <ConfidenceChip text={`based on ${data.observed_range.preliminary.n} posts · low confidence`} />
+                </div>
+                <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                  <div>
+                    <p className="text-3xl font-bold text-accent tabular-nums">
+                      {data.observed_range.preliminary.median}%
+                    </p>
+                    <p className="text-text-muted text-xs mt-1">median like rate</p>
+                  </div>
+                  <div className="text-sm text-text-muted">
+                    <p>
+                      range{" "}
+                      <span className="text-text-primary tabular-nums">
+                        {data.observed_range.preliminary.min}–{data.observed_range.preliminary.max}%
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <p className="text-text-muted text-xs">
+                  Raw spread of your {data.observed_range.preliminary.n} verified posts — historical
+                  context, not a target or a promise.
+                </p>
+                <ThresholdProgress
+                  have={data.observed_range.have}
+                  need={data.observed_range.need}
+                  label={`${data.observed_range.have} of ${data.observed_range.need} posts toward your reliable like-rate range`}
+                />
+              </div>
+            ) : null}
 
             {/* ── Per-dimension patterns ── */}
             {data.patterns.length > 0 ? (
@@ -209,9 +308,17 @@ export default function InsightsPage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-card border border-border rounded-2xl p-5 text-sm text-text-muted">
-                Link <strong className="text-text-primary">{Math.max(0, data.pattern_min - verified)}</strong> more
-                verified {Math.max(0, data.pattern_min - verified) === 1 ? "post" : "posts"} to see which craft dimensions track your results.
+              <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+                <h2 className="text-text-primary font-semibold">Which craft dimensions track your results</h2>
+                <p className="text-text-muted text-sm">
+                  Unlocks at {data.pattern_min} verified posts — the smallest sample where a
+                  high-vs-low comparison is honest rather than noise dressed up as signal.
+                </p>
+                <ThresholdProgress
+                  have={verified}
+                  need={data.pattern_min}
+                  label={`${verified} of ${data.pattern_min} posts toward your craft-vs-results patterns`}
+                />
               </div>
             )}
 
@@ -238,13 +345,8 @@ export default function InsightsPage() {
                       </td>
                       {DIMENSION_ORDER.map(([key]) => {
                         const v = post.scores[key];
-                        const color =
-                          v == null ? "text-text-muted"
-                          : v >= 7 ? "text-success"
-                          : v >= 4 ? "text-warning"
-                          : "text-danger";
                         return (
-                          <td key={key} className={`text-center px-1.5 tabular-nums ${color}`}>
+                          <td key={key} className={`text-center px-1.5 tabular-nums ${scoreColor(v)}`}>
                             {v != null ? v.toFixed(0) : "—"}
                           </td>
                         );
