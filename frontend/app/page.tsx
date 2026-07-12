@@ -20,11 +20,6 @@ import { SAMPLE_SCORES, SAMPLE_RISK } from "@/lib/sampleReport";
 
 type Platform = "tiktok" | "instagram";
 
-const PLATFORM_LABEL: Record<Platform, string> = {
-  tiktok: "TikTok",
-  instagram: "Instagram",
-};
-
 const PROCESSING_STEPS = [
   "Analyzing the first-3-second hook…",
   "Scanning for on-screen text collisions…",
@@ -562,7 +557,13 @@ export default function Home() {
       {/* ── Hero ── */}
       <section className="flex flex-col items-center px-4 pt-10 pb-6 text-center">
         <h1 className="text-3xl font-bold text-text-primary tracking-tight">
-          Review your next {PLATFORM_LABEL[platform]} video
+          Review your next{" "}
+          {platform === "tiktok" ? (
+            <span className="tiktok-glitch" data-text="TikTok">TikTok</span>
+          ) : (
+            <span className="gradient-text-instagram">Instagram</span>
+          )}{" "}
+          video
         </h1>
         <p className="text-text-muted text-sm mt-2">
           Find attention risks and one editing hypothesis to test in your next version.

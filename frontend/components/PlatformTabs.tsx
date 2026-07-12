@@ -8,9 +8,10 @@ const TABS: { id: Platform; label: string }[] = [
 ];
 
 /**
- * Sliding platform switcher. A single pill snaps between TikTok and Instagram
- * (no emojis, no per-platform colors). Reused on every page that toggles
- * platform so the interaction is identical everywhere.
+ * Sliding platform switcher. A single pill snaps between TikTok and Instagram,
+ * and the pill wears the active platform's brand color (TikTok cyan / Instagram
+ * gradient — see the brand layer in globals.css). Reused on every page that
+ * toggles platform so the interaction is identical everywhere.
  */
 export default function PlatformTabs({
   value,
@@ -29,10 +30,13 @@ export default function PlatformTabs({
       aria-label="Platform"
       className={`relative grid grid-cols-2 rounded-2xl border border-border bg-card p-1 ${className}`}
     >
-      {/* Sliding indicator — snaps between the two equal-width cells. */}
+      {/* Sliding indicator — snaps between the two equal-width cells and
+          carries the active platform's brand fill. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl bg-accent shadow-[0_2px_12px_-2px_rgba(45, 212, 191,0.45)] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+        className={`pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl shadow-md transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
+          value === "tiktok" ? "brand-tab-tiktok" : "brand-tab-instagram"
+        }`}
         style={{
           width: "calc((100% - 0.5rem) / 2)",
           transform: `translateX(${activeIndex * 100}%)`,
@@ -46,7 +50,10 @@ export default function PlatformTabs({
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
           className={`relative z-10 rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors ${
-            value === t.id ? "text-background" : "text-text-muted hover:text-text-primary"
+            value === t.id
+              ? // Ink on TikTok cyan, white on the Instagram gradient — both AA.
+                t.id === "tiktok" ? "text-background" : "text-white"
+              : "text-text-muted hover:text-text-primary"
           }`}
         >
           {t.label}

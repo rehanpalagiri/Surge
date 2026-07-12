@@ -432,13 +432,15 @@ type Platform = "tiktok" | "instagram";
 
 const PLATFORM_TABS: {
   id: Platform;
-  // Solid platform accent colors, legible on paper (gradients/glitch retired).
+  // Brand treatments from the globals.css brand layer: chromatic glitch for
+  // TikTok, purple→yellow gradient for Instagram (headings are large enough
+  // for AA; dense contexts use the solid fallbacks instead).
   textGradient: string;
   btnGradient: string;
 }[] = [
   {
     id: "tiktok",
-    textGradient: "tiktok-red",
+    textGradient: "tiktok-glitch",
     btnGradient: "gradient-btn-tiktok",
   },
   {
@@ -629,7 +631,10 @@ export default function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-extrabold">
             Your{" "}
-            <span className={cfg.textGradient}>
+            <span
+              className={cfg.textGradient}
+              data-text={platform === "tiktok" ? "TikTok Projects" : undefined}
+            >
               {platform === "tiktok" ? "TikTok Projects" : "Instagram Reels"}
             </span>
           </h1>

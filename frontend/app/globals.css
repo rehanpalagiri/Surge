@@ -570,9 +570,14 @@ select:-webkit-autofill {
     box-shadow: 0 4px 14px -6px rgb(0 0 0 / 0.4);
   }
 
-  /* ── TikTok accents (bright on ink; no gradients, no glitch) ── */
+  /* ═══ Platform brand layer — the ONLY place TikTok/Instagram colors live.
+     TikTok = cyan #25F4EE / red #FE2C55 chromatic; Instagram = purple→yellow.
+     Rule: glitch/gradient on hero surfaces and headings; where they would
+     hurt scannability (tables, tiny labels), use the solid classes below. ═══ */
+
+  /* ── TikTok ── */
   .gradient-text-tiktok {
-    color: #FE2C55; /* TikTok brand red */
+    color: #FE2C55; /* solid brand red — dense/small-text fallback */
   }
   /* Solid TikTok red — matches TikTok's own CTA button colour */
   .gradient-btn-tiktok {
@@ -583,34 +588,77 @@ select:-webkit-autofill {
     background: #FF4D6D;
   }
 
-  /* Legacy glitch classes: now plain ink (the split-shadow effect read as a
-     rendering bug and cannot work on paper). Kept for class-name compat. */
+  /* Chromatic-split wordmark for hero surfaces. Needs data-text set to the
+     same string so the cyan/red layers can mirror it. Static split; the
+     idle burst animation is gated behind no-preference below. */
   .tiktok-glitch,
   .tiktok-glitch-sm {
+    position: relative;
+    display: inline-block;
+    isolation: isolate;
     color: var(--color-text-primary);
-    text-shadow: none;
   }
+  .tiktok-glitch::before, .tiktok-glitch::after,
+  .tiktok-glitch-sm::before, .tiktok-glitch-sm::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    pointer-events: none;
+  }
+  .tiktok-glitch::before    { color: #25F4EE; transform: translate(-1.5px, 0); z-index: -1; }
+  .tiktok-glitch::after     { color: #FE2C55; transform: translate(1.5px, 0);  z-index: -2; }
+  .tiktok-glitch-sm::before { color: #25F4EE; transform: translate(-1px, 0);   z-index: -1; }
+  .tiktok-glitch-sm::after  { color: #FE2C55; transform: translate(1px, 0);    z-index: -2; }
 
-  /* Solid TikTok accent colours for individual elements (paper-legible) */
-  .tiktok-cyan  { color: #2BC5C0; }
+  /* Solid TikTok accent colours for individual elements */
+  .tiktok-cyan  { color: #25F4EE; }
   .tiktok-red   { color: #FE2C55; }
 
-  /* TikTok upload-zone accent ring (was a neon glow) */
+  /* TikTok upload-zone accent ring (cyan hairline, red ambience) */
   .tiktok-glow {
-    box-shadow: 0 0 0 1px #fe2c5540;
+    box-shadow: 0 0 0 1px #25f4ee40, 0 10px 30px -10px #fe2c5545;
   }
 
-  /* ── Instagram accent: single magenta, no tri-color gradient ── */
-  .gradient-text-instagram {
-    color: #E1489E;
+  /* Active platform-tab fills (PlatformTabs indicator). TikTok cyan takes
+     ink text; the Instagram gradient stops at deep pink so white text
+     stays AA — never extend it into the orange/yellow range on fills. */
+  .brand-tab-tiktok {
+    background: #25F4EE;
   }
+  .brand-tab-instagram {
+    background: linear-gradient(120deg, #4f5bd5, #962fbf, #d62976);
+  }
+
+  /* ── Instagram ── */
+  /* Purple→yellow gradient for headings (large text only — the indigo stop
+     is 3.5:1 on ink, AA-large not AA-normal). Mirrored so it loops. */
+  .gradient-text-instagram {
+    background: linear-gradient(120deg, #4f5bd5, #962fbf, #d62976, #fa7e1e, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+  /* Solid magenta — dense/small-text fallback where a gradient hurts */
+  .ig-magenta { color: #E1489E; }
   .gradient-btn-instagram {
-    background: #C13584;
+    background: linear-gradient(45deg, #4f5bd5, #962fbf, #d62976);
     color: #ffffff;
   }
   .gradient-btn-instagram:hover {
-    background: #D63A96;
+    filter: saturate(1.15) brightness(1.12);
   }
+}
+
+/* TikTok glitch idle bursts + Instagram shimmer for the brand utilities —
+   reuses the landing keyframes; motion only when the user allows it. */
+@media (prefers-reduced-motion: no-preference) {
+  .tiktok-glitch::before { animation: surge-glitch-a 4.2s steps(1) infinite; }
+  .tiktok-glitch::after  { animation: surge-glitch-b 4.2s steps(1) infinite; }
+  .gradient-text-instagram { animation: surge-ig-shimmer 6s linear infinite; }
 }
 
 /* Volt Graphite colorway — youthful energy without the default AI-purple palette. */
