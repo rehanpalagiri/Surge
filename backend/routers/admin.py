@@ -23,8 +23,9 @@ from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
 from services.instagram_harvest import harvest_instagram_all, get_last_instagram_harvest
 from services.trend_harvest import harvest_trending, get_last_trend_harvest
 from services.trend_insights import generate_trend_insight
-from services.outcome_collection import collect_due_outcomes, collection_status
+from services.outcome_collection import collect_due_outcomes, collection_status, collector_health
 from services.economics import build_operations_report
+from services.telemetry import gemini_price_source
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -67,6 +68,18 @@ async def get_outcome_collection_status(
     return await collection_status(db)
 
 
+@router.get("/outcomes/health")
+async def get_outcome_collector_health(
+    window_days: int = 7,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Full collector health: per-provider fetch reliability, recent job outcomes,
+    and the last run summary. Durable (derived from usage_events + jobs), so a
+    silently-failing collector reports non-OK even across a process restart."""
+    return await collector_health(db, window_days=max(1, min(window_days, 90)))
+
+
 @router.get("/operations/report")
 async def get_operations_report(
     db: AsyncSession = Depends(get_db),
@@ -74,6 +87,68 @@ async def get_operations_report(
 ):
     """Measured reliability/economics inputs with explicit missing-cost coverage."""
     return await build_operations_report(db)
+
+
+@router.get("/costs/per-analysis")
+async def get_per_analysis_cost(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Real measured Gemini cost per completed analysis over a recent window.
+
+    Sums the perception + reasoning cost per analysis_id (from token counts × list
+    price), then reports the distribution so a $9.99 unlimited seat can be checked
+    against actual spend. Only analyses with recorded token cost are included."""
+    days = max(1, min(days, 365))
+    since = utc_now_naive() - timedelta(days=days)
+    per_analysis = (await db.execute(
+        select(
+            UsageEvent.analysis_id,
+            func.sum(UsageEvent.estimated_cost_micros),
+            func.sum(UsageEvent.input_tokens),
+            func.sum(UsageEvent.output_tokens),
+        )
+        .where(
+            UsageEvent.operation.in_(("video_craft_perception", "video_craft_reasoning")),
+            UsageEvent.analysis_id.isnot(None),
+            UsageEvent.estimated_cost_micros.isnot(None),
+            UsageEvent.created_at >= since,
+        )
+        .group_by(UsageEvent.analysis_id)
+    )).all()
+
+    costs = sorted(int(row[1]) for row in per_analysis if row[1] is not None)
+    n = len(costs)
+
+    def _usd(micros: float) -> float:
+        return round(micros / 1_000_000, 4)
+
+    if n == 0:
+        return {
+            "window_days": days,
+            "analyses_costed": 0,
+            "note": "No analyses with recorded token cost yet in this window.",
+            "price_source": gemini_price_source(),
+        }
+
+    total = sum(costs)
+    avg = total / n
+    median = costs[n // 2]
+    p90 = costs[min(n - 1, int(round(0.9 * (n - 1))))]
+    return {
+        "window_days": days,
+        "analyses_costed": n,
+        "avg_cost_micros": round(avg),
+        "avg_cost_usd": _usd(avg),
+        "median_cost_usd": _usd(median),
+        "p90_cost_usd": _usd(p90),
+        "max_cost_usd": _usd(costs[-1]),
+        "total_cost_usd": _usd(total),
+        # Break-even check against the $9.99/mo Pro price at the observed average.
+        "pro_breakeven_analyses_per_month": round(9_990_000 / avg, 1) if avg else None,
+        "price_source": gemini_price_source(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -850,5 +925,6 @@ async def get_api_usage(
             for provider, operation, calls, successes, avg_latency,
             input_tokens, output_tokens, verified_cost in usage_rows
         ],
-        "cost_status": "unknown_until_verified_pricing_is_configured",
+        "cost_status": "estimated_from_token_counts_and_list_price",
+        "price_source": gemini_price_source(),
     }

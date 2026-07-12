@@ -387,3 +387,23 @@ app.include_router(settings_router)
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     return {"status": "ok"}
+
+
+# Coarse, unauthenticated collector health for uptime monitors. A 100%-failing
+# outcome collector was previously indistinguishable from "nothing was due"; a
+# monitor can now alert when status becomes "failing". Provider names and per-job
+# detail are withheld here (see the authenticated admin route for the full view).
+@app.get("/health/collectors")
+async def health_collectors():
+    from database import AsyncSessionLocal
+    from services.outcome_collection import collector_health
+    async with AsyncSessionLocal() as db:
+        health = await collector_health(db)
+    return {
+        "status": health["status"],
+        "window_days": health["window_days"],
+        "fetch_attempts": health["fetch_attempts"],
+        "fetch_successful": health["fetch_successful"],
+        "fetch_failure_ratio": health["fetch_failure_ratio"],
+        "last_run_incident": (health.get("last_run") or {}).get("incident"),
+    }

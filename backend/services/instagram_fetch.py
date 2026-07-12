@@ -3,15 +3,26 @@
 Primary: RapidAPI (RAPIDAPI_KEY + configurable host/path).
 Fallback: HikerAPI (HIKERAPI_KEY) via /v1/media/by/shortcode.
 """
+import logging
 import os
 import time
 from urllib.parse import urlsplit
 import httpx
 from services.telemetry import record_usage_event
 
+log = logging.getLogger("instagram_fetch")
+
 _DEFAULT_IG_HOST = "instagram-reels-downloader-api.p.rapidapi.com"
 _DEFAULT_IG_PATH = "/download"
 _HIKERAPI_BASE = "https://api.hikerapi.com"
+
+
+def _status_error_code(exc: Exception) -> str:
+    """Prefer http_<status> for a non-2xx so telemetry shows the provider status,
+    not just the exception class."""
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
+        return f"http_{exc.response.status_code}"
+    return type(exc).__name__
 
 
 def is_instagram_url(url: str) -> bool:
@@ -69,7 +80,7 @@ async def _fetch_via_rapidapi(url: str, api_key: str) -> int:
         success = True
         return int(data["like_count"])
     except Exception as exc:
-        error_code = type(exc).__name__
+        error_code = _status_error_code(exc)
         raise
     finally:
         await record_usage_event(
@@ -107,7 +118,7 @@ async def _fetch_via_hikerapi(url: str) -> int:
         success = True
         return int(like_count)
     except Exception as exc:
-        error_code = type(exc).__name__
+        error_code = _status_error_code(exc)
         raise
     finally:
         await record_usage_event(
@@ -135,15 +146,21 @@ async def fetch_instagram_likes(url: str) -> int:
     # Try RapidAPI first
     if api_key:
         try:
-            return await _fetch_via_rapidapi(url, api_key)
+            likes = await _fetch_via_rapidapi(url, api_key)
+            log.info("instagram fetch ok via rapidapi (likes=%s): %s", likes, url)
+            return likes
         except Exception as e:
+            log.warning("instagram rapidapi path failed (%s): %s", _status_error_code(e), url)
             primary_err = e
 
     # Fallback to HikerAPI
     if hikerapi_key:
         try:
-            return await _fetch_via_hikerapi(url)
+            likes = await _fetch_via_hikerapi(url)
+            log.info("instagram fetch ok via hikerapi (likes=%s): %s", likes, url)
+            return likes
         except Exception as fallback_err:
+            log.warning("instagram hikerapi path failed (%s): %s", _status_error_code(fallback_err), url)
             # Both failed — raise the primary error for a more descriptive message
             raise primary_err or fallback_err
 

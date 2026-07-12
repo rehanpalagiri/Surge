@@ -11,7 +11,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from services.outcome_collection import collect_due_outcomes
+from services.outcome_collection import collect_due_outcomes, summarize_run
 
 logger = logging.getLogger("surge.scheduler")
 
@@ -22,9 +22,12 @@ async def _run_daily_collection() -> None:
     logger.info("Scheduler: starting daily outcome collection")
     try:
         result = await collect_due_outcomes(limit=100)
-        logger.info("Scheduler: collection complete — %s", result)
+        # summarize_run stashes the run for /health/collectors and ERROR-logs a
+        # high-failure run so a 100%-failing collector can't hide as a quiet INFO.
+        summary = summarize_run(result)
+        logger.info("Scheduler: collection complete — %s", summary)
     except Exception as exc:
-        logger.error("Scheduler: collection failed — %s: %s", type(exc).__name__, exc)
+        logger.error("Scheduler: collection crashed — %s: %s", type(exc).__name__, exc)
 
 
 def start() -> AsyncIOScheduler:

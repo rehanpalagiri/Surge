@@ -511,8 +511,8 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
                   <p className={`text-[11px] ${remaining === 0 ? "text-danger" : "text-text-muted"}`}>
                     {remaining === 0
                       ? `Monthly limit reached.${resetLabel ? ` Resets ${resetLabel}.` : ""}`
-                      : rateLimit.bonus < 10
-                      ? "Link a posted video to earn +1 analysis (up to +10)."
+                      : rateLimit.bonus < 2
+                      ? "Link a posted video to earn +1 analysis (up to +2)."
                       : `Free plan · resets ${resetLabel}.`}
                   </p>
                   <Link

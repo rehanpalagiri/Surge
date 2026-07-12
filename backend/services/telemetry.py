@@ -1,17 +1,57 @@
 """Best-effort provider usage accounting.
 
-Costs remain NULL until verified pricing is configured. Recording measured units
-without inventing prices lets finance calculations be reproduced later.
+Cost is derived from measured token counts × the Gemini 2.5 Flash list price
+(overridable per contracted rate via env). It stays NULL only when token counts
+are unavailable, so a finance calc is never built on a fabricated zero.
 """
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 from database import AsyncSessionLocal
 from models import UsageEvent
 
 log = logging.getLogger("usage_telemetry")
+
+# Gemini 2.5 Flash list price (USD per 1M tokens), used to convert measured tokens
+# into a per-call cost. These are the public list rates — not a guess — and can be
+# overridden to a contracted rate with GEMINI_FLASH_INPUT_PRICE_PER_MTOK /
+# GEMINI_FLASH_OUTPUT_PRICE_PER_MTOK without a code change.
+_DEFAULT_FLASH_INPUT_PER_MTOK = 0.30
+_DEFAULT_FLASH_OUTPUT_PER_MTOK = 2.50
+
+
+def _price_per_mtok(env_key: str, default: float) -> float:
+    raw = os.getenv(env_key)
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def gemini_price_source() -> dict:
+    """The pricing actually in effect, for transparency in the admin cost view."""
+    return {
+        "input_usd_per_mtok": _price_per_mtok("GEMINI_FLASH_INPUT_PRICE_PER_MTOK", _DEFAULT_FLASH_INPUT_PER_MTOK),
+        "output_usd_per_mtok": _price_per_mtok("GEMINI_FLASH_OUTPUT_PRICE_PER_MTOK", _DEFAULT_FLASH_OUTPUT_PER_MTOK),
+        "source": "gemini-2.5-flash list price (override via env for contracted rate)",
+    }
+
+
+def estimate_gemini_cost_micros(input_tokens: int | None, output_tokens: int | None) -> int | None:
+    """Per-call cost in micro-USD from token counts × list price. Returns None when
+    BOTH token counts are missing, so the ledger stays honestly NULL rather than
+    recording a fabricated 0."""
+    if input_tokens is None and output_tokens is None:
+        return None
+    in_rate = _price_per_mtok("GEMINI_FLASH_INPUT_PRICE_PER_MTOK", _DEFAULT_FLASH_INPUT_PER_MTOK)
+    out_rate = _price_per_mtok("GEMINI_FLASH_OUTPUT_PRICE_PER_MTOK", _DEFAULT_FLASH_OUTPUT_PER_MTOK)
+    cost_usd = (int(input_tokens or 0) / 1_000_000) * in_rate + (int(output_tokens or 0) / 1_000_000) * out_rate
+    return round(cost_usd * 1_000_000)
 
 
 def response_token_usage(response) -> tuple[int | None, int | None]:
@@ -106,6 +146,7 @@ async def tracked_generate_content(
             output_bytes=response_text_bytes(response),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            estimated_cost_micros=estimate_gemini_cost_micros(input_tokens, output_tokens),
         )
         return response
     except Exception as exc:

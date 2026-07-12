@@ -453,6 +453,19 @@ export default function ResultsPage() {
     { label: "Audio-Visual Sync",   score: s.audio_visual_sync, naReason: notApplicable["audio_visual_sync"] },
     { label: "Ending Strength",     score: s.loop_seamlessness, naReason: notApplicable["loop_seamlessness"] },
   ];
+  // Lowest-scoring APPLICABLE dimension (skip not-applicable), for the verdict
+  // subtext. Computed client-side so it also covers analyses stored before the
+  // backend started emitting weakest_dimension.
+  const _applicable = scores.filter(
+    (sc) => typeof sc.score === "number" && !sc.naReason
+  );
+  const weakestDim =
+    _applicable.length > 0
+      ? _applicable.reduce((min, sc) =>
+          (sc.score as number) < (min.score as number) ? sc : min
+        )
+      : null;
+
   const _riskOrder = { high: 0, medium: 1, low: 2 } as const;
   const attentionRisks = Array.isArray(s.attention_risk_map)
     ? [...s.attention_risk_map].sort((a, b) => _riskOrder[a.risk] - _riskOrder[b.risk])
@@ -492,7 +505,10 @@ export default function ResultsPage() {
         <RubricContextBadge context={s.rubric_context} fallbackNiche={analysis.niche} />
 
         {/* Verdict banner — always shown */}
-        <VerdictBanner verdict={analysis.verdict} />
+        <VerdictBanner
+          verdict={analysis.verdict}
+          weakest={weakestDim ? { label: weakestDim.label, score: weakestDim.score as number } : null}
+        />
 
         {locked ? (
           /* ---------- FREE TIER (anonymous): locked teaser ---------- */

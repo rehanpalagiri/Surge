@@ -6,18 +6,134 @@ late observation as 24h/7d/30d data.
 """
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
 from database import AsyncSessionLocal
-from models import OutcomeCollectionJob, UserAnalysis
+from models import OutcomeCollectionJob, UsageEvent, UserAnalysis
 from services.instagram_fetch import fetch_instagram_likes
 from services.outcomes import add_outcome_snapshot, post_id_from_url, upsert_artifact, utc_now_naive
 from services.tiktok_fetch import fetch_tiktok
 
+log = logging.getLogger("surge.outcome_collection")
+
 MAX_ATTEMPTS = 3
 _TARGET_HOURS = {"24h": 24, "7d": 24 * 7, "30d": 24 * 30}
+
+# When at least this many jobs were processed in a run and this fraction failed,
+# the run is treated as an incident (ERROR log + non-OK health), so a
+# 100%-failing collector never again looks identical to "nothing was due".
+RUN_FAILURE_ALERT_RATIO = 0.5
+RUN_FAILURE_MIN_PROCESSED = 1
+# Same idea for the durable fetcher-reliability view derived from usage_events.
+FETCH_FAILURE_ALERT_RATIO = 0.5
+
+# Last nightly/admin run summary, kept in-process for the health surface. This is
+# best-effort context only; collector_health() derives its authoritative signal
+# from the durable usage_events + job tables so a restart never hides an outage.
+_LAST_RUN: dict | None = None
+
+
+def summarize_run(result: dict) -> dict:
+    """Fold a collect_due_outcomes() result into a flat summary, stash it for the
+    health surface, and ERROR-log when the run crossed the failure threshold.
+    Returns the summary dict (also used by the scheduler's log line)."""
+    global _LAST_RUN
+    counts = result.get("results", {}) if isinstance(result, dict) else {}
+    processed = result.get("processed", 0) if isinstance(result, dict) else 0
+    failed = counts.get("failed", 0)
+    summary = {
+        "at": utc_now_naive().isoformat(),
+        "processed": processed,
+        "complete": counts.get("complete", 0),
+        "missed": counts.get("missed", 0),
+        "failed": failed,
+        "skipped": counts.get("skipped", 0),
+        "failure_ratio": round(failed / processed, 3) if processed else 0.0,
+    }
+    is_incident = (
+        processed >= RUN_FAILURE_MIN_PROCESSED
+        and summary["failure_ratio"] >= RUN_FAILURE_ALERT_RATIO
+    )
+    summary["incident"] = is_incident
+    _LAST_RUN = summary
+    if is_incident:
+        log.error(
+            "Outcome collection INCIDENT: %d/%d jobs failed (ratio %.0f%%). "
+            "Check /health/collectors and provider keys/limits.",
+            failed, processed, summary["failure_ratio"] * 100,
+        )
+    else:
+        log.info("Outcome collection run: %s", summary)
+    return summary
+
+
+async def collector_health(db, *, window_days: int = 7) -> dict:
+    """Authoritative collector health from durable tables (survives restarts).
+
+    Reads the fetch-reliability ledger (usage_events) and recent job outcomes so a
+    silently-failing collector reports a non-OK status instead of looking idle.
+    Status: "ok" (no failures) | "degraded" (some failures) | "failing" (majority
+    failing) | "idle" (no fetches attempted in the window — genuinely nothing due)."""
+    since = utc_now_naive() - timedelta(days=window_days)
+
+    provider_rows = (await db.execute(
+        select(
+            UsageEvent.provider,
+            func.count(UsageEvent.id),
+            func.sum(case((UsageEvent.success.is_(True), 1), else_=0)),
+        )
+        .where(
+            UsageEvent.operation == "fetch_post_metrics",
+            UsageEvent.created_at >= since,
+        )
+        .group_by(UsageEvent.provider)
+    )).all()
+
+    providers = []
+    total = 0
+    total_ok = 0
+    for provider, calls, ok in provider_rows:
+        ok = int(ok or 0)
+        total += calls
+        total_ok += ok
+        providers.append({
+            "provider": provider,
+            "attempts": calls,
+            "successful": ok,
+            "success_rate": round(ok / calls, 3) if calls else None,
+        })
+
+    failure_ratio = (total - total_ok) / total if total else 0.0
+
+    job_rows = (await db.execute(
+        select(OutcomeCollectionJob.status, func.count())
+        .where(OutcomeCollectionJob.completed_at >= since)
+        .group_by(OutcomeCollectionJob.status)
+    )).all()
+    job_outcomes = {status: count for status, count in job_rows}
+
+    if total == 0:
+        status = "idle"
+    elif failure_ratio >= FETCH_FAILURE_ALERT_RATIO:
+        status = "failing"
+    elif failure_ratio > 0:
+        status = "degraded"
+    else:
+        status = "ok"
+
+    return {
+        "status": status,
+        "window_days": window_days,
+        "fetch_attempts": total,
+        "fetch_successful": total_ok,
+        "fetch_failure_ratio": round(failure_ratio, 3),
+        "providers": sorted(providers, key=lambda p: p["provider"]),
+        "job_outcomes": job_outcomes,
+        "last_run": _LAST_RUN,
+    }
 
 
 async def collection_status(db) -> dict:
@@ -61,8 +177,11 @@ async def _collect_job(job_id: int) -> str:
         platform = analysis.platform or "tiktok"
         url = analysis.video_url
         analysis_id = analysis.id
+        horizon = job.horizon
         posted_at = job.due_at - timedelta(hours=_TARGET_HOURS[job.horizon])
 
+    log.info("Collecting %s outcome for analysis %s via %s: %s",
+             horizon, analysis_id, platform, url)
     try:
         if platform == "instagram":
             likes = await fetch_instagram_likes(url)

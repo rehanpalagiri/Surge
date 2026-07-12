@@ -84,6 +84,11 @@ async def audit_prediction(analysis_id: int) -> None:
     `or a.correction_json is not None` to the first guard."""
     from auth import is_minor
     from models import User
+    from services.calibration import calibration_enabled
+    # Dormant by default: produce no AI correction opinion unless the calibration
+    # path is explicitly enabled. Keeps the AI-audits-AI loop fully off by default.
+    if not calibration_enabled():
+        return
     try:
         async with AsyncSessionLocal() as db:
             a = (await db.execute(

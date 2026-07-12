@@ -24,6 +24,7 @@ Inert until corrections accumulate past MIN_CORRECTIONS, the note is generated
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from services.clock import utc_now_naive
 
@@ -39,6 +40,21 @@ log = logging.getLogger("calibration")
 
 # Sentinel niche for the cross-niche fallback note.
 GLOBAL_NICHE = "GLOBAL"
+
+
+def calibration_enabled() -> bool:
+    """Master kill-switch for the AI-audits-AI calibration path
+    (correction audit → calibration note → grading nudge).
+
+    Defaults OFF and is read at call time (not import) so nothing in this dormant
+    path can influence a live craft score unless an operator EXPLICITLY enables it.
+    Before it is ever turned on, a drift metric must be in place (see
+    backend/tools/craft_correlation.py) to catch the runaway self-reinforcement /
+    selection-bias inflation this path risks. Every entry point — note generation,
+    the correction audit, and the grade-time note read — checks this first."""
+    return os.getenv("SURGE_CALIBRATION_ENABLED", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
 
 MIN_CORRECTIONS = 12        # FIX hole #5: below this per niche, do not generate a niche note
 MIN_PER_DIMENSION = 5       # FIX hole #4: a dimension nudge needs this many corrections naming it
@@ -74,6 +90,12 @@ async def load_calibration_note(db, platform: str, niche: str) -> dict | None:
     NOTE: returns the note regardless of confidence/sample_count — the gemini grader
     decides whether to actually apply it (see _calibration_applies). This keeps the
     application gate in one place."""
+    # Grade-time injection fence: with the calibration path disabled (default),
+    # never hand a note to the grader, even if one exists in the table. This is the
+    # single point any future grading wire-up must pass through, so the flag alone
+    # keeps grading un-nudged.
+    if not calibration_enabled():
+        return None
     try:
         row = (await db.execute(
             select(CalibrationNote).where(
@@ -152,6 +174,13 @@ Return ONLY valid JSON:
 async def generate_calibration_note(platform: str, niche: str) -> dict:
     """Regenerate FROM SCRATCH each time (FIX hole #2 — never stack). Returns the note or
     raises ValueError if below floor (caller falls back to GLOBAL or skips)."""
+    # Dormant by default: refuse to synthesize any AI calibration opinion unless the
+    # path is explicitly enabled. Raised as ValueError so the admin endpoint reports
+    # it as "skipped" alongside below-floor niches.
+    if not calibration_enabled():
+        raise ValueError(
+            "calibration path is disabled (set SURGE_CALIBRATION_ENABLED=1 to enable)"
+        )
     cutoff = utc_now_naive() - timedelta(days=RECENCY_WINDOW_DAYS)
     async with AsyncSessionLocal() as db:
         stmt = select(UserAnalysis).where(

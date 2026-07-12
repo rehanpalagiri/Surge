@@ -6,14 +6,19 @@ Tiers (chosen 2026-06-30):
 
 Bonus credits (both tiers retain the engagement loop, though it's moot for Pro):
   +1 per all-time UNIQUE verified linked post (video_url AND counts_fetched_at
-  set = the provider confirmed it was live), capped at +10. Counted by unique
+  set = the provider confirmed it was live), capped at +2. Counted by unique
   normalized post id, so one video linked to several projects yields one credit.
 
 Only authenticated users are metered here; guests are gated by the in-memory
 guest throttle in routers/analyze.py. Failed analyses (status="error") never
 consume the allowance.
+
+Pro is monthly-unlimited but carries a SOFT DAILY fair-use ceiling: at
+~1.5–3¢/analysis, a 30+/day agency seat would run the Gemini bill underwater on a
+$9.99/mo flat price. The ceiling only bites at agency-scale abuse; a normal Pro
+creator never approaches it, and it resets every UTC day.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 
 from sqlalchemy import select, func, or_
@@ -25,7 +30,11 @@ from services.clock import utc_now_naive
 from services.outcomes import post_id_from_url
 
 FREE_MONTHLY_LIMIT = 3
-MAX_BONUS = 10
+MAX_BONUS = 2
+# Soft daily fair-use ceiling on "unlimited" Pro. Chosen so a normal creator never
+# hits it while an agency running dozens/day (which would make the flat price
+# unprofitable) is throttled to a sustainable rate. Resets at 00:00 UTC.
+PRO_FAIR_USE_DAILY = 15
 
 
 def _normalize_video_url(url: str) -> str:
@@ -45,6 +54,14 @@ def _normalize_video_url(url: str) -> str:
 
 def _month_start(now: datetime) -> datetime:
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _day_start(now: datetime) -> datetime:
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _next_day_start(now: datetime) -> datetime:
+    return _day_start(now) + timedelta(days=1)
 
 
 def _next_month_start(now: datetime) -> datetime:
@@ -101,8 +118,20 @@ async def get_rate_limit(user: User, db: AsyncSession) -> dict:
     bonus = await _bonus_credits(user.id, db)
 
     if is_pro(user):
+        # Monthly is unlimited, but a soft daily fair-use ceiling protects unit
+        # economics. Only today's (UTC) successful/active analyses count toward it;
+        # failed rows are excluded exactly like the free tier.
+        day_start = _day_start(now)
+        used_today = (await db.execute(
+            select(func.count()).select_from(UserAnalysis).where(
+                UserAnalysis.user_id == user.id,
+                UserAnalysis.created_at >= day_start,
+                consumes_credit,
+            )
+        )).scalar() or 0
+        within_fair_use = used_today < PRO_FAIR_USE_DAILY
         return {
-            "allowed": True,
+            "allowed": within_fair_use,
             "tier": "pro",
             "unlimited": True,
             "used": used,
@@ -112,6 +141,12 @@ async def get_rate_limit(user: User, db: AsyncSession) -> dict:
             "remaining": None,
             "resets_at": None,
             "period": "month",
+            # Fair-use (Pro only): daily soft ceiling status.
+            "fair_use_daily_limit": PRO_FAIR_USE_DAILY,
+            "used_today": used_today,
+            "fair_use_remaining": max(0, PRO_FAIR_USE_DAILY - used_today),
+            "fair_use_resets_at": _next_day_start(now).isoformat(),
+            "limit_reason": None if within_fair_use else "fair_use",
         }
 
     effective_limit = FREE_MONTHLY_LIMIT + bonus

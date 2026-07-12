@@ -76,8 +76,18 @@ def _prune_pending() -> None:
 
 
 def _limit_message(rl: dict) -> str:
-    """Friendly 429 copy for a free user who hit the monthly cap, steering them
-    to Surge Pro (and the earn-by-linking bonus). Pro users never see this."""
+    """Friendly 429 copy. Free users who hit the monthly cap are steered to Surge
+    Pro (and the earn-by-linking bonus); a Pro user who trips the daily fair-use
+    ceiling gets a distinct message that never implies they should 'upgrade'."""
+    if rl.get("tier") == "pro" and rl.get("limit_reason") == "fair_use":
+        resets = ""
+        if rl.get("fair_use_resets_at"):
+            resets = f" It resets on {str(rl['fair_use_resets_at'])[:10]} (UTC)."
+        return (
+            f"You've reached today's fair-use limit of {rl.get('fair_use_daily_limit')} "
+            f"analyses on Surge Pro.{resets} This keeps the service fast for everyone — "
+            f"reach out if you routinely need a higher daily volume."
+        )
     limit = rl.get("effective_limit")
     bonus_tip = (
         " Link a posted video to earn +1 analysis."
@@ -90,6 +100,12 @@ def _limit_message(rl: dict) -> str:
         f"You've used all {limit} free analyses this month. "
         f"Upgrade to Surge Pro for unlimited analyses.{bonus_tip}{resets}"
     )
+
+
+def _limit_headers(rl: dict) -> dict:
+    """Advertise upgrade only to non-Pro users; a Pro fair-use block isn't an
+    upsell opportunity."""
+    return {} if rl.get("tier") == "pro" else {"X-Upgrade-Available": "1"}
 
 
 def _title_from_caption(caption: str, max_words: int = 3) -> str:
@@ -163,7 +179,7 @@ async def get_upload_presigned_url(
             raise HTTPException(
                 status_code=429,
                 detail=_limit_message(rl),
-                headers={"X-Upgrade-Available": "1"},
+                headers=_limit_headers(rl),
             )
     if not os.getenv("R2_ACCOUNT_ID"):
         raise HTTPException(status_code=503, detail="File upload service not configured.")
@@ -254,7 +270,11 @@ async def _run_r2_analysis(
         # from auth/permission (403) from anything else — the stored message is
         # deliberately generic for users.
         logger.warning("R2 analysis %s failed: %r", analysis_id, exc)
-        err_msg = "AI analysis is temporarily unavailable." if isinstance(exc, _GeminiClientError) and exc.code in (429, 403) else "Analysis failed."
+        err_msg = (
+            "We're at capacity right now — this didn't count against your limit. Give it a minute and try again."
+            if isinstance(exc, _GeminiClientError) and exc.code in (429, 403)
+            else "Analysis failed."
+        )
         async with AsyncSessionLocal() as db:
             row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
             if row:
@@ -342,7 +362,7 @@ async def analyze(
             raise HTTPException(
                 status_code=429,
                 detail=_limit_message(rl),
-                headers={"X-Upgrade-Available": "1"},
+                headers=_limit_headers(rl),
             )
 
     # Niche: optional — empty input classifies to Uncategorized (generic rubric),
@@ -540,11 +560,15 @@ async def analyze(
     except _GeminiClientError as e:
         logger.warning("Direct analysis Gemini error (code=%s): %r", getattr(e, "code", "?"), e)
         if e.code in (429, 403):
-            # Gemini quota exhausted or bad API key — return 503. Session
-            # auto-rollback discards the flushed row so no broken record persists.
+            # Gemini quota exhausted or bad API key — return 503 AFTER the perception
+            # call already retried with backoff. Session auto-rollback discards the
+            # flushed row so no broken record persists (no credit consumed). Retry-After
+            # signals clients (and the frontend's recoverable state) to back off, not
+            # to treat this as a hard failure.
             raise HTTPException(
                 status_code=503,
-                detail="AI analysis is temporarily unavailable. Please try again in a few minutes.",
+                detail="We're at capacity right now — your upload wasn't charged. Give it a minute and try again.",
+                headers={"Retry-After": "60"},
             )
         raise
     finally:

@@ -12,7 +12,7 @@ const FALLBACK_PRICE = "$9.99/mo";
 
 const FREE_FEATURES = [
   "3 craft reviews a month",
-  "Earn +1 review per linked post (up to +10)",
+  "Earn +1 review per linked post (up to +2)",
   "The full report — six dimensions, risk map, next experiment",
   "Craft vs. Your Results insights",
   "No card required",

@@ -15,7 +15,9 @@ from sqlalchemy.pool import StaticPool
 
 from models import Base, User, UserAnalysis
 from services.clock import utc_now_naive
-from services.rate_limit import get_rate_limit, FREE_MONTHLY_LIMIT, _month_start
+from services.rate_limit import (
+    get_rate_limit, FREE_MONTHLY_LIMIT, PRO_FAIR_USE_DAILY, _month_start, _day_start,
+)
 
 
 class RateLimitTest(unittest.IsolatedAsyncioTestCase):
@@ -95,11 +97,13 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rl["used"], 1)
         self.assertTrue(rl["allowed"])
 
-    async def test_pro_is_unlimited(self):
+    async def test_pro_is_monthly_unlimited(self):
+        # 20 analyses spread across days (≤ 1/day) — far beyond the free tier, and
+        # under the daily fair-use ceiling, so Pro stays unlimited monthly.
         now = utc_now_naive()
         async with self.Session() as db:
             user = await self._user(db, subscription_status="active")
-            db.add_all([self._analysis(user.id, "complete", now - timedelta(hours=i + 1)) for i in range(20)])
+            db.add_all([self._analysis(user.id, "complete", now - timedelta(days=i + 1)) for i in range(20)])
             await db.commit()
             rl = await get_rate_limit(user, db)
         self.assertEqual(rl["tier"], "pro")
@@ -107,6 +111,40 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(rl["allowed"])
         self.assertIsNone(rl["effective_limit"])
         self.assertIsNone(rl["resets_at"])
+
+    async def test_pro_soft_daily_fair_use_cap_blocks(self):
+        # A single seat doing 15 analyses in one UTC day hits the fair-use ceiling
+        # (protects the flat $9.99 unit economics) — monthly is still "unlimited".
+        now = utc_now_naive()
+        day = _day_start(now)
+        async with self.Session() as db:
+            user = await self._user(db, subscription_status="active")
+            db.add_all([
+                self._analysis(user.id, "complete", day + timedelta(seconds=i))
+                for i in range(PRO_FAIR_USE_DAILY)
+            ])
+            await db.commit()
+            rl = await get_rate_limit(user, db)
+        self.assertEqual(rl["tier"], "pro")
+        self.assertTrue(rl["unlimited"])          # monthly cap unchanged
+        self.assertFalse(rl["allowed"])           # daily fair-use ceiling reached
+        self.assertEqual(rl["limit_reason"], "fair_use")
+        self.assertEqual(rl["used_today"], PRO_FAIR_USE_DAILY)
+        self.assertEqual(rl["fair_use_remaining"], 0)
+        self.assertIsNotNone(rl["fair_use_resets_at"])
+
+    async def test_pro_under_daily_cap_allowed(self):
+        now = utc_now_naive()
+        day = _day_start(now)
+        async with self.Session() as db:
+            user = await self._user(db, subscription_status="active")
+            db.add_all([self._analysis(user.id, "complete", day + timedelta(seconds=i)) for i in range(5)])
+            await db.commit()
+            rl = await get_rate_limit(user, db)
+        self.assertTrue(rl["allowed"])
+        self.assertIsNone(rl["limit_reason"])
+        self.assertEqual(rl["used_today"], 5)
+        self.assertEqual(rl["fair_use_remaining"], PRO_FAIR_USE_DAILY - 5)
 
     async def test_comp_email_gets_unlimited(self):
         # Operator comp allowlist grants Pro with no Stripe — case-insensitive.
