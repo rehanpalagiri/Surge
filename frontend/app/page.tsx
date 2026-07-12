@@ -14,6 +14,7 @@ import { LandingSkeleton } from "@/components/Skeleton";
 import { Tooltip } from "@/components/Tooltip";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import PlatformTabs from "@/components/PlatformTabs";
+import ProfileNudgeModal from "@/components/ProfileNudgeModal";
 import { track } from "@vercel/analytics";
 import ScoreBar from "@/components/ScoreBar";
 import { SAMPLE_SCORES, SAMPLE_RISK } from "@/lib/sampleReport";
@@ -548,6 +549,8 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col bg-background">
       <Nav />
+      {/* One-time post-signup nudge; self-gates via localStorage. */}
+      <ProfileNudgeModal />
 
       {/* ── Platform toggle ── */}
       <div className="flex justify-center pt-8 px-4">

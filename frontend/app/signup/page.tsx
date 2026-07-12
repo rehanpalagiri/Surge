@@ -111,6 +111,9 @@ function SignupForm() {
     try {
       const { access_token } = await signup(email.trim(), username.trim(), password, isoDate);
       setToken(access_token);
+      // Marks this browser as a brand-new account so the dashboard can show
+      // the one-time profile nudge (ProfileNudgeModal consumes this).
+      localStorage.setItem("surge_new_account", "1");
 
       // Save the just-analyzed video to the brand-new account.
       const id = extractAnalysisId(next);
@@ -146,6 +149,7 @@ function SignupForm() {
     try {
       const { access_token } = await googleAuth(credential, isoDate);
       setToken(access_token);
+      localStorage.setItem("surge_new_account", "1");
       const id = extractAnalysisId(next);
       if (id) {
         try { await claimAnalysis(id, access_token); } catch { /* non-fatal */ }
