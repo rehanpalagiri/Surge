@@ -9,9 +9,9 @@ const TABS: { id: Platform; label: string }[] = [
 
 /**
  * Sliding platform switcher. A single pill snaps between TikTok and Instagram,
- * and the pill wears the active platform's brand color (TikTok cyan / Instagram
- * gradient — see the brand layer in globals.css). Reused on every page that
- * toggles platform so the interaction is identical everywhere.
+ * and the pill uses the shared magnetic-pink action color for either platform.
+ * Reused on every page that toggles platform so the interaction is identical
+ * everywhere.
  */
 export default function PlatformTabs({
   value,
@@ -35,7 +35,7 @@ export default function PlatformTabs({
       <span
         aria-hidden="true"
         className={`pointer-events-none absolute top-1 bottom-1 left-1 rounded-xl shadow-md transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
-          value === "tiktok" ? "brand-tab-tiktok" : "brand-tab-instagram"
+          "brand-tab-pink"
         }`}
         style={{
           width: "calc((100% - 0.5rem) / 2)",
@@ -51,9 +51,7 @@ export default function PlatformTabs({
           onClick={() => onChange(t.id)}
           className={`relative z-10 rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors ${
             value === t.id
-              ? // Fixed inks on fixed brand fills (theme-independent): black on
-                // TikTok cyan, white on the Instagram gradient — both AA.
-                t.id === "tiktok" ? "text-black" : "text-white"
+              ? "text-black"
               : "text-text-muted hover:text-text-primary"
           }`}
         >

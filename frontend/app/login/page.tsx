@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { login, claimAnalysis, getMe, googleAuth } from "@/lib/api";
 import { setToken, safeNext } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
+import BrandLogo from "@/components/BrandLogo";
 import GoogleSignInButton, { GOOGLE_ENABLED } from "@/components/GoogleSignInButton";
 
 function extractAnalysisId(next: string | null): string | null {
@@ -75,9 +76,7 @@ function LoginForm() {
     <main className="min-h-screen flex items-center justify-center px-4 bg-background">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-8 space-y-6">
         <div className="text-center">
-          <Link href="/" className="font-bold text-2xl gradient-text">
-            Surge
-          </Link>
+          <BrandLogo className="text-2xl" />
           <h1 className="text-xl font-bold text-text-primary mt-4">Welcome back</h1>
           <p className="text-text-muted text-sm mt-1">Log in to your account</p>
         </div>
