@@ -655,14 +655,10 @@ select:-webkit-autofill {
     box-shadow: 0 0 0 1px #25f4ee40, 0 10px 30px -10px #fe2c5545;
   }
 
-  /* Active platform-tab fills (PlatformTabs indicator). TikTok cyan takes
-     ink text; the Instagram gradient stops at deep pink so white text
-     stays AA — never extend it into the orange/yellow range on fills. */
-  .brand-tab-tiktok {
-    background: #25F4EE;
-  }
-  .brand-tab-instagram {
-    background: linear-gradient(120deg, #4f5bd5, #962fbf, #d62976);
+  /* Active platform-tab fill: both platforms use the shared magnetic pink
+     action color so the selected state stays consistent while toggling. */
+  .brand-tab-pink {
+    background: var(--color-accent);
   }
 
   /* ── Instagram ── */
