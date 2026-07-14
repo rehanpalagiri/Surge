@@ -46,16 +46,6 @@ function formatBadRequestMessage(msg: string) {
   return detail || "Analysis failed. Please try again.";
 }
 
-// ── Landing-only platform wordmarks + interactive button helpers ──
-// TikTok cyan/red glitch wordmark (see .surge-glitch in globals.css).
-function Glitch({ text }: { text: string }) {
-  return <span className="surge-glitch" data-text={text}>{text}</span>;
-}
-// Instagram purple→yellow gradient wordmark (.surge-ig-gradient).
-function Gradient({ text }: { text: string }) {
-  return <span className="surge-ig-gradient">{text}</span>;
-}
-
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -354,16 +344,8 @@ function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; on
 // ─── Premium anonymous landing page ──────────────────────────────────────────
 
 function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismissDeleted: () => void }) {
-  const router = useRouter();
-  const [platform, setPlatform] = useState<Platform>("tiktok");
-  const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState("");
-  const [processing, setProcessing] = useState(false);
-
   const navCta = useInteractive<HTMLAnchorElement>();
   const heroCta = useInteractive<HTMLAnchorElement>();
-  const finalCta = useInteractive<HTMLAnchorElement>();
-  const submitBtn = useInteractive<HTMLButtonElement>();
   const progressRef = useRef<HTMLDivElement>(null);
 
   // Scroll progress bar + subtle parallax on the floating badges (rAF-throttled).
@@ -409,55 +391,8 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
     return () => io.disconnect();
   }, []);
 
-  const handleFile = async (f: File) => {
-    setError("");
-    if (!isAllowedVideoFile(f)) {
-      setError("Please upload a supported video file (MP4, MOV, WEBM, AVI & more).");
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      setError("Your video is too large. Maximum size is 100 MB — try exporting at 720p from your camera app.");
-      return;
-    }
-    const duration = await new Promise<number>((resolve) => {
-      const video = document.createElement("video");
-      video.preload = "metadata";
-      const url = URL.createObjectURL(f);
-      video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(video.duration); };
-      video.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
-      video.src = url;
-    });
-    if (duration > 600) {
-      setError("Your video is over 10 minutes. Please trim it before uploading.");
-      return;
-    }
-    setFile(f);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) { setError("Upload a video to get started — MP4, MOV, WEBM, AVI & more."); return; }
-    setError("");
-    track("upload_started", { platform, niche_count: 0, logged_in: false });
-    setProcessing(true);
-    try {
-      await wakeBackend();
-      const { id } = await analyzeVideo(file, "", "", "", platform, "", "");
-      track("analysis_complete", { platform, mode: "direct" });
-      router.push(`/results/${id}`);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      track("upload_error", { error_type: msg.includes("429") ? "rate_limit" : msg.includes("400") ? "validation" : "other" });
-      setProcessing(false);
-      if (msg.includes("429")) setError("You've used your free analyses for today. Sign up free to get more.");
-      else if (msg.includes("400")) setError(formatBadRequestMessage(msg));
-      else setError(msg || "Analysis failed. Please try again.");
-    }
-  };
-
   return (
     <>
-      {processing && <AnalysisOverlay active={processing} steps={PROCESSING_STEPS} />}
       <main className="surge-landing min-h-screen bg-background">
         <div className="surge-progress" ref={progressRef} aria-hidden />
         <header className="surge-nav">
@@ -472,7 +407,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <div className="surge-eyebrow"><Sparkles size={14}/> BUILT FOR SHORT-FORM CREATORS</div>
             <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
             <p>Surge finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
-            <div className="surge-actions"><a className="surge-primary" href="#upload" {...heroCta}>Analyze my video <ArrowRight size={18}/></a><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
+            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
             <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Tooltip label="Your uploaded video is analyzed privately"><Lock size={13}/></Tooltip> Videos stay private</span><span>No card</span></div>
           </div>
 
@@ -480,30 +415,16 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <div className="surge-monitor-bar"><span className="surge-dots">● ● ●</span><span>surge / craft review</span><span className="surge-live"><b/> Review ready</span></div>
             <div className="surge-monitor-body">
               <div className="surge-video-frame"><div className="surge-video-copy">3 editing tricks<br/><b>nobody tells you</b></div><div className="surge-person"/><div className="surge-timeline"><span>0:09</span><i/></div><label><Tooltip label="AI-estimated craft issue"><Eye size={11}/></Tooltip> Attention risk</label></div>
-              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map <Tooltip label="AI-estimated craft diagnostic, not measured audience retention"><span className="surge-help">?</span></Tooltip></span><b>0:08–0:12</b></div><div className="surge-chart" aria-label="Attention risk drops around 0:09"><div className="surge-chart-line" aria-hidden><i className="seg-one"/><i className="seg-two"/><i className="seg-three"/><i className="seg-four"/><b/></div></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
+              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map <Tooltip label="AI-estimated craft diagnostic, not measured audience retention"><span className="surge-help">?</span></Tooltip></span><b>0:08–0:12</b></div><div className="surge-chart" aria-label="Attention risk drops around 0:09"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 0 14 L 29 18.5 L 55 23.5 L 64.5 37.5 L 100 46"/></svg><span className="surge-chart-marker" aria-hidden="true"/></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
             </div>
             <div className="surge-float surge-float-a"><Sparkles size={14}/> AI craft analysis</div><div className="surge-float surge-float-b"><b>+24%</b> clearer hook</div>
           </div>
-        </section>
-
-        <div className="surge-platforms surge-reveal"><span>BUILT FOR THE FEEDS YOU CARE ABOUT</span><div><b>♪ <Glitch text="TikTok"/></b><b>◎ <Gradient text="Instagram Reels"/></b></div></div>
-
-        <section className="surge-upload-wrap" id="upload">
-          <div className="surge-section-heading surge-reveal"><span>YOUR FIRST WIN</span><h2>See what your viewers see.</h2><p>No dashboards. No guesswork. Drop a draft and get a clear edit list in under a minute.</p></div>
-          <form onSubmit={handleSubmit} className="surge-upload-card surge-reveal">
-            <div className="surge-platform-tabs"><button type="button" className={platform === "tiktok" ? "active" : ""} onClick={() => setPlatform("tiktok")}>♪ <Glitch text="TikTok"/></button><button type="button" className={platform === "instagram" ? "active" : ""} onClick={() => setPlatform("instagram")}>◎ <Gradient text="Instagram"/></button></div>
-            <ReactiveVideoDropzone file={file} onFileSelected={handleFile} selectedDetail={file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · validation passed` : undefined}/>
-            {error && <div className="surge-error">{error}</div>}
-            <button type="submit" disabled={processing} className="surge-submit" {...submitBtn}>{file ? "Find my attention leaks" : "Choose a video to continue"}<ArrowRight size={18}/></button>
-            <div className="surge-privacy"><Tooltip label="Your upload is encrypted in transit and deleted after analysis"><Lock size={13}/></Tooltip> Encrypted in transit · Automatically deleted after analysis</div>
-          </form>
         </section>
 
         <section className="surge-how" id="how"><div className="surge-section-heading surge-left surge-reveal"><span>HOW IT WORKS</span><h2>From rough cut to<br/><em>ready to post.</em></h2></div><div className="surge-step-grid"><article className="surge-reveal"><b>01</b><div className="surge-step-art"><Upload size={25}/><i/><i/><i/></div><h3>Drop your draft</h3><p>Upload the version sitting in your camera roll. No account needed.</p></article><article className="surge-reveal"><b>02</b><div className="surge-step-art scan"><span>Scanning hook</span><i/></div><h3>Surge reads the edit</h3><p>We review hook, pacing, captions, tension, sync, and ending.</p></article><article className="surge-reveal"><b>03</b><div className="surge-step-art fix"><Check size={25}/><i/><i/><i/></div><h3>Fix what matters</h3><p>Get timestamped changes you can make before your next post.</p></article></div></section>
 
         <section className="surge-report" id="report"><div className="surge-report-inner"><div className="surge-report-copy surge-reveal"><span>AN ACTUAL SURGE REPORT</span><h2>Feedback that speaks<br/>creator, <em>not corporate.</em></h2><p>Every review turns six craft signals into one clear next experiment.</p><div className="surge-score-list">{SAMPLE_SCORES.slice(0, 4).map((sc) => <div key={sc.label}><span>{sc.label}</span><b>{sc.score}/10</b><i><em style={{ width: `${sc.score * 10}%` }}/></i></div>)}</div></div><div className="surge-report-card surge-reveal"><div><span>BIGGEST ATTENTION LEAK · {SAMPLE_RISK.section}</span><h3>Make the moment easier to read.</h3><p>{SAMPLE_RISK.reason}</p></div><a href="/sample">Explore the full sample report <ArrowRight size={16}/></a></div></div></section>
 
-        <section className="surge-final"><span className="surge-brand-mark large">↯</span><h2 className="surge-reveal">Your better edit is<br/><em>one upload away.</em></h2><p>Find the moment they&apos;ll scroll—before they do.</p><a className="surge-primary" href="#upload" {...finalCta}>Analyze my first video <ArrowRight size={18}/></a><small>Free · no card · under 60 seconds</small></section>
         <footer className="surge-footer"><BrandLogo className="text-[21px]" /><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} Surge</small></footer>
       </main>
     </>
