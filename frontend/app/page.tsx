@@ -18,6 +18,7 @@ import ProfileNudgeModal from "@/components/ProfileNudgeModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import { track } from "@vercel/analytics";
 import ScoreBar from "@/components/ScoreBar";
+import BrandLogo from "@/components/BrandLogo";
 import { SAMPLE_SCORES, SAMPLE_RISK } from "@/lib/sampleReport";
 
 type Platform = "tiktok" | "instagram";
@@ -171,7 +172,7 @@ function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; on
       <main className="min-h-screen flex flex-col bg-background">
         {/* ── Minimal nav ── */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <span className="text-xl font-extrabold text-text-primary tracking-tight font-display">Surge</span>
+          <BrandLogo className="text-xl" />
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-text-muted text-sm hover:text-text-primary transition-colors">
               Log in
@@ -460,7 +461,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
       <main className="surge-landing min-h-screen bg-background">
         <div className="surge-progress" ref={progressRef} aria-hidden />
         <header className="surge-nav">
-          <Link href="/" className="surge-brand" aria-label="Surge home"><span className="surge-brand-mark">↯</span> surge</Link>
+          <BrandLogo className="text-[21px]" />
           <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><ThemeToggle/><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
         </header>
 
@@ -503,7 +504,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         <section className="surge-report" id="report"><div className="surge-report-inner"><div className="surge-report-copy surge-reveal"><span>AN ACTUAL SURGE REPORT</span><h2>Feedback that speaks<br/>creator, <em>not corporate.</em></h2><p>Every review turns six craft signals into one clear next experiment.</p><div className="surge-score-list">{SAMPLE_SCORES.slice(0, 4).map((sc) => <div key={sc.label}><span>{sc.label}</span><b>{sc.score}/10</b><i><em style={{ width: `${sc.score * 10}%` }}/></i></div>)}</div></div><div className="surge-report-card surge-reveal"><div><span>BIGGEST ATTENTION LEAK · {SAMPLE_RISK.section}</span><h3>Make the moment easier to read.</h3><p>{SAMPLE_RISK.reason}</p></div><a href="/sample">Explore the full sample report <ArrowRight size={16}/></a></div></div></section>
 
         <section className="surge-final"><span className="surge-brand-mark large">↯</span><h2 className="surge-reveal">Your better edit is<br/><em>one upload away.</em></h2><p>Find the moment they&apos;ll scroll—before they do.</p><a className="surge-primary" href="#upload" {...finalCta}>Analyze my first video <ArrowRight size={18}/></a><small>Free · no card · under 60 seconds</small></section>
-        <footer className="surge-footer"><Link href="/" className="surge-brand"><span className="surge-brand-mark">↯</span> surge</Link><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} Surge</small></footer>
+        <footer className="surge-footer"><BrandLogo className="text-[21px]" /><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} Surge</small></footer>
       </main>
     </>
   );

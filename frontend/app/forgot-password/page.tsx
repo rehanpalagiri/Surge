@@ -7,6 +7,7 @@ import { forgotPassword, verifyResetCode, resetPassword, login, apiErrorDetail }
 import { setToken } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
 import OtpInput from "@/components/OtpInput";
+import BrandLogo from "@/components/BrandLogo";
 
 type Step = "email" | "code" | "password" | "done";
 
@@ -79,7 +80,7 @@ export default function ForgotPasswordPage() {
     <main className="min-h-screen flex items-center justify-center px-4 bg-background">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-8 space-y-6">
         <div className="text-center">
-          <Link href="/" className="font-bold text-2xl gradient-text">Surge</Link>
+          <BrandLogo className="text-2xl" />
           {step === "email" && (
             <>
               <h1 className="text-xl font-bold text-text-primary mt-4">Forgot your password?</h1>

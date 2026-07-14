@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandLogo from "@/components/BrandLogo";
 
 export const metadata = { title: "Privacy Policy — Surge" };
 
@@ -16,7 +17,7 @@ export default function PrivacyPage() {
     <main className="min-h-screen bg-background">
       <nav className="border-b border-border bg-surface/50 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4">
-          <Link href="/" className="font-bold text-xl gradient-text">Surge</Link>
+          <BrandLogo className="text-xl" />
         </div>
       </nav>
 

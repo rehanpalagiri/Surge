@@ -15,6 +15,25 @@ type DropzoneStyle = CSSProperties & {
   "--drop-y"?: string;
 };
 
+function getDroppedFile(dataTransfer: DataTransfer): File | undefined {
+  // macOS apps such as Messages can expose an attachment through drag items
+  // before (or instead of) populating the FileList used by a standard browser
+  // file picker. Prefer the item payload, then retain the FileList fallback.
+  for (const item of Array.from(dataTransfer.items)) {
+    if (item.kind === "file") {
+      const file = item.getAsFile();
+      if (file) return file;
+    }
+  }
+
+  return Array.from(dataTransfer.files).find((file) => file instanceof File);
+}
+
+function hasDroppedFile(dataTransfer: DataTransfer) {
+  return Array.from(dataTransfer.items).some((item) => item.kind === "file") ||
+    dataTransfer.types.includes("Files");
+}
+
 export default function ReactiveVideoDropzone({
   file,
   onFileSelected,
@@ -41,7 +60,7 @@ export default function ReactiveVideoDropzone({
 
   const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (disabled) return;
+    if (disabled || !hasDroppedFile(event.dataTransfer)) return;
     dragDepth.current += 1;
     setDragging(true);
   };
@@ -54,9 +73,16 @@ export default function ReactiveVideoDropzone({
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     dragDepth.current = 0;
     setDragging(false);
-    receiveFile(event.dataTransfer.files[0]);
+    receiveFile(getDroppedFile(event.dataTransfer));
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (disabled || !hasDroppedFile(event.dataTransfer)) return;
+    event.dataTransfer.dropEffect = "copy";
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -76,7 +102,7 @@ export default function ReactiveVideoDropzone({
       onKeyDown={handleKeyDown}
       onPointerMove={handlePointerMove}
       onDragEnter={handleDragEnter}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`reactive-dropzone group ${dragging ? "is-dragging" : ""} ${file ? "has-file" : ""} ${disabled ? "is-disabled" : ""}`}

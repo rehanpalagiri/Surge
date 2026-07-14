@@ -28,6 +28,7 @@ import {
   GenerateTrendsResult,
 } from "@/lib/api";
 import { AdminDataSkeleton, SkeletonButton, SkeletonCard, SkeletonInput, SkeletonTitle } from "@/components/Skeleton";
+import BrandLogo from "@/components/BrandLogo";
 
 // Must stay in sync with CANONICAL_NICHES in backend/services/niche_classifier.py —
 // seed matching is an exact string compare against the classified user niche.
@@ -483,7 +484,7 @@ export default function AdminPage() {
         <div className="max-w-5xl mx-auto px-4 py-0 flex items-stretch justify-between">
           {/* Left: brand + main tabs */}
           <div className="flex items-stretch gap-1">
-            <span className="font-bold gradient-text flex items-center pr-6">Surge Admin</span>
+            <span className="flex items-center gap-1.5 pr-6"><BrandLogo href={null} /><span className="font-bold text-text-primary">Admin</span></span>
             {(["seeds", "harvest", "intelligence"] as MainTab[]).map((t) => (
               <button
                 key={t}

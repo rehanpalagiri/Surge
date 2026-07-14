@@ -7,6 +7,7 @@ import { signup, claimAnalysis, apiErrorDetail, googleAuth } from "@/lib/api";
 import { setToken, safeNext } from "@/lib/auth";
 import GoogleSignInButton, { GOOGLE_ENABLED } from "@/components/GoogleSignInButton";
 import PasswordInput from "@/components/PasswordInput";
+import BrandLogo from "@/components/BrandLogo";
 import { track } from "@vercel/analytics";
 
 function extractAnalysisId(next: string | null): string | null {
@@ -168,9 +169,7 @@ function SignupForm() {
     <main className="min-h-screen flex items-center justify-center px-4 bg-background">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-8 space-y-6">
         <div className="text-center">
-          <Link href="/" className="font-bold text-2xl gradient-text">
-            Surge
-          </Link>
+          <BrandLogo className="text-2xl" />
           <h1 className="text-xl font-bold text-text-primary mt-4">
             Create your free account
           </h1>

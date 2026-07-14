@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { getToken } from "@/lib/auth";
 import { Skeleton } from "@/components/Skeleton";
 import ThemeToggle from "@/components/ThemeToggle";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Nav({ subtitle }: { subtitle?: string }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
@@ -43,9 +44,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
 
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="font-bold text-xl text-text-primary tracking-tight font-display">
-            Surge
-          </Link>
+          <BrandLogo className="text-xl" />
           {subtitle && (
             <span className="text-text-muted text-sm capitalize">{subtitle}</span>
           )}

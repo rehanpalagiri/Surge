@@ -64,11 +64,11 @@
 /* Landing UX utilities: quiet typography, accessible explanations, and a stable CSS-only chart. */
 .surge-chart-line { position:absolute; inset:0; }
 .surge-chart-line i { position:absolute; display:block; height:2px; transform-origin:left center; background:var(--color-accent); box-shadow:0 0 6px color-mix(in srgb, var(--color-accent) 30%, transparent); }
-.surge-chart-line .seg-one { left:0; top:17%; width:27%; transform:rotate(10deg); }
-.surge-chart-line .seg-two { left:26%; top:22%; width:26%; transform:rotate(13deg); }
-.surge-chart-line .seg-three { left:51%; top:36%; width:17%; transform:rotate(42deg); }
-.surge-chart-line .seg-four { left:66%; top:54%; width:33%; transform:rotate(12deg); }
-.surge-chart-line b { position:absolute; left:66%; top:51%; width:10px; height:10px; border:3px solid var(--color-danger); border-radius:50%; background:var(--color-card); transform:translate(-50%,-50%); }
+.surge-chart-line .seg-one { left:0; top:14%; width:29%; transform:rotate(9deg); }
+.surge-chart-line .seg-two { left:28.5%; top:18.5%; width:27%; transform:rotate(10deg); }
+.surge-chart-line .seg-three { left:55%; top:23.5%; width:17%; transform:rotate(55deg); }
+.surge-chart-line .seg-four { left:64.5%; top:37.5%; width:35.5%; transform:rotate(14deg); }
+.surge-chart-line b { position:absolute; left:64.5%; top:37.5%; width:10px; height:10px; border:3px solid var(--color-danger); border-radius:50%; background:var(--color-card); transform:translate(-50%,-50%); }
 .surge-help { display:inline-grid; place-items:center; width:14px; height:14px; margin-left:5px; border:1px solid currentColor; border-radius:50%; font-size:9px; line-height:1; }
 .tooltip-wrap { position:relative; display:inline-flex; align-items:center; vertical-align:middle; }
 .tooltip-trigger { display:inline-flex; align-items:center; justify-content:center; border-radius:4px; }
@@ -82,6 +82,7 @@
 
 /* ── Anonymous landing refresh: an editorial edit-bay with one waveform accent ── */
 .surge-landing { color: var(--color-text-primary); overflow: hidden; }
+.surge-wordmark { color:var(--color-accent); font-family:var(--font-schibsted),system-ui,sans-serif; font-style:italic; font-weight:800; line-height:1; letter-spacing:-.04em; }
 .surge-nav { height: 76px; display:flex; align-items:center; justify-content:space-between; width:min(1180px,calc(100% - 48px)); margin:0 auto; border-bottom:1px solid var(--color-border); }
 .surge-brand { display:flex; align-items:center; gap:9px; color:var(--color-text-primary); font:800 21px/1 var(--font-display),system-ui,sans-serif; letter-spacing:-.025em; }
 .surge-brand-mark { width:30px; height:30px; display:grid; place-items:center; color:var(--color-background); background:var(--color-accent); border-radius:9px; font:800 20px/1 var(--font-display),system-ui,sans-serif; }
@@ -621,9 +622,8 @@ select:-webkit-autofill {
   }
 
   /* Chromatic-split wordmark for hero surfaces. Needs data-text set to the
-     same string so the cyan/red layers can mirror it. The wordmark rests as
-     plain text — the split + glitch bursts appear only while the cursor is
-     over it (hover-only by product decision; see the hover block below). */
+     same string so the cyan/red layers can mirror it. The split remains
+     visible at rest, while hover adds the existing glitch bursts. */
   .tiktok-glitch,
   .tiktok-glitch-sm {
     position: relative;
@@ -639,12 +639,12 @@ select:-webkit-autofill {
     top: 0;
     width: 100%;
     pointer-events: none;
-    opacity: 0;
+    opacity: 0.9;
   }
   .tiktok-glitch::before    { color: #25F4EE; transform: translate(-1.5px, 0); z-index: -1; }
-  .tiktok-glitch::after     { color: #FE2C55; transform: translate(1.5px, 0);  z-index: -2; }
+  .tiktok-glitch::after     { color: #FF78B4; transform: translate(1.5px, 0);  z-index: -2; }
   .tiktok-glitch-sm::before { color: #25F4EE; transform: translate(-1px, 0);   z-index: -1; }
-  .tiktok-glitch-sm::after  { color: #FE2C55; transform: translate(1px, 0);    z-index: -2; }
+  .tiktok-glitch-sm::after  { color: #FF78B4; transform: translate(1px, 0);    z-index: -2; }
 
   /* Solid TikTok accent colours for individual elements */
   .tiktok-cyan  { color: #25F4EE; }
@@ -684,10 +684,10 @@ select:-webkit-autofill {
   }
 }
 
-/* Brand wordmark effects are HOVER-ONLY: at rest TikTok reads as plain text
-   and the Instagram gradient sits still. Cursor over the wordmark reveals
-   the chromatic split + glitch bursts / rotates the gradient. Gated behind
-   hover-capable pointers so touch devices never get stuck mid-effect. */
+/* Brand wordmark motion is HOVER-ONLY: TikTok keeps its chromatic split at
+   rest, then glitches on hover; Instagram's gradient only animates on hover.
+   Gated behind hover-capable pointers so touch devices never get stuck
+   mid-effect. */
 @media (hover: hover) and (pointer: fine) {
   .tiktok-glitch:hover::before, .tiktok-glitch:hover::after,
   .tiktok-glitch-sm:hover::before, .tiktok-glitch-sm:hover::after,
@@ -780,11 +780,11 @@ select:-webkit-autofill {
 /* Scroll progress bar */
 .surge-progress { position:fixed; top:0; left:0; right:0; height:2px; transform:scaleX(0); transform-origin:0 50%; background:linear-gradient(90deg,var(--color-accent),color-mix(in srgb, var(--color-accent) 70%, white)); box-shadow:0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent); z-index:60; }
 
-/* TikTok glitch wordmark (cyan/red chromatic split) — split shows on hover only */
+/* TikTok glitch wordmark (cyan/pink chromatic split) — split remains visible at rest */
 .surge-glitch { position:relative; display:inline-block; isolation:isolate; color:var(--color-text-primary); }
-.surge-glitch::before, .surge-glitch::after { content:attr(data-text); position:absolute; left:0; top:0; width:100%; pointer-events:none; opacity:0; }
+.surge-glitch::before, .surge-glitch::after { content:attr(data-text); position:absolute; left:0; top:0; width:100%; pointer-events:none; opacity:.9; }
 .surge-glitch::before { color:#25F4EE; transform:translate(-1.5px,0); z-index:-1; }
-.surge-glitch::after  { color:#FE2C55; transform:translate(1.5px,0);  z-index:-2; }
+.surge-glitch::after  { color:#FF78B4; transform:translate(1.5px,0);  z-index:-2; }
 
 /* Instagram gradient wordmark (purple → yellow, mirrored so the full range shows and loops) */
 .surge-ig-gradient { background:linear-gradient(120deg,var(--ig-gradient-stops)); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; font-weight:inherit; }
@@ -806,13 +806,17 @@ select:-webkit-autofill {
    the landing (.surge-*) and app (.tiktok-glitch/.gradient-text-instagram)
    variants share them. */
 @keyframes surge-glitch-a {
-  0%,88%,100%{ transform:translate(-1.5px,0); clip-path:inset(0 0 0 0); }
-  90%{ transform:translate(-4px,-1px); clip-path:inset(12% 0 58% 0); }
+  0%{ transform:translate(-4px,-1px); clip-path:inset(12% 0 58% 0); }
+  5%{ transform:translate(-2px,1px);  clip-path:inset(46% 0 18% 0); }
+  10%,84%,100%{ transform:translate(-1.5px,0); clip-path:inset(0 0 0 0); }
+  88%{ transform:translate(-4px,-1px); clip-path:inset(12% 0 58% 0); }
   94%{ transform:translate(-2px,1px);  clip-path:inset(46% 0 18% 0); }
 }
 @keyframes surge-glitch-b {
-  0%,86%,100%{ transform:translate(1.5px,0); clip-path:inset(0 0 0 0); }
-  89%{ transform:translate(4px,1px);  clip-path:inset(52% 0 16% 0); }
+  0%{ transform:translate(4px,1px);  clip-path:inset(52% 0 16% 0); }
+  5%{ transform:translate(2px,-1px); clip-path:inset(16% 0 54% 0); }
+  10%,82%,100%{ transform:translate(1.5px,0); clip-path:inset(0 0 0 0); }
+  86%{ transform:translate(4px,1px);  clip-path:inset(52% 0 16% 0); }
   93%{ transform:translate(2px,-1px); clip-path:inset(16% 0 54% 0); }
 }
 @keyframes surge-ig-shimmer { to { background-position:200% 0; } }
