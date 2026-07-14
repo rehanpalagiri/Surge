@@ -4,8 +4,9 @@ Read this before any visual, layout, styling, copy, or component work. It exists
 Surge never ships a page that reads as "AI-generated." If you are only touching
 backend, tests, or non-visual code, you don't need this file.
 
-The single source of visual truth is the **"Phosphor"** design system in
-`frontend/app/globals.css` (the `:root` token block) plus the fonts wired in
+The single source of visual truth is the **"Noir"** design system in
+`frontend/app/globals.css` (the `:root` token block = dark default, the
+`[data-theme="light"]` block = light theme) plus the fonts wired in
 `frontend/app/layout.tsx`. This file is the judgment layer on top of those tokens.
 When this file and a stray hardcoded style disagree, the tokens win — fix the stray.
 
@@ -18,10 +19,11 @@ It has a recognizable smell. Never produce any of these:
 
 - **Purple / violet / indigo anything.** No purple hero, no `#6366F1`/indigo-600,
   no violet-to-blue or purple-to-pink gradient. Purple is THE tell. Surge's palette
-  is cool graphite + citron + ice on purpose (`globals.css` even labels it "without
-  the default AI-purple palette"). The ONLY sanctioned purple in the entire app is
-  the Instagram brand wordmark gradient (purple→yellow), which is a deliberate
-  platform-logo device — never a UI surface, button, or background.
+  is true black/white neutrals + one magnetic pink on purpose — the pink is a
+  *signal*, not a wash; never flood a surface with it. The ONLY sanctioned purple
+  in the entire app is the Instagram brand wordmark gradient (purple→yellow),
+  which is a deliberate platform-logo device — never a UI surface, button, or
+  background.
 - **Gradient soup.** No full-bleed multi-stop gradient backgrounds, no gradient
   fills on cards/buttons, no gradient body text as a default. Accent glow via a
   low-opacity radial (already in the token system) is fine; a purple-pink hero is not.
@@ -44,15 +46,29 @@ reference (§3) and match it instead of inventing.
 
 - Use CSS variables from `globals.css` (`--color-background`, `--color-surface`,
   `--color-card`, `--color-border`, `--color-text-primary`, `--color-text-muted`,
-  `--color-accent` citron, `--color-accent-2` ice, `--color-success/-warning/-danger`).
+  `--color-accent` pink, `--color-accent-2` ice, `--color-success/-warning/-danger`,
+  `--color-accent-hover`, `--color-shadow`).
   Derive shades with `color-mix(in srgb, var(--color-x) N%, …)`, never with a new hex.
-- **Two accent temperatures, kept distinct:** citron `--color-accent` = *act*
+- **Two accent temperatures, kept distinct:** pink `--color-accent` = *act*
   (primary CTAs, live signals). Ice `--color-accent-2` = *inform* (insights,
   secondary highlights). Don't swap their jobs; don't add a third accent.
+  **Pink stays minimal** — CTAs, eyebrows, live dots, focus rings. If a surface
+  starts reading "pink website" instead of "black/white website with pink
+  signals", pull it back.
 - Never introduce a raw hex value in a component when a token exists. If a genuinely
-  new color is unavoidable, add it as a token in `:root` first so it cascades and
-  stays theme-consistent — don't scatter one-off hexes.
-- Dark-only. Don't build a half-baked light mode; the app is a single dark theme.
+  new color is unavoidable, add it as a token in BOTH theme blocks first so it
+  cascades and stays theme-consistent — don't scatter one-off hexes.
+- **Two themes, both first-class.** `:root` is the dark default; the
+  `[data-theme="light"]` block re-tokens the same ramp for paper white.
+  `components/ThemeToggle.tsx` flips the `data-theme` attribute (persisted as
+  `surge-theme`; a pre-paint script in `layout.tsx` prevents theme-flash).
+  Anything you style must be checked in BOTH themes — a white-highlight hack or
+  a hardcoded dark hex is a bug even if dark mode looks fine. Fixed-color islands
+  (the dark mock-video frame, brand fills) are the deliberate exceptions.
+- **Platform brand motion is hover-only.** The TikTok chromatic split/glitch and
+  the Instagram gradient rotation run ONLY while the cursor is over the wordmark
+  (gated behind `hover: hover` + reduced-motion). Never reintroduce idle/looping
+  brand animation.
 
 ## 2. Typography — it must be beautiful, and it's already chosen
 
@@ -77,7 +93,7 @@ is the brief. Do this before writing CSS:
    spacing rhythm, type scale and pairing, color restraint, the ONE accent, border/
    radius/shadow treatment, density, motion. Write those down, then build to them.
 2. **Translate into Surge tokens.** Keep the reference's *structure and taste*, but
-   render it in the Phosphor palette and fonts — don't paste in the reference's colors
+   render it in the Noir palette and fonts — don't paste in the reference's colors
    (especially not if they're purple).
 3. **Match the level of polish, not just the layout.** Alignment, optical spacing,
    consistent radii, and intentional whitespace are what separate "designed" from
@@ -124,9 +140,12 @@ Never ask the user to eyeball it for you. Use the Browser-pane tools:
    gradient-souped.
 4. **Mobile pass** (`resize_window` mobile, 375×812): screenshot again; confirm the
    collapse behavior from §5 and that there's no horizontal scroll.
-5. Spot-check computed styles with `javascript_tool` + `getComputedStyle` when a color
+5. **Both themes.** Repeat the visual check with `data-theme="light"` and
+   `data-theme="dark"` on `<html>` (or click the nav toggle) — a change isn't done
+   until it reads correctly on noir black AND paper white.
+6. Spot-check computed styles with `javascript_tool` + `getComputedStyle` when a color
    or font needs confirming (don't trust the source — confirm the rendered value).
-6. Share the before/after or the two screenshots as proof.
+7. Share the before/after or the two screenshots as proof.
 
 > Verification gotcha: a backgrounded/hidden preview tab runs with
 > `visibilityState:hidden`, which freezes CSS opacity transitions and `rAF` — reveal
@@ -140,11 +159,14 @@ Never ask the user to eyeball it for you. Use the Browser-pane tools:
 
 - [ ] Zero purple/indigo/violet UI (Instagram brand wordmark is the only exception).
 - [ ] No default gradient hero/cards/buttons; accent used sparingly and correctly
-      (citron = act, ice = inform).
-- [ ] Colors are tokens; no stray hardcoded hex.
+      (pink = act, ice = inform); the page reads black/white with pink signals,
+      not "pink website".
+- [ ] Colors are tokens; no stray hardcoded hex; correct in BOTH light and dark.
+- [ ] Platform brand motion (TikTok glitch, Instagram gradient rotation) only ever
+      runs on hover.
 - [ ] Schibsted Grotesk display + Instrument Sans body; real size/weight hierarchy;
       tight heading tracking; sane measure.
-- [ ] If the user gave a reference, the result demonstrably follows it (in Phosphor).
+- [ ] If the user gave a reference, the result demonstrably follows it (in Noir).
 - [ ] Correct and screenshotted at BOTH 1280px and 375px; no horizontal scroll.
 - [ ] Console/log clean; reduced-motion respected.
 - [ ] It looks intentionally designed, not generated. If in doubt, it isn't done.

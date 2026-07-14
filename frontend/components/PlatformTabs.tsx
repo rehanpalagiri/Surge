@@ -51,8 +51,9 @@ export default function PlatformTabs({
           onClick={() => onChange(t.id)}
           className={`relative z-10 rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors ${
             value === t.id
-              ? // Ink on TikTok cyan, white on the Instagram gradient — both AA.
-                t.id === "tiktok" ? "text-background" : "text-white"
+              ? // Fixed inks on fixed brand fills (theme-independent): black on
+                // TikTok cyan, white on the Instagram gradient — both AA.
+                t.id === "tiktok" ? "text-black" : "text-white"
               : "text-text-muted hover:text-text-primary"
           }`}
         >

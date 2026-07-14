@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getToken } from "@/lib/auth";
 import { Skeleton } from "@/components/Skeleton";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Nav({ subtitle }: { subtitle?: string }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
@@ -50,6 +51,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
           )}
         </div>
 
+        <div className="flex items-center gap-3">
         {/* ── Desktop nav (md+) ── */}
         <div className="hidden md:flex items-center gap-5 text-sm">
           {loggedIn === null ? (
@@ -72,6 +74,8 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             </>
           )}
         </div>
+
+        <ThemeToggle />
 
         {/* ── Mobile hamburger (< md) ── */}
         <div className="md:hidden relative" ref={menuRef}>
@@ -103,6 +107,7 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
     </nav>

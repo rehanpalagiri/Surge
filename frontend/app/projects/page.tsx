@@ -17,7 +17,7 @@ function seededRand(seed: number): number {
   return x - Math.floor(x);
 }
 
-const _COLORS8 = ["#2DD4BF", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
+const _COLORS8 = ["#FF4D8D", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c", "#f43f5e", "#10b981"];
 
 const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
   const angle = (i / 80) * 2 * Math.PI + seededRand(i * 3) * 0.5;
@@ -33,7 +33,7 @@ const MEGA_CONFETTI = Array.from({ length: 80 }, (_, i) => {
   };
 });
 
-const _COLORS6 = ["#2DD4BF", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
+const _COLORS6 = ["#FF4D8D", "#fbbf24", "#ec4899", "#34d399", "#60a5fa", "#fb923c"];
 
 const MINI_BURST = Array.from({ length: 14 }, (_, i) => {
   const angle = (i / 14) * 2 * Math.PI + seededRand(i * 5) * 0.5;

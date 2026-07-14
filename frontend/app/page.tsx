@@ -15,6 +15,7 @@ import { Tooltip } from "@/components/Tooltip";
 import ReactiveVideoDropzone from "@/components/ReactiveVideoDropzone";
 import PlatformTabs from "@/components/PlatformTabs";
 import ProfileNudgeModal from "@/components/ProfileNudgeModal";
+import ThemeToggle from "@/components/ThemeToggle";
 import { track } from "@vercel/analytics";
 import ScoreBar from "@/components/ScoreBar";
 import { SAMPLE_SCORES, SAMPLE_RISK } from "@/lib/sampleReport";
@@ -460,7 +461,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         <div className="surge-progress" ref={progressRef} aria-hidden />
         <header className="surge-nav">
           <Link href="/" className="surge-brand" aria-label="Surge home"><span className="surge-brand-mark">↯</span> surge</Link>
-          <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
+          <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><ThemeToggle/><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
         </header>
 
         {deleted && <div className="surge-toast">Your account has been deleted.<button onClick={onDismissDeleted} aria-label="Dismiss">×</button></div>}

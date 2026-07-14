@@ -15,7 +15,7 @@ export default function Image() {
     (
       <div
         style={{
-          background: "#0B0C10",
+          background: "#0A0A0B",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -32,7 +32,7 @@ export default function Image() {
             width: 120,
             height: 120,
             borderRadius: 28,
-            background: "#CDF54A",
+            background: "#FF4D8D",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -42,7 +42,7 @@ export default function Image() {
             style={{
               fontSize: 68,
               fontWeight: 800,
-              color: "#0B0C10",
+              color: "#0A0A0B",
               lineHeight: 1,
             }}
           >
@@ -55,7 +55,7 @@ export default function Image() {
           style={{
             fontSize: 80,
             fontWeight: 800,
-            color: "#F2EFE9",
+            color: "#F5F5F6",
             letterSpacing: "-2px",
             lineHeight: 1,
           }}
@@ -67,7 +67,7 @@ export default function Image() {
         <div
           style={{
             fontSize: 32,
-            color: "#A29B91",
+            color: "#9C9CA6",
             textAlign: "center",
             maxWidth: 780,
             lineHeight: 1.4,
@@ -88,9 +88,9 @@ export default function Image() {
             <div
               key={label}
               style={{
-                background: "#1E1B21",
-                border: "1px solid #2E2A31",
-                color: "#CDF54A",
+                background: "#18181B",
+                border: "1px solid #29292F",
+                color: "#FF4D8D",
                 fontSize: 20,
                 fontWeight: 600,
                 padding: "10px 22px",
@@ -103,7 +103,7 @@ export default function Image() {
         </div>
 
         {/* URL */}
-        <div style={{ fontSize: 22, color: "#A29B91", marginTop: 8 }}>
+        <div style={{ fontSize: 22, color: "#9C9CA6", marginTop: 8 }}>
           {SITE_HOST}
         </div>
       </div>

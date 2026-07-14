@@ -1,7 +1,8 @@
 // Lightweight, dependency-free confetti burst. Appends a transient full-screen
 // canvas, animates a particle burst, then removes itself. No-ops on the server
 // and for users who prefer reduced motion.
-const CONFETTI_COLORS = ["#7c3aed", "#a855f7", "#2563eb", "#3b82f6", "#22c55e", "#eab308"];
+// Noir celebration ramp: pinks lead, ice/green/gold support — no purple.
+const CONFETTI_COLORS = ["#FF4D8D", "#FF8FB8", "#8FB8FF", "#52DE8F", "#F4C24D", "#F5F5F6"];
 
 interface Particle {
   x: number;
