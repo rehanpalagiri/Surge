@@ -55,12 +55,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0A0A0B",
+  themeColor: "#FFFFFF",
 };
 
-// Applies the persisted theme before first paint so a light-theme user never
-// sees a dark flash (and vice versa). Dark is the brand default.
-const themeInitScript = `try{var t=localStorage.getItem("surge-theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark")}catch(e){document.documentElement.setAttribute("data-theme","dark")}`;
+// Applies the persisted theme before first paint. Light is the first-visit
+// default; an explicit saved dark preference is still respected.
+const themeInitScript = `try{var t=localStorage.getItem("surge-theme");document.documentElement.setAttribute("data-theme",t==="dark"?"dark":"light")}catch(e){document.documentElement.setAttribute("data-theme","light")}`;
 
 export default function RootLayout({
   children,
@@ -68,7 +68,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
+    <html lang="en" data-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

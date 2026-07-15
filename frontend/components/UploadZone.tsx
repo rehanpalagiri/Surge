@@ -351,7 +351,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       {/* ── Analysis loading overlay ── */}
       {loading && (
         <div
-          className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
+          className="analysis-page fixed inset-0 z-50 overflow-y-auto bg-white px-4 py-8 sm:py-10"
           role="dialog"
           aria-modal="true"
           aria-busy="true"

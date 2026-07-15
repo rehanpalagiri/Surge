@@ -91,9 +91,12 @@ export default function AnalyzePage() {
     }
   };
 
+  if (processing) {
+    return <AnalysisOverlay active steps={PROCESSING_STEPS} />;
+  }
+
   return (
     <main className="min-h-screen bg-background">
-      {processing && <AnalysisOverlay active={processing} steps={PROCESSING_STEPS} />}
       <Nav />
       <section className="mx-auto w-full max-w-3xl px-4 py-14 sm:py-20">
         <div className="mx-auto mb-8 max-w-xl text-center">
