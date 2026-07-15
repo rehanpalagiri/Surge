@@ -178,7 +178,7 @@ export function AnalysisOverlay(props: AnalysisProgressProps & { label?: string 
   const { label = "Preparing your craft review", ...rest } = props;
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-background/95 backdrop-blur-sm px-4 py-10"
+      className="analysis-page fixed inset-0 z-50 overflow-y-auto bg-white px-4 py-10"
       role="dialog"
       aria-modal="true"
       aria-busy="true"

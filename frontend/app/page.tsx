@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Eye, Lock, Play, Sparkles, Target, LineChart, Upload, Zap } from "lucide-react";
+import { ArrowRight, Check, Eye, Lock, Sparkles, Target, LineChart, Upload, Zap } from "lucide-react";
 import UploadZone from "@/components/UploadZone";
 import Nav from "@/components/Nav";
 import { getToken } from "@/lib/auth";
@@ -407,7 +407,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <div className="surge-eyebrow"><Sparkles size={14}/> BUILT FOR SHORT-FORM CREATORS</div>
             <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
             <p>Surge finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
-            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
+            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link></div>
             <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Tooltip label="Your uploaded video is analyzed privately"><Lock size={13}/></Tooltip> Videos stay private</span><span>No card</span></div>
           </div>
 
@@ -415,9 +415,9 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <div className="surge-monitor-bar"><span className="surge-dots">● ● ●</span><span>surge / craft review</span><span className="surge-live"><b/> Review ready</span></div>
             <div className="surge-monitor-body">
               <div className="surge-video-frame"><div className="surge-video-copy">3 editing tricks<br/><b>nobody tells you</b></div><div className="surge-person"/><div className="surge-timeline"><span>0:09</span><i/></div><label><Tooltip label="AI-estimated craft issue"><Eye size={11}/></Tooltip> Attention risk</label></div>
-              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map <Tooltip label="AI-estimated craft diagnostic, not measured audience retention"><span className="surge-help">?</span></Tooltip></span><b>0:08–0:12</b></div><div className="surge-chart" aria-label="Attention risk drops around 0:09"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 0 14 L 29 18.5 L 55 23.5 L 64.5 37.5 L 100 46"/></svg><span className="surge-chart-marker" aria-hidden="true"/></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
+              <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map <Tooltip label="AI-estimated craft diagnostic, not measured audience retention"><span className="surge-help">?</span></Tooltip></span><b>0:08–0:12</b></div><div className="surge-chart" aria-label="Attention risk drops sharply around 0:09"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 0 13 L 30 16 L 54 20 L 62 52 L 100 63"/></svg><span className="surge-chart-marker" aria-hidden="true"/></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
             </div>
-            <div className="surge-float surge-float-a"><Sparkles size={14}/> AI craft analysis</div><div className="surge-float surge-float-b"><b>+24%</b> clearer hook</div>
+            <div className="surge-float surge-float-b"><b>+24%</b> clearer hook</div>
           </div>
         </section>
 
