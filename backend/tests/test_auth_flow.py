@@ -5,6 +5,7 @@ SQLite DB (StaticPool so every request shares one connection). Email sending is
 stubbed so no real mail goes out and the tests stay hermetic and offline.
 """
 import unittest
+import uuid
 from datetime import datetime, timedelta
 from services.clock import utc_now_naive
 
@@ -55,10 +56,12 @@ class AuthFlowTest(unittest.IsolatedAsyncioTestCase):
         await self.engine.dispose()
 
     async def _signup(self, email="creator@example.com", username="creator"):
+        # Unique per-call IP: signup is now IP-throttled (5/900s) and the throttle
+        # state is process-global, so a shared IP would bleed across tests.
         return await self.client.post("/api/auth/signup", json={
             "email": email, "username": username,
             "password": "supersecret1", "birth_date": "1995-06-15",
-        })
+        }, headers={"X-Forwarded-For": f"signup-{uuid.uuid4()}"})
 
     async def _latest_code(self) -> str:
         async with self.Session() as s:

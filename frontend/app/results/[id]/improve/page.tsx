@@ -112,16 +112,16 @@ export default function ImprovePage() {
     : [];
   const rubricContext = s.rubric_context as RubricContext | undefined;
 
-  // Emotional impact. Gemini is told emotional_analysis is required, but the type marks it
-  // optional and the model can omit/malform fields — so guard achieved_score (a missing or
-  // non-numeric value would render "undefined/10" with a NaN-width bar).
+  // Emotional impact. Legacy analyses have no assessed flag, so a finite numeric score
+  // remains authoritative; missing or malformed scores are shown as not assessed.
   const ea = s.emotional_analysis;
   const hasEmotional =
     !!ea && Array.isArray(ea.target_emotions) && ea.target_emotions.length > 0;
-  const emoScore =
-    ea && typeof ea.achieved_score === "number" && Number.isFinite(ea.achieved_score)
-      ? ea.achieved_score
-      : 0;
+  const emoAssessed =
+    ea?.assessed !== false &&
+    typeof ea?.achieved_score === "number" &&
+    Number.isFinite(ea.achieved_score);
+  const emoScore = emoAssessed ? (ea.achieved_score as number) : null;
 
   return (
     <main className="min-h-screen bg-background">
@@ -289,8 +289,10 @@ export default function ImprovePage() {
                 <h3 className="text-text-primary font-semibold">
                   Emotional impact
                 </h3>
-                <span className={`text-sm font-bold ${scoreColor(emoScore)}`}>
-                  {emoScore}/10
+                <span
+                  className={`text-sm font-bold ${emoScore === null ? "text-text-muted" : scoreColor(emoScore)}`}
+                >
+                  {emoScore === null ? "Not assessed" : `${emoScore}/10`}
                 </span>
               </div>
 
@@ -310,12 +312,14 @@ export default function ImprovePage() {
                 </div>
               </div>
 
-              <div className="w-full h-2 rounded-full bg-surface overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${scoreBarBg(emoScore)}`}
-                  style={{ width: `${Math.max(0, Math.min(10, emoScore)) * 10}%` }}
-                />
-              </div>
+              {emoScore !== null && (
+                <div className="w-full h-2 rounded-full bg-surface overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${scoreBarBg(emoScore)}`}
+                    style={{ width: `${Math.max(0, Math.min(10, emoScore)) * 10}%` }}
+                  />
+                </div>
+              )}
 
               {ea.what_lands && (
                 <div>

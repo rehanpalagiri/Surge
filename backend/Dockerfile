@@ -20,15 +20,18 @@ EXPOSE 8000
 
 # WEB_CONCURRENCY controls the number of worker processes.
 #
-# It defaults to 1 ON PURPOSE. Two guards keep per-process state in memory and
-# would each grant the full quota if duplicated across workers:
-#   • the guest analysis limit  (services/throttle.py → check_rate "guest:<ip>")
-#   • the password-reset brute-force guard (same module)
-# Before raising WEB_CONCURRENCY > 1 (or running multiple Railway replicas),
-# move services/throttle.py to a shared store (a DB table or Redis) so the
-# counters are global. Until then, one worker is the correct, safe setting.
-# Under load a single worker stays error-free (see tools/stress_test.py) but
-# its throughput is capped by one event loop — horizontal scaling is the lever.
+# The in-memory constraint that pinned this to 1 is LIFTED: both throttle counters
+# (services/throttle.py → rate_limit_hits table) and presigned-upload ownership
+# (routers/analyze.py → pending_uploads table) now live in the shared DB, so limits
+# and upload keys hold across workers and replicas.
+#
+# Still defaults to 1 deliberately. Before raising it, mind the DB connection math:
+# total connections = WEB_CONCURRENCY * (pool_size + max_overflow) from
+# database.py (currently 20 per worker) and MUST stay under Neon's max_connections
+# for the plan — verify that number first. Also note DB-backed throttling adds load
+# to the primary DB (the measured bottleneck); for serious scale, move the throttle
+# to Redis (see services/throttle.py). A single worker's throughput is capped by one
+# event loop, so horizontal scaling is the real lever once that's saturated.
 ENV WEB_CONCURRENCY=1
 
 # Use shell form so $PORT / $WEB_CONCURRENCY are expanded at runtime.

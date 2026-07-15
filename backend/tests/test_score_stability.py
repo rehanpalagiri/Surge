@@ -72,8 +72,9 @@ class _FakeFile:
 
 
 class _FakeResp:
-    def __init__(self, text):
+    def __init__(self, text, model_version=None):
         self.text = text
+        self.model_version = model_version
         self.usage_metadata = _types.SimpleNamespace(
             prompt_token_count=100, candidates_token_count=50)
 
@@ -97,9 +98,11 @@ class _FakeModels:
 
     async def generate_content(self, model, contents, config):
         self.configs.append(config)
-        text = _PERCEPTION_FIXTURE if self._i % 2 == 0 else _REASONING_FIXTURE
+        is_perception = self._i % 2 == 0
+        text = _PERCEPTION_FIXTURE if is_perception else _REASONING_FIXTURE
+        model_version = "served-perception-version" if is_perception else "served-reasoning-version"
         self._i += 1
-        return _FakeResp(text)
+        return _FakeResp(text, model_version=model_version)
 
 
 class _FakeAio:
@@ -157,6 +160,26 @@ class ScoreStabilityMockedTest(unittest.IsolatedAsyncioTestCase):
         # Deterministic model output → deterministic pipeline → zero drift.
         self.assertLessEqual(max_spread, 1, f"spread too large: {spreads}")
         print(f"\n[P1-B] mocked pipeline max score spread over {N} runs: {max_spread}")
+
+    async def test_served_model_versions_are_recorded_for_both_passes(self):
+        fake = _FakeClient()
+        usage_mock = AsyncMock()
+        with patch.object(gemini, "client", fake), \
+             patch.object(gemini, "record_usage_event", new=usage_mock):
+            await analyze_video(self._tmp.name, niche="Uncategorized")
+
+        events = {
+            call.kwargs["operation"]: call.kwargs
+            for call in usage_mock.await_args_list
+        }
+        self.assertEqual(
+            events["video_craft_perception"]["model_version"],
+            "served-perception-version",
+        )
+        self.assertEqual(
+            events["video_craft_reasoning"]["model_version"],
+            "served-reasoning-version",
+        )
 
     async def test_spread_helper_catches_real_variance(self):
         # Guard against a vacuous test: the spread computation must actually flag

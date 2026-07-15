@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from models import Base, OutcomeSnapshot, UserAnalysis
+from services.craft_insights import MIN_VIEWS_FOR_RATE
 from services.outcomes import utc_now_naive
 from tools.craft_correlation import (
-    build_correlation_report, fisher_ci, pearson_r,
+    _rankdata, build_correlation_report, fisher_ci, pearson_r, spearman_r,
 )
 
 
@@ -36,6 +37,17 @@ class PearsonTest(unittest.TestCase):
         self.assertGreater(hi, 0.6)
         self.assertGreaterEqual(lo, -1.0)
         self.assertLessEqual(hi, 1.0)
+
+
+class SpearmanTest(unittest.TestCase):
+    def test_rankdata_averages_ties(self):
+        self.assertEqual(_rankdata([3, 1, 2, 2]), [4.0, 1.0, 2.5, 2.5])
+
+    def test_monotonic_non_linear_relationship(self):
+        self.assertAlmostEqual(spearman_r([1, 2, 3, 4], [1, 4, 9, 16]), 1.0)
+
+    def test_zero_rank_variance_is_none(self):
+        self.assertIsNone(spearman_r([5, 5, 5], [1, 2, 3]))
 
 
 def _scores(hook: float, curiosity: float) -> str:
@@ -99,6 +111,7 @@ class CorrelationReportTest(unittest.IsolatedAsyncioTestCase):
         hook = dims["hook_velocity"]
         self.assertEqual(hook["n"], 10)
         self.assertAlmostEqual(hook["r"], 1.0, places=2)     # perfect by construction
+        self.assertAlmostEqual(hook["spearman"], 1.0, places=2)
         self.assertIsNotNone(hook["ci95"])                    # n>3 → CI present
         self.assertFalse(hook["insufficient"])
         # A constant dimension has no variance → r is honestly None, not a fake 0.
@@ -107,6 +120,31 @@ class CorrelationReportTest(unittest.IsolatedAsyncioTestCase):
         # Both naive baselines are present, each with n and (for caption) a value.
         names = {b["baseline"] for b in rep["baselines"]}
         self.assertEqual(names, {"caption_length_chars", "posting_hour_utc"})
+        self.assertTrue(all("spearman" in b for b in rep["baselines"]))
+
+    async def test_excludes_snapshots_below_minimum_views_floor(self):
+        async with self.Session() as db:
+            await self._seed(db, 2)
+            noisy = UserAnalysis(
+                platform="tiktok", filename="noise.mp4", niche="Fitness",
+                scores_json=_scores(10.0, 10.0), verdict="Developing craft",
+                status="complete",
+            )
+            db.add(noisy)
+            await db.flush()
+            db.add(OutcomeSnapshot(
+                analysis_id=noisy.id, platform="tiktok", source="tikwm",
+                observed_at=utc_now_naive(), horizon="7d",
+                views=3, likes=1,  # 33.33% noise
+                metric_version="observed_response_v1",
+            ))
+            await db.commit()
+            rep = await build_correlation_report(db, horizon="7d", min_n=2)
+
+        self.assertEqual(rep["n"], 2)
+        self.assertLess(3, MIN_VIEWS_FOR_RATE)
+        hook = next(d for d in rep["dimensions"] if d["dimension"] == "hook_velocity")
+        self.assertEqual(hook["n"], 2)
 
     async def test_collinearity_flags_duplicated_pair(self):
         async with self.Session() as db:

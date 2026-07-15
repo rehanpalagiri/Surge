@@ -41,10 +41,18 @@ DIMENSION_LABELS = {
 # number for its own sake — it's the smallest split where neither side's median
 # is a single point that one outlier could define.)
 PATTERN_MIN = 6
+# Discrete, tie-heavy scores can still turn PATTERN_MIN posts into a lopsided
+# median split. Each half needs >= 3 observations so one post's like rate
+# cannot define an entire creator-facing pattern.
+SPLIT_MIN_PER_SIDE = 3
 # An empirical interquartile range is only more than two raw values when the
 # middle 50% spans >= 4 points, i.e. >= 8 observations. Below that we don't
 # pretend the observed range is a predictive band.
 FORECAST_MIN = 8
+# A like rate on very few views is noise: its resolution is one like = 1/views.
+# Requiring 1/views <= 0.01 (a single like moves the observed rate by <= 1 point)
+# floors this at 100 views. Below it we do not treat likes/views as an observed rate.
+MIN_VIEWS_FOR_RATE = 100
 # Provider sources we treat as verified (vs user-asserted manual entries).
 VERIFIED_SOURCES = ("tikwm", "rapidapi", "hikerapi")
 HORIZON_ORDER = {"24h": 0, "7d": 1, "30d": 2}
@@ -138,7 +146,7 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
     # Keep the latest snapshot per (analysis, horizon) so refreshes don't double-count.
     latest: dict[tuple[int, str], OutcomeSnapshot] = {}
     for s in snaps:
-        if not s.views or s.views <= 0 or s.likes is None:
+        if not s.views or s.views < MIN_VIEWS_FOR_RATE or s.likes is None:
             continue
         key = (s.analysis_id, s.horizon)
         cur = latest.get(key)
@@ -190,8 +198,7 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
             dim_median = _median([p["scores"][dim] for p in scored])
             high = [p["like_rate"] for p in scored if p["scores"][dim] >= dim_median]
             low = [p["like_rate"] for p in scored if p["scores"][dim] < dim_median]
-            # Need both sides populated to compare at all.
-            if len(high) < 1 or len(low) < 1:
+            if len(high) < SPLIT_MIN_PER_SIDE or len(low) < SPLIT_MIN_PER_SIDE:
                 continue
             mh, ml = _median(high), _median(low)
             patterns.append({

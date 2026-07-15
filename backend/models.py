@@ -262,6 +262,7 @@ class UsageEvent(Base):
     operation = Column(String, nullable=False, index=True)
     provider = Column(String, nullable=False, index=True)
     model = Column(String, nullable=True)
+    model_version = Column(String, nullable=True)
     success = Column(Boolean, nullable=False)
     latency_ms = Column(Integer, nullable=False)
     input_bytes = Column(Integer, nullable=True)
@@ -306,3 +307,32 @@ class FetchStatus(Base):
     url = Column(String, nullable=True)
     acknowledged = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=utc_now_naive)
+
+
+class RateLimitHit(Base):
+    """One row per accepted hit against a throttle key — the durable, cross-process
+    backing store for services.throttle.check_rate. Replaces the old in-memory
+    per-process deque (which is why the Dockerfile pinned WEB_CONCURRENCY=1: each
+    worker kept its own counters and granted the full quota). Each check drops this
+    key's rows older than the window, counts the rest, and inserts a new row only if
+    under the cap. Rows are swept once their window elapses."""
+    __tablename__ = "rate_limit_hits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String, nullable=False, index=True)
+    hit_at = Column(DateTime, nullable=False, index=True)
+
+
+class PendingUpload(Base):
+    """A presigned R2 upload key awaiting its /analyze call, plus the issuer's
+    identity so ownership can be verified even when a different worker handles the
+    analyze request. Replaces the in-memory _pending_uploads dict. Ephemeral: rows
+    are pruned once older than the presign TTL, and consumed (SELECT … FOR UPDATE +
+    DELETE) exactly once when the upload is analyzed. No FK on user_id — the row is
+    short-lived and its only job is to carry ownership through the presign round-trip."""
+    __tablename__ = "pending_uploads"
+
+    r2_key = Column(String, primary_key=True)
+    user_id = Column(Integer, nullable=True)   # None for guests
+    issuer_ip = Column(String, nullable=False)
+    issued_at = Column(DateTime, nullable=False)

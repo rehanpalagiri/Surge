@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -90,6 +91,17 @@ def verify_password(password: str, password_hash: str) -> bool:
         )
     except (ValueError, TypeError):
         return False
+
+
+async def hash_password_async(password: str) -> str:
+    # bcrypt is CPU-bound and releases the GIL during hashing, so a worker thread
+    # runs it truly in parallel and keeps the single event loop free for other
+    # requests (prod is WEB_CONCURRENCY=1 — one hash inline stalls the whole API).
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_async(password: str, password_hash: str) -> bool:
+    return await asyncio.to_thread(verify_password, password, password_hash)
 
 
 def create_access_token(user_id: int, token_version: int = 0) -> str:

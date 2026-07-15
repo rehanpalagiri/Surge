@@ -7,8 +7,15 @@ raising. Before the fix the router stored that as status="complete", which (a)
 charged authenticated users a rate-limit credit for a report they never got and
 (b) showed guests a locked card reading 0/10 across every dimension instead of a
 failure screen. These tests pin the corrected behaviour.
+
+The direct upload path now backgrounds the Gemini call (it returns
+{"status": "pending"} immediately and finalizes the row in a BackgroundTask), so
+these tests assert on the persisted row after the request — the background task
+runs to completion within the httpx ASGI request cycle. The background task uses
+the module-level AsyncSessionLocal, so we repoint it at the in-memory test engine.
 """
 import unittest
+import uuid
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -50,6 +57,12 @@ class FailedAnalysisTest(unittest.IsolatedAsyncioTestCase):
 
         analyze_router.analyze_video = _fake_failed_analyze
 
+        # The direct path now finalizes in a BackgroundTask that opens its own
+        # session via the module-level AsyncSessionLocal — point it at the
+        # in-memory test engine so it reads/writes the same DB as the request.
+        self._orig_sessionlocal = analyze_router.AsyncSessionLocal
+        analyze_router.AsyncSessionLocal = self.Session
+
         # Don't send real email on signup.
         self._orig_send = auth_router._send_email
 
@@ -62,6 +75,7 @@ class FailedAnalysisTest(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.client.aclose()
         analyze_router.analyze_video = self._orig_analyze
+        analyze_router.AsyncSessionLocal = self._orig_sessionlocal
         auth_router._send_email = self._orig_send
         app.dependency_overrides.pop(get_db, None)
         await self.engine.dispose()
@@ -70,10 +84,11 @@ class FailedAnalysisTest(unittest.IsolatedAsyncioTestCase):
         return {"file": ("clip.mp4", b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64, "video/mp4")}
 
     async def _signup_token(self) -> str:
+        # Unique per-call IP: signup is IP-throttled (5/900s) with process-global state.
         r = await self.client.post("/api/auth/signup", json={
             "email": "creator@example.com", "username": "creator",
             "password": "supersecret1", "birth_date": "1995-06-15",
-        })
+        }, headers={"X-Forwarded-For": f"signup-{uuid.uuid4()}"})
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["access_token"]
 
@@ -82,8 +97,9 @@ class FailedAnalysisTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
         analysis_id = body["id"]
-        # Immediate response surfaces the failure.
-        self.assertIn("error", body["scores_json"])
+        # The direct path returns immediately as pending; the background task
+        # (which ran within this request cycle) records the failure.
+        self.assertEqual(body["status"], "pending")
 
         # Stored row is flagged error, not a bogus "complete".
         async with self.Session() as db:
@@ -105,11 +121,13 @@ class FailedAnalysisTest(unittest.IsolatedAsyncioTestCase):
 
         r = await self.client.post("/api/analyze", files=self._file(), data={"platform": "tiktok"}, headers=auth)
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertIn("error", r.json()["scores_json"])
+        self.assertEqual(r.json()["status"], "pending")
 
-        # The failed analysis must not consume one of the user's rate-limit slots.
+        # The background task finalized the row as an error; that failed analysis
+        # must not consume one of the user's rate-limit slots.
         async with self.Session() as db:
             analysis = (await db.execute(select(UserAnalysis))).scalars().first()
+            self.assertEqual(analysis.status, "error")
             user_obj = (await db.execute(
                 select(User).where(User.id == analysis.user_id)
             )).scalar_one()

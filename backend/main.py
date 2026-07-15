@@ -194,6 +194,14 @@ async def _ensure_columns(conn):
             "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
         )
 
+    # --- usage_events: served Gemini model version ---
+    result6 = await conn.exec_driver_sql("PRAGMA table_info(usage_events)")
+    usage_event_cols = {row[1] for row in result6.fetchall()}
+    if "model_version" not in usage_event_cols:
+        await conn.exec_driver_sql(
+            "ALTER TABLE usage_events ADD COLUMN model_version TEXT"
+        )
+
 
 async def _ensure_columns_pg(conn):
     """Postgres self-migration (v1.21): additive-only, idempotent statements run on
@@ -254,6 +262,8 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS canonical_niche VARCHAR",
         # Re-analysis lineage: NULL = original; non-NULL = improved version of parent.
         "ALTER TABLE user_analyses ADD COLUMN IF NOT EXISTS parent_id INTEGER",
+        # Served model version exposes weight changes behind Gemini's moving alias.
+        "ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS model_version VARCHAR",
         # Dedup: if any email appears more than once (case-insensitive), null out all
         # but the newest account (highest id). Idempotent — no-op when no duplicates.
         "UPDATE users SET email = NULL WHERE email IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM users WHERE email IS NOT NULL GROUP BY lower(email))",

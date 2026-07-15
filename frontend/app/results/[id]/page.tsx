@@ -290,9 +290,14 @@ export default function ResultsPage() {
       let a = await getAnalysis(id, token);
 
       // If scores are absent, the analysis is still processing — poll until done.
+      // Authenticated owners get an empty scores object; guests get the LOCKED
+      // payload whose dimensions are still null (a direct guest upload now lands
+      // here as "pending" before the background review finishes). hook_velocity is
+      // always a number once scored, so a null hook with no error means "still
+      // generating" — poll in the locked case too, don't treat locked as finished.
       const isPending = (scores: AnalysisOut["scores_json"]) =>
         Object.keys(scores).length === 0 ||
-        (scores.hook_velocity == null && !scores.error && !scores.locked);
+        (scores.hook_velocity == null && !scores.error);
 
       let wasPending = false;
       if (isPending(a.scores_json)) {
@@ -480,15 +485,23 @@ export default function ResultsPage() {
   const modeLabel = MODE_LABEL[analysis.mode ?? "quick"] ?? MODE_LABEL.quick;
 
   // Emotional teaser (owner only). Full lands/misses/amplify lives on the improve page.
-  // Guard achieved_score — Gemini can omit/malform it (would render "undefined/10").
+  // Legacy analyses have no assessed flag, so a finite numeric score remains authoritative.
   const ea = s.emotional_analysis;
   const hasEmotional =
     !!ea && Array.isArray(ea.target_emotions) && ea.target_emotions.length > 0;
-  const emoScore =
-    ea && typeof ea.achieved_score === "number" && Number.isFinite(ea.achieved_score)
-      ? ea.achieved_score
-      : 0;
-  const emoColor = emoScore >= 7 ? "text-success" : emoScore >= 4 ? "text-warning" : "text-danger";
+  const emoAssessed =
+    ea?.assessed !== false &&
+    typeof ea?.achieved_score === "number" &&
+    Number.isFinite(ea.achieved_score);
+  const emoScore = emoAssessed ? (ea.achieved_score as number) : null;
+  const emoColor =
+    emoScore === null
+      ? "text-text-muted"
+      : emoScore >= 7
+        ? "text-success"
+        : emoScore >= 4
+          ? "text-warning"
+          : "text-danger";
 
   return (
     <main className="min-h-screen bg-background">
@@ -674,7 +687,9 @@ export default function ResultsPage() {
                   <h3 className="text-text-primary font-semibold">
                     Emotional impact
                   </h3>
-                  <span className={`text-sm font-bold ${emoColor}`}>{emoScore}/10</span>
+                  <span className={`text-sm font-bold ${emoColor}`}>
+                    {emoScore === null ? "Not assessed" : `${emoScore}/10`}
+                  </span>
                 </div>
                 <p className="text-text-muted text-xs uppercase tracking-wide mb-2">
                   Should make viewers feel

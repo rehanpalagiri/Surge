@@ -45,6 +45,32 @@ class VerdictGateTest(unittest.TestCase):
         self.assertNotEqual(out["weakest_dimension"]["key"], "cut_frequency")
         self.assertEqual(out["weakest_dimension"]["score"], 6.0)
 
+    def test_missing_or_malformed_emotional_score_is_not_assessed(self):
+        for raw_score in (None, "high", True, float("inf")):
+            with self.subTest(raw_score=raw_score):
+                r = _result()
+                r["emotional_analysis"] = {
+                    "target_emotions": ["curiosity"],
+                    "achieved_score": raw_score,
+                }
+
+                emotional = _validate_analysis_result(r)["emotional_analysis"]
+
+                self.assertIsNone(emotional["achieved_score"])
+                self.assertFalse(emotional["assessed"])
+
+    def test_genuine_zero_emotional_score_remains_assessed(self):
+        r = _result()
+        r["emotional_analysis"] = {
+            "target_emotions": ["curiosity"],
+            "achieved_score": 0,
+        }
+
+        emotional = _validate_analysis_result(r)["emotional_analysis"]
+
+        self.assertEqual(emotional["achieved_score"], 0)
+        self.assertTrue(emotional["assessed"])
+
 
 if __name__ == "__main__":
     unittest.main()

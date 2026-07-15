@@ -21,7 +21,10 @@ from sqlalchemy import select, or_, func
 from database import get_db
 from models import User, PasswordResetToken, EmailVerificationToken
 from schemas import SignupIn, LoginIn, UserOut, TokenOut, ForgotPasswordIn, ResetPasswordIn, VerifyResetCodeIn, VerifyEmailIn, GoogleAuthIn
-from auth import hash_password, verify_password, create_access_token, require_user, is_minor
+from auth import (
+    hash_password, hash_password_async, verify_password_async,
+    create_access_token, require_user, is_minor,
+)
 from services.throttle import check_rate, client_ip
 
 _RESET_TTL = timedelta(hours=1)
@@ -82,7 +85,14 @@ def user_to_out(user: User) -> dict:
 
 
 @router.post("/signup", response_model=TokenOut)
-async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def signup(payload: SignupIn, request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+    # Brute-force / spam guard: signup is unauthenticated and expensive (bcrypt +
+    # a verification email + two DB commits). Keyed on the real client IP.
+    if not await check_rate(db, f"signup-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many sign-up attempts. Please wait a few minutes and try again.",
+        )
     email = payload.email.strip().lower()
     username = payload.username.strip()
 
@@ -124,7 +134,7 @@ async def signup(payload: SignupIn, background_tasks: BackgroundTasks, db: Async
         birth_year=bd.year,
         birth_date=payload.birth_date,
         seed_consent=consent,
-        password_hash=hash_password(payload.password),
+        password_hash=await hash_password_async(payload.password),
         email_verified=False,
     )
     db.add(user)
@@ -165,7 +175,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
     # submitted username) on purpose — a per-account counter would let an attacker
     # lock a victim out by spamming failed logins for their name. 10 / 5 min is
     # well above any human's fumble rate but throttles automated guessing.
-    if not check_rate(f"login-ip:{_client_ip(request)}", max_hits=10, window_seconds=300):
+    if not await check_rate(db, f"login-ip:{_client_ip(request)}", max_hits=10, window_seconds=300):
         raise HTTPException(
             status_code=429,
             detail="Too many login attempts. Please wait a few minutes and try again.",
@@ -181,7 +191,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
     # Constant-work verify: always run bcrypt (against a dummy hash when the account
     # doesn't exist) so the not-found and wrong-password paths take the same time and
     # can't be told apart to enumerate registered usernames/emails.
-    password_ok = verify_password(payload.password, user.password_hash if user else _DUMMY_PW_HASH)
+    password_ok = await verify_password_async(payload.password, user.password_hash if user else _DUMMY_PW_HASH)
     if not user or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     return TokenOut(access_token=create_access_token(user.id, user.token_version or 0))
@@ -257,7 +267,7 @@ async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, 
         birth_year=birth_year,
         birth_date=birth_date,
         seed_consent=consent,
-        password_hash=hash_password(secrets.token_urlsafe(32)),  # unusable; OAuth-only
+        password_hash=await hash_password_async(secrets.token_urlsafe(32)),  # unusable; OAuth-only
         email_verified=True,
     )
     db.add(user)
@@ -281,7 +291,7 @@ async def verify_email(
     db: AsyncSession = Depends(get_db),
 ):
     # Brute-force guard: codes are 6 digits and scoped to this user; cap guesses.
-    if not check_rate(f"verify-email-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
+    if not await check_rate(db, f"verify-email-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
         raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
 
     if user.email_verified:
@@ -319,7 +329,7 @@ async def resend_verification(
     if user.email_verified or not user.email:
         return {"ok": True}
     # Per-IP + per-email caps protect the inbox and the Brevo quota.
-    if not check_rate(f"verify-resend-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
+    if not await check_rate(db, f"verify-resend-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a few minutes.")
     recent_cutoff = utc_now_naive() - timedelta(hours=1)
     recent_q = await db.execute(
@@ -339,7 +349,7 @@ async def resend_verification(
 async def forgot_password(payload: ForgotPasswordIn, background_tasks: BackgroundTasks, request: Request, db: AsyncSession = Depends(get_db)):
     # Per-IP guard: stop a script from spraying requests to burn the Brevo quota.
     # IP-based, so it's independent of whether the email exists (no enumeration leak).
-    if not check_rate(f"forgot-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
+    if not await check_rate(db, f"forgot-ip:{_client_ip(request)}", max_hits=5, window_seconds=900):
         raise HTTPException(
             status_code=429,
             detail="Too many reset requests. Please wait a few minutes and try again.",
@@ -412,7 +422,7 @@ async def verify_reset_code(payload: VerifyResetCodeIn, request: Request, db: As
     # Brute-force guard: cap guesses per real client IP. 20 / 10 min vs a 1M code
     # space inside the 1h TTL = negligible hit chance; email-scoping (below) closes
     # the residual "hit any active token" angle.
-    if not check_rate(f"reset-verify-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
+    if not await check_rate(db, f"reset-verify-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
         raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
 
     reset = await _find_reset_token(payload.token, payload.email, db)
@@ -424,7 +434,7 @@ async def verify_reset_code(payload: VerifyResetCodeIn, request: Request, db: As
 @router.post("/reset-password")
 async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSession = Depends(get_db)):
     # Same brute-force guard as verify — this endpoint also matches the code globally.
-    if not check_rate(f"reset-pw-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
+    if not await check_rate(db, f"reset-pw-ip:{_client_ip(request)}", max_hits=20, window_seconds=600):
         raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes.")
 
     if len(payload.new_password) < 8:
@@ -440,7 +450,7 @@ async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSe
     if not user:
         raise HTTPException(status_code=400, detail="User not found.")
 
-    user.password_hash = hash_password(payload.new_password)
+    user.password_hash = await hash_password_async(payload.new_password)
     # Invalidate every JWT issued before this reset — if the account was
     # compromised, the attacker's outstanding token stops working immediately.
     user.token_version = (user.token_version or 0) + 1

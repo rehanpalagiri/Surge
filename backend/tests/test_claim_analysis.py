@@ -1,4 +1,5 @@
 import unittest
+import uuid
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -43,12 +44,13 @@ class ClaimAnalysisTest(unittest.IsolatedAsyncioTestCase):
         await self.engine.dispose()
 
     async def _signup_token(self) -> str:
+        # Unique per-call IP: signup is IP-throttled (5/900s) with process-global state.
         r = await self.client.post("/api/auth/signup", json={
             "email": "owner@example.com",
             "username": "owner",
             "password": "supersecret1",
             "birth_date": "1995-06-15",
-        })
+        }, headers={"X-Forwarded-For": f"signup-{uuid.uuid4()}"})
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["access_token"]
 

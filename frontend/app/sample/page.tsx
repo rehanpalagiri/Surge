@@ -132,12 +132,6 @@ export default function SamplePage() {
             >
               Create free account →
             </Link>
-            <p className="text-text-muted/50 text-xs">
-              Already have an account?{" "}
-              <Link href="/login" className="text-accent hover:underline">
-                Log in
-              </Link>
-            </p>
           </div>
         </div>
 

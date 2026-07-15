@@ -16,6 +16,7 @@ from auth import hash_password
 from database import get_db
 from main import app
 from models import Base, PasswordResetToken, User
+from routers import auth as auth_router
 from services.clock import utc_now_naive
 from datetime import timedelta
 
@@ -36,10 +37,19 @@ class AuthHardeningTest(unittest.IsolatedAsyncioTestCase):
                 yield s
 
         app.dependency_overrides[get_db] = _override_get_db
+
+        # Stub email so signup's verification background task stays offline/hermetic.
+        self._orig_send = auth_router._send_email
+
+        async def _fake_send(*args, **kwargs):
+            return True
+
+        auth_router._send_email = _fake_send
         self.client = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
     async def asyncTearDown(self):
         await self.client.aclose()
+        auth_router._send_email = self._orig_send
         app.dependency_overrides.pop(get_db, None)
         await self.engine.dispose()
 
@@ -98,6 +108,35 @@ class AuthHardeningTest(unittest.IsolatedAsyncioTestCase):
                                        headers={"X-Forwarded-For": "203.0.113.31"})
         self.assertEqual(right.status_code, 200)
         self.assertTrue(right.json()["valid"])
+
+    def _signup_body(self, n: int) -> dict:
+        # Distinct email+username each call so only the throttle (not the 409
+        # duplicate check) can reject a request.
+        return {
+            "email": f"signup{n}@example.com",
+            "username": f"signup{n}",
+            "password": "supersecret1",
+            "birth_date": "1995-06-15",
+        }
+
+    async def test_signup_is_rate_limited_per_ip(self):
+        ip = {"X-Forwarded-For": "203.0.113.50"}
+        # 5 signups from one IP succeed on their own merits; the 6th is throttled.
+        for n in range(5):
+            r = await self.client.post("/api/auth/signup", json=self._signup_body(n), headers=ip)
+            self.assertEqual(r.status_code, 200, r.text)
+        throttled = await self.client.post("/api/auth/signup", json=self._signup_body(5), headers=ip)
+        self.assertEqual(throttled.status_code, 429)
+
+    async def test_signup_throttle_is_per_ip_not_global(self):
+        # Exhaust one IP's bucket.
+        for n in range(5):
+            await self.client.post("/api/auth/signup", json=self._signup_body(n),
+                                   headers={"X-Forwarded-For": "203.0.113.60"})
+        # A fresh IP still gets its own bucket and can sign up.
+        r = await self.client.post("/api/auth/signup", json=self._signup_body(99),
+                                   headers={"X-Forwarded-For": "203.0.113.61"})
+        self.assertEqual(r.status_code, 200, r.text)
 
     async def test_reset_password_rejects_wrong_email(self):
         a = await self._make_user("carl", "carl@example.com")

@@ -59,6 +59,15 @@ def _build_engine(raw_url: str):
         connect_args=connect_args,
         pool_pre_ping=True,   # re-validate connections before use; drops dead ones
         pool_recycle=300,     # recycle after 5 min — before Neon's idle timeout closes them
+        # Explicit sizing (was the implicit 5+10=15 / 30s default). Total connections
+        # this process can open = pool_size + max_overflow. With WEB_CONCURRENCY=1 that
+        # is 20; if you ever raise WEB_CONCURRENCY or add replicas, total becomes
+        # workers * (pool_size + max_overflow) and MUST stay under Neon's max_connections
+        # for this plan — verify that number before scaling. Shorter pool_timeout so an
+        # overloaded backend rejects fast instead of hanging 30s on a checkout.
+        pool_size=10,
+        max_overflow=10,
+        pool_timeout=10,
     )
 
 

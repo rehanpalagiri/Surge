@@ -9,7 +9,7 @@ from models import (
     PasswordResetToken, UsageEvent, User, UserAnalysis, UserProfile,
 )
 from schemas import ConsentIn
-from auth import require_user, hash_password, verify_password, is_minor, create_access_token
+from auth import require_user, hash_password_async, verify_password_async, is_minor, create_access_token
 
 router = APIRouter(prefix="/api/me", tags=["settings"])
 
@@ -37,7 +37,7 @@ async def change_username(
         raise HTTPException(status_code=400, detail="Username must be 40 characters or fewer.")
 
     # Verify current password before allowing the change
-    if not verify_password(body.current_password, user.password_hash):
+    if not await verify_password_async(body.current_password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect current password.")
 
     # Check uniqueness
@@ -59,10 +59,10 @@ async def change_password(
     if len(body.new_password) < 8:
         raise HTTPException(status_code=400, detail="New password must be at least 8 characters.")
 
-    if not verify_password(body.current_password, user.password_hash):
+    if not await verify_password_async(body.current_password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect current password.")
 
-    user.password_hash = hash_password(body.new_password)
+    user.password_hash = await hash_password_async(body.new_password)
     # Invalidate every OTHER session (bump the token epoch), then hand this device
     # a fresh token so the user who just changed their password stays signed in.
     user.token_version = (user.token_version or 0) + 1
@@ -109,7 +109,7 @@ async def delete_account(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_user),
 ):
-    if not verify_password(body.password, user.password_hash):
+    if not await verify_password_async(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect password.")
 
     # Delete in FK order. Account deletion removes analyses and their measurement

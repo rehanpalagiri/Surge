@@ -273,23 +273,26 @@ def _validate_analysis_result(result) -> dict:
             })
     result["attention_risk_map"] = normalized_risks
     # Emotional intent is requested in the prompt but the model can omit or
-    # malform it. Coerce to the contract the frontend reads so a missing field
-    # never renders "undefined/10" or a NaN-width bar.
+    # malform it. Preserve that distinction so an absent assessment is never
+    # presented as a genuine 0/10 emotional-impact score.
     emotional = result.get("emotional_analysis")
     if not isinstance(emotional, dict):
         emotional = {}
     targets = emotional.get("target_emotions")
     targets = [str(t) for t in targets] if isinstance(targets, list) else []
-    score = emotional.get("achieved_score")
-    if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score):
-        score = 0
-    else:
-        score = max(0, min(10, int(round(score))))
+    raw_score = emotional.get("achieved_score")
+    assessed = not (
+        isinstance(raw_score, bool)
+        or not isinstance(raw_score, (int, float))
+        or not math.isfinite(raw_score)
+    )
+    score = max(0, min(10, int(round(raw_score)))) if assessed else None
     amplify = emotional.get("how_to_amplify")
     amplify = [str(a) for a in amplify] if isinstance(amplify, list) else []
     result["emotional_analysis"] = {
         "target_emotions": targets,
         "achieved_score": score,
+        "assessed": assessed,
         "what_lands": str(emotional.get("what_lands") or ""),
         "what_misses": str(emotional.get("what_misses") or ""),
         "how_to_amplify": amplify,
@@ -685,6 +688,7 @@ async def analyze_video(
         await record_usage_event(
             operation="video_craft_perception",
             provider="google_gemini", model="gemini-2.5-flash",
+            model_version=getattr(perception_resp, "model_version", None),
             analysis_id=analysis_id, success=scores_ok,
             latency_ms=(time.perf_counter() - perception_started) * 1000,
             input_bytes=input_bytes,
@@ -745,6 +749,7 @@ async def analyze_video(
             await record_usage_event(
                 operation="video_craft_reasoning",
                 provider="google_gemini", model="gemini-2.5-flash",
+                model_version=getattr(reasoning_resp, "model_version", None),
                 analysis_id=analysis_id, success=isinstance(reasoning, dict),
                 latency_ms=(time.perf_counter() - reasoning_started) * 1000,
                 output_bytes=len((reasoning_resp.text or "").encode("utf-8")),
@@ -836,7 +841,8 @@ def _error_dict(msg: str) -> dict:
         "recommended_experiment": {},
         "emotional_analysis": {
             "target_emotions": [],
-            "achieved_score": 0,
+            "achieved_score": None,
+            "assessed": False,
             "what_lands": "",
             "what_misses": "",
             "how_to_amplify": [],

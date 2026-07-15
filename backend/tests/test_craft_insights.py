@@ -14,21 +14,23 @@ from sqlalchemy.orm import sessionmaker
 
 from models import Base, OutcomeSnapshot, UserAnalysis
 from services.craft_insights import (
-    FORECAST_MIN, PATTERN_MIN, build_craft_insights,
+    FORECAST_MIN, MIN_VIEWS_FOR_RATE, PATTERN_MIN, SPLIT_MIN_PER_SIDE,
+    build_craft_insights,
 )
 from services.outcomes import utc_now_naive
 
 USER = 42
 
 
-def _scores(hook: float) -> str:
-    # Only hook_velocity varies; the rest are held constant so their median
-    # split is degenerate (one side empty) and produces no spurious pattern.
+def _scores(hook: float, cut: float = 5.0) -> str:
+    # Hook Velocity varies by default; the other dimensions are held constant
+    # unless a test explicitly supplies a Cut Frequency score.
     s = {k: 5.0 for k in (
         "cut_frequency", "text_scannability", "curiosity_gap",
         "audio_visual_sync", "loop_seamlessness",
     )}
     s["hook_velocity"] = hook
+    s["cut_frequency"] = cut
     return json.dumps(s)
 
 
@@ -42,11 +44,11 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.engine.dispose()
 
-    async def _add_post(self, db, hook, views, likes, *, horizon="7d",
+    async def _add_post(self, db, hook, views, likes, *, cut=5.0, horizon="7d",
                         source="tikwm", user_id=USER, observed_offset=0):
         a = UserAnalysis(
             user_id=user_id, platform="tiktok", filename="v.mp4",
-            niche="Fitness", scores_json=_scores(hook), verdict="Developing craft",
+            niche="Fitness", scores_json=_scores(hook, cut), verdict="Developing craft",
             mode="craft_review", status="complete",
         )
         db.add(a)
@@ -83,6 +85,21 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
         rates = sorted(p["like_rate"] for p in out["posts"])
         self.assertEqual(rates, [5.0, 12.0])
 
+    async def test_minimum_views_floor_excludes_noisy_like_rate(self):
+        async with self.Session() as db:
+            await self._add_post(db, 8, views=3, likes=1)  # 33.33% noise
+            await self._add_post(
+                db, 7, views=MIN_VIEWS_FOR_RATE, likes=1,
+            )  # boundary is admissible: 1.0%
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+
+        self.assertEqual(out["with_verified_outcome"], 1)
+        self.assertEqual(len(out["posts"]), 1)
+        self.assertEqual(out["posts"][0]["views"], MIN_VIEWS_FOR_RATE)
+        self.assertEqual(out["posts"][0]["like_rate"], 1.0)
+        self.assertNotEqual(out["observed_range"]["preliminary"]["max"], 33.33)
+
     async def test_never_mixes_horizons(self):
         async with self.Session() as db:
             for i in range(4):
@@ -118,6 +135,31 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
             out = await build_craft_insights(USER, db)
         self.assertLess(out["with_verified_outcome"], PATTERN_MIN)
         self.assertEqual(out["patterns"], [])
+
+    async def test_patterns_require_three_observations_per_realized_split(self):
+        async with self.Session() as db:
+            # Hook ties produce a 5-vs-1 split, while Cut Frequency splits the
+            # same six posts cleanly 3-vs-3.
+            scores = (
+                (3, 3), (8, 3), (8, 3),
+                (8, 8), (8, 8), (8, 8),
+            )
+            for likes, (hook, cut) in enumerate(scores, start=10):
+                await self._add_post(
+                    db, hook, views=1000, likes=likes * 10, cut=cut,
+                )
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+
+        self.assertEqual(out["with_verified_outcome"], PATTERN_MIN)
+        self.assertFalse(any(
+            p["dimension"] == "hook_velocity" for p in out["patterns"]
+        ))
+        cut_pattern = next(
+            p for p in out["patterns"] if p["dimension"] == "cut_frequency"
+        )
+        self.assertEqual(cut_pattern["n_high"], SPLIT_MIN_PER_SIDE)
+        self.assertEqual(cut_pattern["n_low"], SPLIT_MIN_PER_SIDE)
 
     async def test_pattern_detects_hook_signal_and_observed_range_unlocks(self):
         async with self.Session() as db:

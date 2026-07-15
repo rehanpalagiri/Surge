@@ -136,7 +136,8 @@ export interface UserOut {
 
 export interface EmotionalAnalysis {
   target_emotions: string[];      // the feeling(s) the video should evoke
-  achieved_score: number;         // 0-10, how well this video lands the intended feeling
+  achieved_score: number | null;  // 0-10 when assessed; null when Gemini did not assess it
+  assessed?: boolean;             // absent on legacy analyses; numeric scores still count as assessed
   what_lands?: string;            // what makes the feeling work ("" if it doesn't land)
   what_misses?: string;           // what blunts the feeling ("" if it lands fully)
   how_to_amplify?: string[];      // concrete changes to deepen the feeling

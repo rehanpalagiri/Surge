@@ -4,7 +4,6 @@ import json
 import logging
 import hmac
 import secrets
-import time
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, UploadFile, File, Form
@@ -13,8 +12,8 @@ from sqlalchemy import select, delete, update
 
 from database import get_db, AsyncSessionLocal
 from models import (
-    AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot, UsageEvent,
-    User, UserAnalysis, UserProfile,
+    AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot, PendingUpload,
+    UsageEvent, User, UserAnalysis, UserProfile,
 )
 from schemas import (
     AnalysisOut, AnalysisSummaryOut, ClaimAnalysisIn, FeedbackIn, OutcomeSnapshotOut,
@@ -62,17 +61,41 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
-# Upload key ownership store: key → (user_id | None, requester_ip, issued_at)
-# Matches the 300s presigned URL TTL; entries are pruned lazily on each access.
+# Presigned-upload ownership store — a shared DB table (pending_uploads) so a key
+# issued by one worker is recognizable and consumable by ANY worker's /analyze call
+# (was an in-memory dict, which is why WEB_CONCURRENCY was pinned to 1). Matches the
+# 300s presign TTL; rows are pruned lazily on each access.
 _PRESIGN_TTL = 300
-_pending_uploads: dict[str, tuple[int | None, str, float]] = {}
 
 
-def _prune_pending() -> None:
-    cutoff = time.time() - _PRESIGN_TTL
-    stale = [k for k, (_, _, issued_at) in _pending_uploads.items() if issued_at < cutoff]
-    for k in stale:
-        del _pending_uploads[k]
+async def _prune_pending(db: AsyncSession) -> None:
+    """Delete presign rows older than the TTL. No commit — the caller commits it
+    along with the record/pop it's about to do (or rolls this back harmlessly)."""
+    cutoff = utc_now_naive() - timedelta(seconds=_PRESIGN_TTL)
+    await db.execute(delete(PendingUpload).where(PendingUpload.issued_at < cutoff))
+
+
+async def _record_pending(db: AsyncSession, r2_key: str, user_id: int | None, issuer_ip: str) -> None:
+    """Persist a freshly issued upload key with its issuer identity, then commit so
+    the key is immediately recognizable by any worker's /analyze call."""
+    db.add(PendingUpload(r2_key=r2_key, user_id=user_id, issuer_ip=issuer_ip, issued_at=utc_now_naive()))
+    await db.commit()
+
+
+async def _pop_pending(db: AsyncSession, r2_key: str) -> Optional[tuple[int | None, str, datetime]]:
+    """Atomically consume an upload key: SELECT … FOR UPDATE then DELETE so two
+    concurrent /analyze calls (even on different workers) can't both claim the same
+    key. Returns (user_id, issuer_ip, issued_at) or None if absent. Does NOT commit —
+    the caller commits the delete together with the new analysis row, or rolls it
+    back on an ownership mismatch so the key survives for a legitimate retry."""
+    row = (await db.execute(
+        select(PendingUpload).where(PendingUpload.r2_key == r2_key).with_for_update()
+    )).scalar_one_or_none()
+    if row is None:
+        return None
+    entry = (row.user_id, row.issuer_ip, row.issued_at)
+    await db.execute(delete(PendingUpload).where(PendingUpload.r2_key == r2_key))
+    return entry
 
 
 def _limit_message(rl: dict) -> str:
@@ -168,7 +191,7 @@ async def get_upload_presigned_url(
 ):
     requester_ip = client_ip(request)
     if user is None:
-        if not check_rate(f"guest-upload-url:{requester_ip}", 10, 24 * 3600):
+        if not await check_rate(db, f"guest-upload-url:{requester_ip}", 10, 24 * 3600):
             raise HTTPException(
                 status_code=429,
                 detail="Too many upload attempts. Sign up free to keep analyzing.",
@@ -191,9 +214,107 @@ async def get_upload_presigned_url(
         safe_filename = safe_filename[-140:]
     key = f"uploads/{uuid.uuid4()}_{safe_filename}"
     upload_url = r2.presigned_upload_url(key, ct)
-    _prune_pending()
-    _pending_uploads[key] = (user.id if user else None, requester_ip, time.time())
+    await _prune_pending(db)
+    await _record_pending(db, key, user.id if user else None, requester_ip)
     return {"upload_url": upload_url, "key": key}
+
+
+async def _set_analysis_status(analysis_id: int, status: str) -> None:
+    """Flip a background analysis to a lifecycle status (its own short session)."""
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
+        if row:
+            row.status = status
+            await db.commit()
+
+
+async def _mark_analysis_error(analysis_id: int, err_msg: str = "Analysis failed.") -> None:
+    """Persist a background failure: store the error dict, flag status="error" so
+    the row is excluded from the upload limiter and the UI shows a failure screen
+    (never a credit-consuming all-zero scorecard)."""
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
+        if row:
+            row.scores_json = json.dumps({"error": err_msg})
+            row.verdict = "Error"
+            row.status = "error"
+            await db.commit()
+
+
+async def _finalize_analysis(
+    analysis_id: int,
+    file_path: str,
+    raw_niche: str,
+    canonical_niche: str,
+    caption: str,
+    platform: str,
+    niche_needs_confirmation: bool = False,
+    secondary_niche: Optional[str] = None,
+    r2_key: Optional[str] = None,
+) -> None:
+    """Run the Gemini review for a file already on local disk, persist the result,
+    and clean up. The single shared code path for "write the Gemini result and
+    clean up" — used by both the R2 background path and the direct-upload
+    background path. The live review is deliberately blind to prior outcomes, seed
+    labels, channel history, trends, and calibration notes.
+
+    Always removes the temp file (and the R2 object, when ``r2_key`` is given) in
+    the finally, whether the review succeeded, failed, or raised.
+    """
+    try:
+        content_sha256 = sha256_file(file_path)
+        result = await analyze_video(
+            file_path,
+            canonical_niche,
+            caption=caption,
+            platform=platform,
+            niche_raw=raw_niche,
+            secondary_niche=secondary_niche or "",
+            analysis_id=analysis_id,
+        )
+        async with AsyncSessionLocal() as db:
+            row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
+            if row:
+                result["niche_needs_confirmation"] = _needs_niche_confirmation(result, niche_needs_confirmation)
+                row.niche = _display_niche(raw_niche, result, canonical_niche)
+                row.canonical_niche = _canonical_from_result(result, canonical_niche)
+                row.scores_json = json.dumps(result)
+                row.mode = "craft_review"
+                row.calibration_version = 0
+                # A non-429 Gemini failure returns an error dict (it doesn't raise),
+                # so flag it "error" rather than storing an all-zero scorecard as a
+                # successful, credit-consuming review.
+                if result.get("error"):
+                    row.verdict = "Error"
+                    row.status = "error"
+                else:
+                    row.verdict = result.get("verdict", "Needs revision")
+                    row.status = "complete"
+                await upsert_artifact(db, row.id, content_sha256=content_sha256)
+                await db.commit()
+
+    except Exception as exc:
+        # Log the real cause (status code + message) so prod can tell quota (429)
+        # from auth/permission (403) from anything else — the stored message is
+        # deliberately generic for users.
+        logger.warning("Analysis %s failed: %r", analysis_id, exc)
+        err_msg = (
+            "We're at capacity right now — this didn't count against your limit. Give it a minute and try again."
+            if isinstance(exc, _GeminiClientError) and exc.code in (429, 403)
+            else "Analysis failed."
+        )
+        await _mark_analysis_error(analysis_id, err_msg)
+
+    finally:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+        if r2_key:
+            try:
+                await r2.delete(r2_key)
+            except Exception:
+                pass
 
 
 async def _run_r2_analysis(
@@ -211,12 +332,10 @@ async def _run_r2_analysis(
     parent_id: Optional[int] = None,
 ) -> None:
     file_path = os.path.join(uploads_dir, f"{uuid.uuid4()}_r2upload.mp4")
-    async with AsyncSessionLocal() as db:
-        row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
-        if row:
-            row.status = "processing"
-            await db.commit()
+    await _set_analysis_status(analysis_id, "processing")
 
+    # Fetch the uploaded bytes from R2 to local disk. On any fetch failure, mark the
+    # row "error" and clean up (temp file + R2 object) without reaching finalize.
     try:
         size = await r2.object_size(r2_key)
         if size is None:
@@ -228,62 +347,9 @@ async def _run_r2_analysis(
             raise ValueError("File too large. Maximum size is 100MB.")
         with open(file_path, "wb") as fh:
             fh.write(video_bytes)
-        content_sha256 = sha256_file(file_path)
-
-        # The live review is deliberately blind to prior outcomes, seed labels,
-        # channel history, trends, and calibration notes.
-        effective_mode = "craft_review"
-
-        result = await analyze_video(
-            file_path,
-            canonical_niche,
-            caption=caption,
-            platform=platform,
-            niche_raw=raw_niche,
-            secondary_niche=secondary_niche or "",
-            analysis_id=analysis_id,
-        )
-
-        async with AsyncSessionLocal() as db:
-            row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
-            if row:
-                result["niche_needs_confirmation"] = _needs_niche_confirmation(result, niche_needs_confirmation)
-                row.niche = _display_niche(raw_niche, result, canonical_niche)
-                row.canonical_niche = _canonical_from_result(result, canonical_niche)
-                row.scores_json = json.dumps(result)
-                row.mode = effective_mode
-                row.calibration_version = 0
-                # See the direct path: a non-429 Gemini failure returns an error
-                # dict (it doesn't raise), so flag it "error" rather than storing
-                # an all-zero scorecard as a successful, credit-consuming review.
-                if result.get("error"):
-                    row.verdict = "Error"
-                    row.status = "error"
-                else:
-                    row.verdict = result.get("verdict", "Needs revision")
-                    row.status = "complete"
-                await upsert_artifact(db, row.id, content_sha256=content_sha256)
-                await db.commit()
-
     except Exception as exc:
-        # Log the real cause (status code + message) so prod can tell quota (429)
-        # from auth/permission (403) from anything else — the stored message is
-        # deliberately generic for users.
-        logger.warning("R2 analysis %s failed: %r", analysis_id, exc)
-        err_msg = (
-            "We're at capacity right now — this didn't count against your limit. Give it a minute and try again."
-            if isinstance(exc, _GeminiClientError) and exc.code in (429, 403)
-            else "Analysis failed."
-        )
-        async with AsyncSessionLocal() as db:
-            row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
-            if row:
-                row.scores_json = json.dumps({"error": err_msg})
-                row.verdict = "Error"
-                row.status = "error"
-                await db.commit()
-
-    finally:
+        logger.warning("R2 fetch for analysis %s failed: %r", analysis_id, exc)
+        await _mark_analysis_error(analysis_id)
         try:
             os.remove(file_path)
         except OSError:
@@ -292,6 +358,47 @@ async def _run_r2_analysis(
             await r2.delete(r2_key)
         except Exception:
             pass
+        return
+
+    # File is on local disk — the shared finalize owns Gemini + persistence + cleanup
+    # (it deletes both the temp file and the R2 object in its finally).
+    await _finalize_analysis(
+        analysis_id,
+        file_path,
+        raw_niche,
+        canonical_niche,
+        caption,
+        platform,
+        niche_needs_confirmation,
+        secondary_niche,
+        r2_key=r2_key,
+    )
+
+
+async def _run_local_analysis(
+    analysis_id: int,
+    file_path: str,
+    raw_niche: str,
+    canonical_niche: str,
+    caption: str,
+    platform: str,
+    niche_needs_confirmation: bool = False,
+    secondary_niche: Optional[str] = None,
+) -> None:
+    """Background finalize for the direct upload / TikTok-URL path. The file is
+    already on local disk (the request handler streamed it there), so this skips
+    the R2 fetch step and goes straight to the shared finalize."""
+    await _set_analysis_status(analysis_id, "processing")
+    await _finalize_analysis(
+        analysis_id,
+        file_path,
+        raw_niche,
+        canonical_niche,
+        caption,
+        platform,
+        niche_needs_confirmation,
+        secondary_niche,
+    )
 
 
 @router.get("/analyses/{analysis_id}/status")
@@ -349,7 +456,7 @@ async def analyze(
     # on requests we're going to reject anyway.
     if user is None:
         ip = client_ip(request)
-        if not check_rate(f"guest:{ip}", 5, 24 * 3600):
+        if not await check_rate(db, f"guest:{ip}", 5, 24 * 3600):
             raise HTTPException(
                 status_code=429,
                 detail="You've used your 5 free analyses. Sign up free to keep analyzing.",
@@ -408,8 +515,8 @@ async def analyze(
 
     # --- R2 async path: file already in cloud storage, process in background ---
     if has_r2:
-        _prune_pending()
-        _upload_entry = _pending_uploads.pop(r2_key.strip(), None)
+        await _prune_pending(db)
+        _upload_entry = await _pop_pending(db, r2_key.strip())
         if _upload_entry is None:
             raise HTTPException(
                 status_code=400,
@@ -521,12 +628,15 @@ async def analyze(
                 pass
             raise
 
-    content_sha256 = sha256_file(file_path)
-
-    # Pre-create the analysis row to get an ID for usage-event telemetry.
-    # The row stays uncommitted (flushed only) until analyze_video succeeds;
-    # any exception causes the session's context manager to auto-rollback it.
-    effective_mode = "craft_review"
+    # Create the row as "pending" and commit immediately, then background the work
+    # — mirroring the R2 path. This releases the pooled DB connection and its open
+    # transaction BEFORE the 30–90s Gemini upload + poll + two passes, so a burst of
+    # concurrent direct analyses no longer holds connections across an external call
+    # and starves the pool (every other DB route was queuing behind them).
+    #
+    # Behavior change (intended, matches the R2 path): a Gemini 429/403 now surfaces
+    # as a background status="error" the results page shows — no credit charged —
+    # instead of the old inline 503, since the caller already has {"status":"pending"}.
     analysis = UserAnalysis(
         user_id=user.id if user else None,
         platform=platform,
@@ -538,65 +648,32 @@ async def analyze(
         bio=bio or None,
         scores_json="{}",
         verdict="",
-        mode=effective_mode,
+        mode="craft_review",
         calibration_version=0,
-        status="processing",
+        status="pending",
         parent_id=resolved_parent_id,
         guest_claim_token=secrets.token_urlsafe(32) if user is None else None,
     )
     db.add(analysis)
-    await db.flush()
-
-    try:
-        result = await analyze_video(
-            file_path,
-            canonical_niche,
-            caption=caption,
-            platform=platform,
-            niche_raw=raw_niche,
-            secondary_niche=secondary_niche or "",
-            analysis_id=analysis.id,
-        )
-    except _GeminiClientError as e:
-        logger.warning("Direct analysis Gemini error (code=%s): %r", getattr(e, "code", "?"), e)
-        if e.code in (429, 403):
-            # Gemini quota exhausted or bad API key — return 503 AFTER the perception
-            # call already retried with backoff. Session auto-rollback discards the
-            # flushed row so no broken record persists (no credit consumed). Retry-After
-            # signals clients (and the frontend's recoverable state) to back off, not
-            # to treat this as a hard failure.
-            raise HTTPException(
-                status_code=503,
-                detail="We're at capacity right now — your upload wasn't charged. Give it a minute and try again.",
-                headers={"Retry-After": "60"},
-            )
-        raise
-    finally:
-        # Remove the temp upload — the video has already been sent to Gemini.
-        try:
-            os.remove(file_path)
-        except OSError:
-            pass
-
-    result["niche_needs_confirmation"] = _needs_niche_confirmation(result, niche_needs_confirmation)
-    analysis.niche = _display_niche(raw_niche, result, canonical_niche)
-    analysis.canonical_niche = _canonical_from_result(result, canonical_niche)
-    analysis.scores_json = json.dumps(result)
-    # A non-429 Gemini failure (timeout, file-processing error, 5xx, bad JSON)
-    # comes back as an error dict with all-zero scores rather than raising. Mark
-    # it "error" so (a) the rate limiter doesn't charge the user a credit for a
-    # report they never really got, and (b) the results page shows the failure
-    # screen instead of a bogus 0/10-across-the-board scorecard.
-    if result.get("error"):
-        analysis.verdict = "Error"
-        analysis.status = "error"
-    else:
-        analysis.verdict = result.get("verdict", "Needs revision")
-        analysis.status = "complete"
-    await upsert_artifact(db, analysis.id, content_sha256=content_sha256)
     await db.commit()
-
-    return _to_out(analysis, include_claim_token=True)
+    # analysis.id is populated by the flush the commit performed; the row is durable
+    # so the background task's separate session can read it (expire_on_commit=False
+    # keeps id/guest_claim_token readable here without a refresh).
+    background_tasks.add_task(
+        _run_local_analysis,
+        analysis.id,
+        file_path,
+        raw_niche,
+        canonical_niche,
+        caption,
+        platform,
+        niche_needs_confirmation,
+        secondary_niche,
+    )
+    out = {"id": analysis.id, "status": "pending"}
+    if analysis.guest_claim_token:
+        out["claim_token"] = analysis.guest_claim_token
+    return out
 
 
 @router.get("/analyses/{analysis_id}", response_model=AnalysisOut)

@@ -491,8 +491,8 @@ function ProjectCard({
   const needsLink = !a.video_url;
 
   return (
-    <article className={`project-card-reactive group ${needsLink ? "needs-link" : ""}`}>
-      <Link href={`/results/${a.id}`} className="relative z-10 block p-5 pb-4">
+    <article className={`project-card-reactive group flex flex-col ${needsLink ? "needs-link" : ""}`}>
+      <Link href={`/results/${a.id}`} className="relative z-10 block flex-1 p-5 pb-4">
         <div className="mb-4 flex items-start justify-between gap-3 pr-10">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-border bg-surface text-accent">

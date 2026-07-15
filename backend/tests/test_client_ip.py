@@ -9,7 +9,7 @@ only the rightmost hop(s) we control.
 import unittest
 
 import services.throttle as throttle
-from services.throttle import client_ip, check_rate
+from services.throttle import client_ip
 
 
 class _Headers(dict):
@@ -68,17 +68,8 @@ class ClientIpTest(unittest.TestCase):
         req = _FakeRequest(xff="1.2.3.4, 198.51.100.7, 10.0.0.1")
         # With 2 trusted hops, the real client is the 2nd-from-right.
         self.assertEqual(client_ip(req), "198.51.100.7")
-
-    def test_xff_rotation_no_longer_mints_fresh_buckets(self):
-        """End-to-end: rotating the spoofable prefix maps to ONE throttle bucket,
-        so the per-IP limit actually fires instead of being bypassed."""
-        allowed = 0
-        for i in range(10):
-            req = _FakeRequest(xff=f"10.0.0.{i}, 198.51.100.50")  # real peer constant
-            if check_rate(f"test-bucket:{client_ip(req)}", max_hits=5, window_seconds=600):
-                allowed += 1
-        # Exactly the cap is granted despite 10 distinct spoofed prefixes.
-        self.assertEqual(allowed, 5)
+        # The end-to-end "XFF rotation maps to one throttle bucket" assertion now
+        # lives in test_throttle.py, since check_rate is DB-backed and async.
 
 
 if __name__ == "__main__":

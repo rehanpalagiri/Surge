@@ -14,6 +14,7 @@ in-memory SQLite, email transport stubbed. Each test uses a distinct
 X-Forwarded-For so the process-wide login/reset throttle buckets don't collide.
 """
 import unittest
+import uuid
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -67,10 +68,14 @@ class SessionInvalidationTest(unittest.IsolatedAsyncioTestCase):
         await self.engine.dispose()
 
     async def _signup(self, email="creator@example.com", username="creator", password="supersecret1"):
+        # Override the client's default XFF with a unique per-call IP: signup is
+        # IP-throttled (5/900s) with process-global state, and self._ip (id-based)
+        # isn't guaranteed unique across tests. The reset/login throttles below
+        # keep using self._ip via the client default — those keys don't collide.
         r = await self.client.post("/api/auth/signup", json={
             "email": email, "username": username,
             "password": password, "birth_date": "1995-06-15",
-        })
+        }, headers={"X-Forwarded-For": f"signup-{uuid.uuid4()}"})
         self.assertEqual(r.status_code, 200, r.text)
         return r.json()["access_token"]
 
