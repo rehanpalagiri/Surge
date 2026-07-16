@@ -311,14 +311,14 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       let delay = 800;
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, delay));
-        const { status } = await getAnalysisStatus(id);
+        const { status, message } = await getAnalysisStatus(id);
         if (status === "complete") {
           track("analysis_complete", { platform, mode: "r2_async" });
           router.push(`/results/${id}`);
           return;
         }
         if (status === "error") {
-          throw new Error("Analysis failed. Please try again.");
+          throw new Error(message || "Analysis failed. Please try again.");
         }
         delay = Math.min(3000, Math.round(delay * 1.3));
       }
@@ -351,7 +351,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
       {/* ── Analysis loading overlay ── */}
       {loading && (
         <div
-          className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm overflow-y-auto px-4 py-8 sm:py-10"
+          className="fixed inset-0 z-50 bg-background overflow-y-auto px-4 py-8 sm:py-10"
           role="dialog"
           aria-modal="true"
           aria-busy="true"
