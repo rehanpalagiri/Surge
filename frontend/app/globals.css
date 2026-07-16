@@ -68,15 +68,15 @@
 .tooltip-content { position:absolute; z-index:30; left:50%; bottom:calc(100% + 8px); width:max-content; max-width:220px; padding:7px 9px; border:1px solid var(--color-border); border-radius:7px; background:var(--color-card); color:var(--color-text-primary); box-shadow:0 10px 26px var(--color-shadow); font-size:10px; line-height:1.35; opacity:0; pointer-events:none; transform:translate(-50%, 3px); transition:opacity 140ms ease, transform 140ms ease; }
 .tooltip-content::after { content:""; position:absolute; left:50%; top:100%; width:7px; height:7px; border-right:1px solid var(--color-border); border-bottom:1px solid var(--color-border); background:var(--color-card); transform:translate(-50%,-4px) rotate(45deg); }
 .tooltip-wrap:hover .tooltip-content, .tooltip-trigger:focus-visible + .tooltip-content { opacity:1; transform:translate(-50%,0); }
-.surge-skeleton-nav { width:min(1180px,calc(100% - 48px)); height:76px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--color-border); }
+.surge-skeleton-nav { position:sticky; top:0; z-index:30; width:min(1180px,calc(100% - 48px)); height:76px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--color-border); background:color-mix(in srgb, var(--color-background) 82%, transparent); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
 .surge-skeleton-hero { width:min(1180px,calc(100% - 48px)); min-height:560px; margin:0 auto; padding:80px 0; display:grid; grid-template-columns:1fr 1.1fr; gap:55px; align-items:center; }
 .surge-skeleton-upload { width:min(700px,calc(100% - 48px)); margin:0 auto; padding:80px 0; display:grid; gap:18px; }
 @media (max-width:720px){.surge-skeleton-nav,.surge-skeleton-hero,.surge-skeleton-upload{width:calc(100% - 28px)}.surge-skeleton-hero{grid-template-columns:1fr;min-height:auto;padding:60px 0}.surge-skeleton-hero>div:last-child{min-height:250px}.surge-skeleton-upload{padding:60px 0}}
 
 /* ── Anonymous landing refresh: an editorial edit-bay with one waveform accent ── */
-.surge-landing { color: var(--color-text-primary); overflow: hidden; }
+.surge-landing { color: var(--color-text-primary); overflow-x: clip; }
 .surge-wordmark { color:var(--color-accent); font-family:var(--font-schibsted),system-ui,sans-serif; font-style:italic; font-weight:800; line-height:1; letter-spacing:-.04em; }
-.surge-nav { height: 76px; display:flex; align-items:center; justify-content:space-between; width:min(1180px,calc(100% - 48px)); margin:0 auto; border-bottom:1px solid var(--color-border); }
+.surge-nav { position:sticky; top:0; z-index:30; height: 76px; display:flex; align-items:center; justify-content:space-between; width:min(1180px,calc(100% - 48px)); margin:0 auto; border-bottom:1px solid var(--color-border); background:color-mix(in srgb, var(--color-background) 82%, transparent); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
 .surge-brand { display:flex; align-items:center; gap:9px; color:var(--color-text-primary); font:800 21px/1 var(--font-display),system-ui,sans-serif; letter-spacing:-.025em; }
 .surge-brand-mark { width:30px; height:30px; display:grid; place-items:center; color:var(--color-background); background:var(--color-accent); border-radius:9px; font:800 20px/1 var(--font-display),system-ui,sans-serif; }
 .surge-brand-mark.large { width:48px; height:48px; border-radius:14px; font-size:28px; }

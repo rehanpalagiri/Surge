@@ -161,7 +161,7 @@ function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; on
 
       <main className="min-h-screen flex flex-col bg-background">
         {/* ── Minimal nav ── */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-border bg-background/85 backdrop-blur-sm">
           <BrandLogo className="text-xl" />
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-text-muted text-sm hover:text-text-primary transition-colors">
