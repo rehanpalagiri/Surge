@@ -1,13 +1,22 @@
-# Render Blueprint for the ViralIQ backend.
+# Render Blueprint for the CraftLint backend.
 # In the Render dashboard: New > Blueprint, point it at this repo root.
 # All secrets (marked sync:false) must be set manually in the Render dashboard —
 # they are never committed to the repo.
 #
-# NOTE: SQLite on a persistent disk is gone. Production uses Neon Postgres.
-#       DATABASE_URL should be your Neon DIRECT (non-pooler) connection string.
+# NOTE: SQLite on a persistent disk is gone. Production uses Supabase Postgres.
+#       DATABASE_URL should be the Supabase SESSION pooler URL (…pooler.supabase.com:5432)
+#       — IPv4 + supports prepared statements for this long-lived process.
+#
+# SCHEDULER: the `plan: free` instance spins down when idle, so the in-process
+#            06:00 UTC scheduler can't be relied on. Drive outcome collection with
+#            an EXTERNAL daily cron POSTing to /api/admin/outcomes/collect-due with
+#            the X-Admin-Password header (see the Render runbook).
+#
+# EMAIL: Render blocks outbound SMTP (like Railway), so mail must go over Brevo's
+#        HTTPS API — set BREVO_API_KEY. The SMTP_* vars are a local-only fallback.
 services:
   - type: web
-    name: Surge
+    name: CraftLint
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -15,17 +24,27 @@ services:
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        sync: false          # Neon direct URL, e.g. postgresql://user:pass@ep-xxx.neon.tech/dbname?sslmode=require
+        sync: false          # Supabase Session pooler, e.g. postgresql://postgres.<ref>:<pass>@aws-0-<region>.pooler.supabase.com:5432/postgres
       - key: GEMINI_API_KEY
         sync: false
       - key: ADMIN_PASSWORD
-        sync: false
+        sync: false          # also used by the external collect-due cron (X-Admin-Password header)
       - key: JWT_SECRET
         sync: false          # python -c "import secrets; print(secrets.token_urlsafe(48))"
       - key: ALLOWED_ORIGINS
         sync: false          # e.g. https://viraliq.vercel.app (set after Vercel deploy)
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"           # Render puts one edge proxy in front; 1 is correct
       - key: HIKERAPI_KEY
         sync: false          # HikerAPI key for Instagram seed harvest (api.hikerapi.com)
+      - key: RAPIDAPI_KEY
+        sync: false          # RapidAPI key for Instagram likes
+      - key: RAPIDAPI_IG_HOST
+        sync: false          # RapidAPI Instagram host
+      - key: RAPIDAPI_IG_PATH
+        sync: false          # RapidAPI Instagram path
+      - key: BREVO_API_KEY
+        sync: false          # PRODUCTION email transport (HTTPS) — Render blocks SMTP
       - key: SMTP_HOST
         sync: false          # e.g. smtp-relay.brevo.com
       - key: SMTP_PORT
@@ -35,6 +54,6 @@ services:
       - key: SMTP_PASS
         sync: false          # Brevo SMTP password — ROTATE if exposed
       - key: EMAIL_FROM
-        sync: false          # e.g. "Surge <noreply@yourdomain.com>"
+        sync: false          # e.g. "CraftLint <noreply@yourdomain.com>"
       - key: FRONTEND_URL
         sync: false          # e.g. https://surge-chi-khaki.vercel.app
