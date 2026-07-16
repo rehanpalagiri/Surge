@@ -86,6 +86,33 @@ def score_outcome(view_count: Optional[int], like_count: int) -> tuple[int, str,
     return 3, "content", "high"              # modest reach + <2% likes → genuinely weak content
 
 
+# The six craft dimensions the niche synthesis reads back (services.seed_insights._DIMS).
+_CRAFT_DIMS = (
+    "hook_velocity", "cut_frequency", "text_scannability",
+    "curiosity_gap", "audio_visual_sync", "loop_seamlessness",
+)
+
+
+def build_user_seed_analysis(review: dict, driver: str, driver_confidence: str) -> dict:
+    """Build a seed-schema ``gemini_analysis`` blob from a user's craft review, so a
+    user upload can enter the seed pool WITHOUT a second (paid) Gemini call.
+
+    The live craft review (``services.gemini.analyze_video``) is itself blind to the
+    view/like counts, so its six dimension scores are already a valid counts-blind
+    craft record — the exact guarantee the admin/harvest seed-analysis pass provides.
+    ``performance_driver`` / ``driver_confidence`` are the CODE-derived outcome labels
+    from ``score_outcome()`` (never the model's guess), matching the seed pipeline's
+    craft-blind / code-rated split. Shape is what ``seed_insights._fmt_seed`` reads.
+    """
+    blob: dict = {d: review[d] for d in _CRAFT_DIMS if isinstance(review.get(d), (int, float))}
+    blob["performance_driver"] = driver
+    blob["driver_confidence"] = driver_confidence
+    # Provenance marker so a future reader can tell a user-upload seed (craft copied
+    # from the live review) from a hand-analyzed admin/harvest seed.
+    blob["source"] = "user_upload"
+    return blob
+
+
 def _build_seed_prompt(platform: str, niche: str) -> str:
     """Craft-only prompt. The model sees ONLY the video — never the counts — so its
     dimension scores cannot anchor to a rating. The outcome fields are added afterward

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import {
   getAdminSeeds,
+  getUserSeeds,
+  UserSeedRow,
   addSeedVideo,
   deleteSeedVideo,
   seedFromUrl,
@@ -87,7 +89,23 @@ const NICHES = [
 
 type Tab = "url" | "manual";
 type Platform = "tiktok" | "instagram";
-type MainTab = "seeds" | "harvest" | "intelligence";
+type MainTab = "seeds" | "userseeds" | "harvest" | "intelligence";
+
+const MAIN_TAB_LABELS: Record<MainTab, string> = {
+  seeds: "Seeds",
+  userseeds: "User Seeds",
+  harvest: "Harvest",
+  intelligence: "Intelligence",
+};
+
+const DIM_LABELS: Record<string, string> = {
+  hook_velocity: "Hook",
+  cut_frequency: "Cuts",
+  text_scannability: "Text",
+  curiosity_gap: "Curiosity",
+  audio_visual_sync: "A/V sync",
+  loop_seamlessness: "Ending",
+};
 
 function parseSeedSummary(raw: string | null): string {
   if (!raw) return "";
@@ -134,6 +152,9 @@ export default function AdminPage() {
   const [authPending, setAuthPending] = useState(false);
   const [seeds, setSeeds] = useState<SeedVideoOut[]>([]);
   const [seedsLoaded, setSeedsLoaded] = useState(false);
+  const [userSeeds, setUserSeeds] = useState<UserSeedRow[]>([]);
+  const [userSeedsLoaded, setUserSeedsLoaded] = useState(false);
+  const [expandedUserSeedId, setExpandedUserSeedId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState<Tab>("url");
   const [activePlatform, setActivePlatform] = useState<Platform>("tiktok");
@@ -188,6 +209,11 @@ export default function AdminPage() {
   const [uploadError, setUploadError] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  // The curated Seed Library excludes user-contributed seeds — those get their own
+  // "User Seeds" tab so admin/harvest curation stays clean. (Niche synthesis still
+  // reads user seeds from the pool server-side.)
+  const librarySeeds = seeds.filter((s) => s.source !== "user");
+
   const igUsed = apiUsage?.instagram.used ?? 0;
   const igLimit = apiUsage?.instagram.limit ?? 20;
   const igResetsAt = apiUsage?.instagram.resets_at ?? "";
@@ -216,6 +242,13 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadUserSeeds = useCallback(async (pw: string) => {
+    try {
+      setUserSeeds(await getUserSeeds(pw));
+    } catch { /* non-fatal */ }
+    finally { setUserSeedsLoaded(true); }
+  }, []);
+
   const loadInsights = useCallback(async (pw: string, platform: string) => {
     try { setInsights(await getInsights(pw, platform)); } catch { /* non-fatal */ }
   }, []);
@@ -237,6 +270,7 @@ export default function AdminPage() {
       setPassword(saved);
       setAuthed(true);
       loadSeeds(saved);
+      loadUserSeeds(saved);
       refreshFetchStatus(saved);
       refreshApiUsage(saved);
       refreshHarvestStatus(saved);
@@ -245,7 +279,7 @@ export default function AdminPage() {
       refreshTrendHarvestStatus(saved);
     }
     setAuthChecked(true);
-  }, [loadSeeds, refreshFetchStatus, refreshApiUsage, refreshHarvestStatus, loadInsights, loadTrends, refreshTrendHarvestStatus]);
+  }, [loadSeeds, loadUserSeeds, refreshFetchStatus, refreshApiUsage, refreshHarvestStatus, loadInsights, loadTrends, refreshTrendHarvestStatus]);
 
   // Reload insights/trends when platform changes
   useEffect(() => {
@@ -266,6 +300,7 @@ export default function AdminPage() {
       setAuthed(true);
       setAuthError("");
       loadSeeds(password);
+      loadUserSeeds(password);
       refreshFetchStatus(password);
       refreshApiUsage(password);
       refreshHarvestStatus(password);
@@ -485,17 +520,17 @@ export default function AdminPage() {
           {/* Left: brand + main tabs */}
           <div className="flex items-stretch gap-1">
             <span className="flex items-center gap-1.5 pr-6"><BrandLogo href={null} /><span className="font-bold text-text-primary">Admin</span></span>
-            {(["seeds", "harvest", "intelligence"] as MainTab[]).map((t) => (
+            {(["seeds", "userseeds", "harvest", "intelligence"] as MainTab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setMainTab(t)}
-                className={`px-5 py-4 text-sm font-semibold capitalize transition-colors border-b-2 ${
+                className={`px-5 py-4 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${
                   mainTab === t
                     ? "text-text-primary border-accent"
                     : "text-text-muted border-transparent hover:text-text-primary"
                 }`}
               >
-                {t}
+                {MAIN_TAB_LABELS[t]}
               </button>
             ))}
           </div>
@@ -736,7 +771,7 @@ export default function AdminPage() {
               <div className="flex justify-between items-center mb-5">
                 <h2 className="text-text-primary font-semibold text-lg">Seed Library</h2>
                 <span className="text-text-muted text-sm bg-surface border border-border px-3 py-1 rounded-full">
-                  {seeds.length} video{seeds.length !== 1 ? "s" : ""}
+                  {librarySeeds.length} video{librarySeeds.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
@@ -744,7 +779,7 @@ export default function AdminPage() {
 
               {!seedsLoaded ? (
                 <AdminDataSkeleton />
-              ) : seeds.length === 0 ? (
+              ) : librarySeeds.length === 0 ? (
                 <p className="text-text-muted text-sm text-center py-8">No seed videos yet. Add some above.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -762,7 +797,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {seeds.map((seed) => {
+                      {librarySeeds.map((seed) => {
                         const summary = parseSeedSummary(seed.gemini_analysis);
                         const isOpen = expandedId === seed.id;
                         const ratingColor =
@@ -836,6 +871,125 @@ export default function AdminPage() {
                                   <p className="text-text-primary text-sm whitespace-pre-wrap">{summary}</p>
                                   {seed.notes && (
                                     <p className="text-text-muted text-xs mt-2">Notes: {seed.notes}</p>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
+            USER SEEDS TAB
+        ══════════════════════════════════════════════════ */}
+        {mainTab === "userseeds" && (
+          <div className="space-y-6">
+            <div className="bg-card border border-border rounded-2xl p-6">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-text-primary font-semibold text-lg">User Seeds</h2>
+                <span className="text-text-muted text-sm bg-surface border border-border px-3 py-1 rounded-full">
+                  {userSeeds.length} upload{userSeeds.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <p className="text-text-muted text-sm mb-5 max-w-3xl">
+                Creator uploads and their craft review. When a creator links the posted video and we
+                fetch <span className="text-text-primary">verified counts</span>, the same counts-blind
+                review is promoted into the shared seed pool (<span className="text-accent">in pool</span>)
+                — this is how real outcomes, including Instagram, start feeding niche synthesis.
+              </p>
+
+              {!userSeedsLoaded ? (
+                <AdminDataSkeleton />
+              ) : userSeeds.length === 0 ? (
+                <p className="text-text-muted text-sm text-center py-8">No user uploads yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-text-muted border-b border-border">
+                        <th className="text-left py-2 pr-4">Platform</th>
+                        <th className="text-left py-2 pr-4">Niche</th>
+                        <th className="text-left py-2 pr-4">Verdict</th>
+                        <th className="text-right py-2 pr-4">Views</th>
+                        <th className="text-right py-2 pr-4">Likes</th>
+                        <th className="text-center py-2 pr-4">Seed pool</th>
+                        <th className="text-left py-2 pr-4">Craft</th>
+                        <th className="text-left py-2">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {userSeeds.map((u) => {
+                        const isOpen = expandedUserSeedId === u.id;
+                        const dims = Object.entries(u.dimensions);
+                        return (
+                          <Fragment key={u.id}>
+                            <tr className="border-b border-border/50 hover:bg-surface/50 transition-colors">
+                              <td className="py-2.5 pr-4">
+                                <span className="text-text-muted text-xs font-medium bg-surface border border-border px-2 py-0.5 rounded-full capitalize">
+                                  {u.platform}
+                                </span>
+                              </td>
+                              <td className="py-2.5 pr-4 text-text-primary font-medium">
+                                {u.canonical_niche || u.niche || "—"}
+                              </td>
+                              <td className="py-2.5 pr-4 text-text-muted text-xs">{u.verdict || "—"}</td>
+                              <td className="py-2.5 pr-4 text-right text-text-primary">
+                                {u.actual_views != null ? u.actual_views.toLocaleString() : (
+                                  <span className="text-text-muted/50 text-xs">—</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 pr-4 text-right text-text-muted">
+                                {u.actual_likes != null ? u.actual_likes.toLocaleString() : (
+                                  <span className="text-text-muted/50 text-xs">—</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 pr-4 text-center">
+                                {u.in_seed_pool ? (
+                                  <span title="Promoted into the shared seed pool (verified counts)" className="text-[10px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full">
+                                    ✓ in pool
+                                  </span>
+                                ) : (
+                                  <span title="No verified counts yet — not in the pool" className="text-[10px] font-semibold text-text-muted bg-surface border border-border px-2 py-0.5 rounded-full">
+                                    pending
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 pr-4">
+                                {dims.length > 0 ? (
+                                  <button onClick={() => setExpandedUserSeedId(isOpen ? null : u.id)} className="text-accent hover:underline text-xs">
+                                    {isOpen ? "Hide" : "View"}
+                                  </button>
+                                ) : (
+                                  <span className="text-text-muted text-xs">—</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 text-text-muted text-xs">
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}
+                              </td>
+                            </tr>
+                            {isOpen && dims.length > 0 && (
+                              <tr className="border-b border-border/50">
+                                <td colSpan={8} className="py-3 px-4 bg-surface/40">
+                                  <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">
+                                    Craft dimensions (counts-blind review)
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {dims.map(([k, v]) => (
+                                      <span key={k} className="text-xs bg-surface border border-border px-2 py-1 rounded-lg">
+                                        <span className="text-text-muted">{DIM_LABELS[k] ?? k}</span>{" "}
+                                        <span className="text-text-primary font-semibold">{v}/10</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                  {u.project_name && (
+                                    <p className="text-text-muted text-xs mt-2">Project: {u.project_name}</p>
                                   )}
                                 </td>
                               </tr>

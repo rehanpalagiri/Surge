@@ -13,13 +13,14 @@ from sqlalchemy import select, delete, update
 from database import get_db, AsyncSessionLocal
 from models import (
     AnalysisArtifact, OutcomeCollectionJob, OutcomeSnapshot, PendingUpload,
-    UsageEvent, User, UserAnalysis, UserProfile,
+    SeedVideo, UsageEvent, User, UserAnalysis, UserProfile,
 )
 from schemas import (
     AnalysisOut, AnalysisSummaryOut, ClaimAnalysisIn, FeedbackIn, OutcomeSnapshotOut,
     SeedConsentDecisionIn, VideoLinkIn,
 )
 from services.gemini import analyze_video
+from services.seed_analysis import build_user_seed_analysis, score_outcome
 from google.genai.errors import ClientError as _GeminiClientError
 from services.niche_classifier import classify_niche, _match_canonical
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
@@ -810,6 +811,70 @@ def _normalize_handle(h: str) -> str:
     return (h or "").strip().lstrip("@").lower()
 
 
+async def _sync_user_seed(db: AsyncSession, analysis: UserAnalysis, user: User) -> None:
+    """Introduce (or refresh) a creator's upload in the shared seed pool once it has
+    VERIFIED provider counts.
+
+    A "user seed" reuses the analysis's counts-blind craft review as its
+    ``gemini_analysis`` and derives its rating deterministically from the real counts
+    via ``score_outcome()`` — the same craft-blind / code-rated split the admin and
+    harvest seed pipelines use. This is the higher-quality signal (a real outcome, not
+    a curator's guess) and is what starts populating the Instagram seed pool, which is
+    otherwise empty.
+
+    Guarantees:
+      • Only VERIFIED provider fetches reach here (called from ``link_video`` after a
+        successful tikwm / RapidAPI fetch). Manual/unverified counts never promote.
+      • Never for minors (their ``seed_consent`` is locked "no" at signup), and skipped
+        when the creator has explicitly opted out (``seed_consent == "no"``).
+      • Idempotent: the analysis's ``promoted_seed_id`` links to its one seed row, so a
+        later refresh updates that row in place instead of creating duplicates.
+      • Errored/incomplete reviews are never seeded.
+    """
+    if is_minor(user) or (user.seed_consent == "no"):
+        return
+    likes = analysis.actual_likes
+    if likes is None or (analysis.status not in (None, "complete")):
+        return
+    try:
+        review = json.loads(analysis.scores_json) if analysis.scores_json else {}
+    except (ValueError, TypeError):
+        return
+    if not isinstance(review, dict) or review.get("error"):
+        return
+
+    views = analysis.actual_views
+    platform = analysis.platform or "tiktok"
+    niche = analysis.canonical_niche or "Uncategorized"
+    rating, driver, driver_conf = score_outcome(views, likes)
+    blob = build_user_seed_analysis(review, driver, driver_conf)
+
+    seed = None
+    if analysis.promoted_seed_id:
+        seed = (await db.execute(
+            select(SeedVideo).where(SeedVideo.id == analysis.promoted_seed_id)
+        )).scalar_one_or_none()
+    if seed is None:
+        seed = SeedVideo(
+            filename=analysis.filename,
+            source="user",
+            platform=platform,
+            niche=niche,
+            like_count=likes,
+        )
+        db.add(seed)
+        await db.flush()  # assign seed.id before linking it back
+        analysis.promoted_seed_id = seed.id
+
+    seed.platform = platform
+    seed.niche = niche
+    seed.view_count = views
+    seed.like_count = likes
+    seed.rating = rating
+    seed.gemini_analysis = json.dumps(blob)
+    seed.posted_at = analysis.counts_fetched_at
+
+
 @router.post("/analyses/{analysis_id}/video-link", response_model=AnalysisOut)
 async def link_video(
     analysis_id: int,
@@ -914,6 +979,7 @@ async def link_video(
             posted_at=asserted_posted_at,
             captured_horizon=snapshot.horizon,
         )
+        await _sync_user_seed(db, analysis, user)
         await db.commit()
         await db.refresh(analysis)
 
@@ -993,6 +1059,7 @@ async def link_video(
         posted_at=meta.get("posted_at"),
         captured_horizon=snapshot.horizon,
     )
+    await _sync_user_seed(db, analysis, user)
     await db.commit()
     await db.refresh(analysis)
 

@@ -583,6 +583,33 @@ export async function getAdminSeeds(password: string): Promise<SeedVideoOut[]> {
   return handleResponse<SeedVideoOut[]>(res);
 }
 
+export interface UserSeedRow {
+  id: number;
+  platform: string;
+  niche: string;
+  canonical_niche: string | null;
+  project_name: string | null;
+  verdict: string;
+  dimensions: Partial<Record<
+    "hook_velocity" | "cut_frequency" | "text_scannability" |
+    "curiosity_gap" | "audio_visual_sync" | "loop_seamlessness",
+    number
+  >>;
+  actual_views: number | null;
+  actual_likes: number | null;
+  counts_fetched_at: string | null;
+  in_seed_pool: boolean;   // promoted into the shared seed pool (has verified counts)
+  video_url: string | null;
+  created_at: string | null;
+}
+
+export async function getUserSeeds(password: string): Promise<UserSeedRow[]> {
+  const res = await fetch(`${BASE}/api/admin/user-seeds`, {
+    headers: { "X-Admin-Password": password },
+  });
+  return handleResponse<UserSeedRow[]>(res);
+}
+
 export async function addSeedVideo(
   formData: FormData,
   password: string

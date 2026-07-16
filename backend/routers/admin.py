@@ -283,6 +283,68 @@ async def delete_seed(
 
 
 # ---------------------------------------------------------------------------
+# User seeds: creator uploads surfaced for admin review
+# ---------------------------------------------------------------------------
+
+_USER_SEED_DIMS = (
+    "hook_velocity", "cut_frequency", "text_scannability",
+    "curiosity_gap", "audio_visual_sync", "loop_seamlessness",
+)
+
+
+@router.get("/user-seeds")
+async def get_user_seeds(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(check_admin),
+):
+    """Creator uploads (completed craft reviews) surfaced for admin visibility.
+
+    A completed review carries the counts-blind craft assessment the model produced.
+    Once the creator links the posted video and we fetch VERIFIED counts, the same
+    review is also promoted into the shared seed pool (``seed_videos``, source="user",
+    linked via ``promoted_seed_id``) — ``in_seed_pool`` reflects that state. This is
+    how real creator outcomes (including Instagram, which has no admin seeds) start
+    feeding the niche synthesis.
+    """
+    rows = (await db.execute(
+        select(UserAnalysis)
+        .where(UserAnalysis.status == "complete")
+        .order_by(UserAnalysis.created_at.desc())
+        .limit(500)
+    )).scalars().all()
+
+    out = []
+    for a in rows:
+        try:
+            scores = json.loads(a.scores_json) if a.scores_json else {}
+        except (ValueError, TypeError):
+            scores = {}
+        if not isinstance(scores, dict) or scores.get("error"):
+            continue  # failed reviews carry no craft signal
+        dims = {
+            d: scores.get(d)
+            for d in _USER_SEED_DIMS
+            if isinstance(scores.get(d), (int, float))
+        }
+        out.append({
+            "id": a.id,
+            "platform": a.platform or "tiktok",
+            "niche": a.niche,
+            "canonical_niche": a.canonical_niche,
+            "project_name": a.project_name,
+            "verdict": a.verdict,
+            "dimensions": dims,
+            "actual_views": a.actual_views,
+            "actual_likes": a.actual_likes,
+            "counts_fetched_at": a.counts_fetched_at.isoformat() if a.counts_fetched_at else None,
+            "in_seed_pool": a.promoted_seed_id is not None,
+            "video_url": a.video_url,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return out
+
+
+# ---------------------------------------------------------------------------
 # URL-based fetchers (tikwm.com for TikTok, EaseApi for Instagram)
 # ---------------------------------------------------------------------------
 
