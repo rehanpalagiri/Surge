@@ -921,12 +921,12 @@ export async function analyzeFromR2(
 export async function getAnalysisStatus(
   id: number,
   token?: string | null
-): Promise<{ id: number; status: string }> {
+): Promise<{ id: number; status: string; message?: string }> {
   // Send auth when we have it: the status endpoint now returns 404 to non-owners
   // of a claimed analysis, so an authenticated owner must identify themselves.
   // Guests (no token) can still poll their own not-yet-claimed upload.
   const res = await fetch(`${BASE}/api/analyses/${id}/status`, { headers: authHeaders(token) });
-  return handleResponse<{ id: number; status: string }>(res);
+  return handleResponse<{ id: number; status: string; message?: string }>(res);
 }
 
 export async function getHarvestStatus(password: string): Promise<HarvestStatus> {

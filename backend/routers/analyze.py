@@ -409,9 +409,9 @@ async def analysis_status(
     user: Optional[User] = Depends(optional_user),
 ):
     result = await db.execute(
-        select(UserAnalysis.id, UserAnalysis.status, UserAnalysis.user_id).where(
-            UserAnalysis.id == analysis_id
-        )
+        select(
+            UserAnalysis.id, UserAnalysis.status, UserAnalysis.user_id, UserAnalysis.scores_json
+        ).where(UserAnalysis.id == analysis_id)
     )
     row = result.first()
     if not row:
@@ -422,7 +422,16 @@ async def analysis_status(
     # analysis gets 404 — no cross-tenant status/existence oracle over sequential IDs.
     if row.user_id is not None and (user is None or row.user_id != user.id):
         raise HTTPException(status_code=404, detail="Analysis not found")
-    return {"id": row.id, "status": row.status or "complete"}
+    status = row.status or "complete"
+    out = {"id": row.id, "status": status}
+    if status == "error":
+        # Surface the real reason (e.g. "we're at capacity") instead of leaving the
+        # caller to show a generic failure for both a quota hit and a real bug.
+        try:
+            out["message"] = json.loads(row.scores_json or "{}").get("error")
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return out
 
 
 @router.post("/analyze")
