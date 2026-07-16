@@ -20,7 +20,7 @@ export default function RegisterSW() {
 
     navigator.serviceWorker
       .register("/sw.js", { scope: "/" })
-      .catch((err) => console.warn("[Surge] SW registration failed:", err));
+      .catch((err) => console.warn("[CraftLint] SW registration failed:", err));
   }, []);
 
   return null;

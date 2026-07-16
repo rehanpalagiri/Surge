@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SITE_URL, SITE_HOST } from "@/lib/site";
 import BrandLogo from "@/components/BrandLogo";
 
-export const metadata = { title: "Terms of Service — Surge" };
+export const metadata = { title: "Terms of Service — CraftLint" };
 
 function Section({ title, number, children }: { title: string; number: string; children: React.ReactNode }) {
   return (
@@ -35,7 +35,7 @@ export default function TermsPage() {
         <div className="border-b border-border pb-6">
           <h1 className="text-2xl font-bold text-text-primary">Terms of Service</h1>
           <p className="text-text-muted text-sm mt-1">
-            Surge &nbsp;·&nbsp; Effective date: June 26, 2026 &nbsp;·&nbsp; Governed by the laws of the State of Texas
+            CraftLint &nbsp;·&nbsp; Effective date: June 26, 2026 &nbsp;·&nbsp; Governed by the laws of the State of Texas
           </p>
         </div>
 
@@ -72,13 +72,13 @@ export default function TermsPage() {
 
         <Section number="Section 1" title="Acceptance of Terms">
           <p>
-            By accessing or using Surge at {SITE_HOST} (the &quot;Service&quot;), creating an account, uploading
+            By accessing or using CraftLint at {SITE_HOST} (the &quot;Service&quot;), creating an account, uploading
             content, or clicking any &quot;I agree&quot; button, you agree to be legally bound by these Terms of
             Service (&quot;Terms&quot;). If you do not agree to all of these Terms, you may not access or use the Service.
           </p>
           <p>
             These Terms constitute a binding legal agreement between you (&quot;User,&quot; &quot;you,&quot; or
-            &quot;your&quot;) and Surge (&quot;Surge,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), a sole
+            &quot;your&quot;) and CraftLint (&quot;CraftLint,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), a sole
             proprietorship operating in the United States.
           </p>
           <p>
@@ -105,7 +105,7 @@ export default function TermsPage() {
         </Section>
 
         <Section number="Section 3" title="Description of Service">
-          <p>Surge is an AI-assisted retention craft review tool for short-form video content. The Service allows you to:</p>
+          <p>CraftLint is an AI-assisted retention craft review tool for short-form video content. The Service allows you to:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
               Upload short-form video files for AI-powered retention craft analysis across six observable dimensions: hook
@@ -120,7 +120,7 @@ export default function TermsPage() {
             </li>
           </ul>
           <p>
-            Surge is an <span className="text-text-primary font-medium">outcome-blind craft reviewer and experiment
+            CraftLint is an <span className="text-text-primary font-medium">outcome-blind craft reviewer and experiment
             tracker</span>. The Service does not predict, guarantee, or promise any specific reach, views, likes,
             follower growth, algorithmic distribution, or any other outcome on any social media platform. All dimension
             assessments are AI-assisted craft opinions, not measured retention or engagement forecasts.
@@ -128,7 +128,7 @@ export default function TermsPage() {
         </Section>
 
         <Section number="Section 4" title="Eligibility">
-          <p>To use Surge, you must meet all of the following requirements:</p>
+          <p>To use CraftLint, you must meet all of the following requirements:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
               <span className="text-text-primary font-medium">Age:</span> You must be at least 13 years old. Users
@@ -228,14 +228,14 @@ export default function TermsPage() {
             ownership of any video, caption, image, or other material you submit (&quot;User Content&quot;).
           </p>
           <p>
-            By uploading a video to the Service, you grant Surge a limited, non-exclusive, royalty-free license to
+            By uploading a video to the Service, you grant CraftLint a limited, non-exclusive, royalty-free license to
             transmit and process that video solely for the purpose of generating your craft analysis.{" "}
             <span className="text-text-primary font-medium">We do not retain your video.</span> Every uploaded video
             is transmitted to Google Gemini for analysis and permanently deleted from our servers within seconds of
-            the analysis completing. No copy of your video remains on Surge&apos;s infrastructure after that point.
+            the analysis completing. No copy of your video remains on CraftLint&apos;s infrastructure after that point.
           </p>
           <p>
-            By linking a social media post URL, you grant Surge a limited, non-exclusive, royalty-free license to
+            By linking a social media post URL, you grant CraftLint a limited, non-exclusive, royalty-free license to
             read and store the public engagement metrics associated with that post for the purpose of tracking
             outcomes within your account.
           </p>
@@ -268,7 +268,7 @@ export default function TermsPage() {
             years of age or older, and (b) have explicitly opted in via Settings → Data &amp; Privacy.
           </p>
           <p>
-            If you opt in, you grant Surge a non-exclusive license to use the public engagement data from your linked
+            If you opt in, you grant CraftLint a non-exclusive license to use the public engagement data from your linked
             social media posts — including view counts, like counts, observation time, post URL, post age, and content
             niche — for internal measurement research and statistical analysis.{" "}
             <span className="text-text-primary font-medium">
@@ -283,7 +283,7 @@ export default function TermsPage() {
               particular outcome;
             </li>
             <li>
-              Surge does not represent that participation in the Measurement Research Program will improve your
+              CraftLint does not represent that participation in the Measurement Research Program will improve your
               content performance;
             </li>
             <li>
@@ -317,7 +317,7 @@ export default function TermsPage() {
             </li>
             <li>
               <span className="text-text-primary font-medium">Unauthorized access:</span> Probe, scan, or test the
-              vulnerability of any Surge system or breach any security mechanism without express written permission;
+              vulnerability of any CraftLint system or breach any security mechanism without express written permission;
             </li>
             <li>
               <span className="text-text-primary font-medium">Impersonation:</span> Create a false identity,
@@ -330,7 +330,7 @@ export default function TermsPage() {
             </li>
             <li>
               <span className="text-text-primary font-medium">Interference:</span> Interfere with, disrupt, or
-              attempt to gain unauthorized access to Surge&apos;s servers, networks, or systems;
+              attempt to gain unauthorized access to CraftLint&apos;s servers, networks, or systems;
             </li>
             <li>
               <span className="text-text-primary font-medium">Reverse engineering:</span> Reverse engineer,
@@ -363,7 +363,7 @@ export default function TermsPage() {
         <Section number="Section 10" title="AI-Generated Output Disclaimer">
           <p>
             The craft assessments, dimension scores, editing hypotheses, and experiment recommendations generated by
-            Surge are produced by artificial intelligence (&quot;AI Output&quot;). You understand and agree that:
+            CraftLint are produced by artificial intelligence (&quot;AI Output&quot;). You understand and agree that:
           </p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
@@ -371,13 +371,13 @@ export default function TermsPage() {
               measurements, scientific conclusions, or professional advice;
             </li>
             <li>
-              Surge makes no representation or warranty that following AI Output will improve any content metric,
+              CraftLint makes no representation or warranty that following AI Output will improve any content metric,
               including views, likes, watch time, follower count, or algorithmic distribution;
             </li>
             <li>AI Output is not a prediction, forecast, or guarantee of content performance on any platform;</li>
             <li>AI Output may contain errors, inaccuracies, or content that does not accurately reflect your video;</li>
             <li>
-              Surge does not produce an aggregate &quot;viral score,&quot; virality index, or any composite
+              CraftLint does not produce an aggregate &quot;viral score,&quot; virality index, or any composite
               performance prediction;
             </li>
             <li>
@@ -401,7 +401,7 @@ export default function TermsPage() {
               <span className="text-text-primary font-medium">Google Gemini (Google LLC):</span> All uploaded videos
               are processed by Google&apos;s Gemini API. By using the Service, you acknowledge that your video is
               transmitted to Google and that Google&apos;s privacy policy and terms of service apply to that
-              processing. Surge has no control over Google&apos;s data handling practices. You can review
+              processing. CraftLint has no control over Google&apos;s data handling practices. You can review
               Google&apos;s policy at{" "}
               <a
                 href="https://policies.google.com/privacy"
@@ -415,7 +415,7 @@ export default function TermsPage() {
             <li>
               <span className="text-text-primary font-medium">TikWM and HikerAPI:</span> Public engagement metrics
               for linked posts are retrieved via third-party data providers including TikWM and HikerAPI. These
-              providers are subject to their own availability, rate limits, and terms of service. Surge makes no
+              providers are subject to their own availability, rate limits, and terms of service. CraftLint makes no
               guarantees regarding the accuracy, completeness, or timeliness of metrics retrieved via these
               providers. Metric retrieval may fail or be delayed due to provider outages, platform changes, or rate
               limiting.
@@ -431,14 +431,14 @@ export default function TermsPage() {
         <Section number="Section 12" title="Intellectual Property">
           <p>
             The Service, including its software, design, user interface, text, graphics, logos, and AI models
-            (excluding User Content), is owned by Surge and protected by applicable copyright, trademark, trade
+            (excluding User Content), is owned by CraftLint and protected by applicable copyright, trademark, trade
             secret, and other intellectual property laws.
           </p>
           <p>
             We grant you a limited, non-exclusive, non-transferable, revocable license to access and use the Service
             solely for your personal, non-commercial use in accordance with these Terms. This license does not
             include any right to sublicense, sell, or commercially exploit the Service; modify or create derivative
-            works; use data mining or extraction methods on the Service; or use Surge&apos;s name, logo, or branding
+            works; use data mining or extraction methods on the Service; or use CraftLint&apos;s name, logo, or branding
             without our express written permission.
           </p>
           <p>
@@ -458,7 +458,7 @@ export default function TermsPage() {
           <CapsBlock>
             THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND,
             EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
-            FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. SURGE DOES NOT WARRANT THAT (A) THE SERVICE WILL
+            FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. CRAFTLINT DOES NOT WARRANT THAT (A) THE SERVICE WILL
             BE UNINTERRUPTED, ERROR-FREE, OR SECURE; (B) ANY DEFECTS WILL BE CORRECTED; (C) THE SERVICE OR THE
             SERVERS THAT MAKE IT AVAILABLE ARE FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS; OR (D) ANY AI OUTPUT
             WILL BE ACCURATE, COMPLETE, RELIABLE, OR SUITABLE FOR ANY PURPOSE.
@@ -469,13 +469,13 @@ export default function TermsPage() {
           </p>
           <p>
             Social media platform metrics retrieved via third-party providers are not independently verified and may
-            differ from metrics shown natively within those platforms. Surge is not responsible for discrepancies.
+            differ from metrics shown natively within those platforms. CraftLint is not responsible for discrepancies.
           </p>
         </Section>
 
         <Section number="Section 14" title="Limitation of Liability">
           <CapsBlock>
-            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL SURGE, ITS OPERATORS, EMPLOYEES,
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL CRAFTLINT, ITS OPERATORS, EMPLOYEES,
             AGENTS, OR LICENSORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR
             PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, LOSS OF DATA, LOSS OF GOODWILL,
             BUSINESS INTERRUPTION, COST OF SUBSTITUTE SERVICES, OR DAMAGES RESULTING FROM: (A) YOUR USE OF OR
@@ -484,8 +484,8 @@ export default function TermsPage() {
             OTHER MATTER RELATING TO THE SERVICE.
           </CapsBlock>
           <CapsBlock>
-            SURGE&apos;S TOTAL CUMULATIVE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATED TO THESE TERMS
-            OR THE SERVICE SHALL NOT EXCEED THE GREATER OF (A) THE TOTAL AMOUNT YOU PAID TO SURGE IN THE SIX (6)
+            CRAFTLINT&apos;S TOTAL CUMULATIVE LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATED TO THESE TERMS
+            OR THE SERVICE SHALL NOT EXCEED THE GREATER OF (A) THE TOTAL AMOUNT YOU PAID TO CRAFTLINT IN THE SIX (6)
             MONTHS IMMEDIATELY PRECEDING THE CLAIM, OR (B) FIFTY U.S. DOLLARS ($50.00).
           </CapsBlock>
           <p>
@@ -496,7 +496,7 @@ export default function TermsPage() {
 
         <Section number="Section 15" title="Indemnification">
           <p>
-            You agree to defend, indemnify, and hold harmless Surge and its operators, employees, agents, and
+            You agree to defend, indemnify, and hold harmless CraftLint and its operators, employees, agents, and
             licensors from and against any claims, liabilities, damages, losses, and expenses, including reasonable
             attorneys&apos; fees, arising out of or in any way connected with:
           </p>
@@ -528,10 +528,10 @@ export default function TermsPage() {
             </a>. Upon account deletion, we will remove your account data in accordance with our Privacy Policy.
           </p>
           <p>
-            <span className="text-text-primary font-medium">Termination by Surge:</span> We may suspend or terminate
+            <span className="text-text-primary font-medium">Termination by CraftLint:</span> We may suspend or terminate
             your account and access to the Service at any time, with or without cause and with or without notice,
             including if we reasonably believe you have violated these Terms, engaged in fraudulent or illegal
-            activity, or if your actions harm other users or Surge.
+            activity, or if your actions harm other users or CraftLint.
           </p>
           <p>
             <span className="text-text-primary font-medium">Effect of termination:</span> Upon termination, your
@@ -558,7 +558,7 @@ export default function TermsPage() {
           </p>
           <p>
             <span className="text-text-primary font-medium">Binding arbitration:</span> Except for disputes that
-            qualify for small claims court, you and Surge agree that any dispute, claim, or controversy arising out
+            qualify for small claims court, you and CraftLint agree that any dispute, claim, or controversy arising out
             of or relating to these Terms or the Service shall be resolved by binding individual arbitration
             administered by the American Arbitration Association (&quot;AAA&quot;) under its Consumer Arbitration
             Rules. The arbitration will be conducted in English, in Texas. Judgment on the award may be entered in
@@ -567,7 +567,7 @@ export default function TermsPage() {
           <p>
             <span className="text-text-primary font-medium">Class action waiver:</span>{" "}
             <span className="text-text-primary font-medium">
-              You and Surge each waive any right to participate in a class action lawsuit, class-wide arbitration,
+              You and CraftLint each waive any right to participate in a class action lawsuit, class-wide arbitration,
               or any other representative proceeding.
             </span>{" "}
             All disputes must be brought in your individual capacity.
@@ -593,7 +593,7 @@ export default function TermsPage() {
             regard to its conflict of law provisions.
           </p>
           <p>
-            For any disputes not subject to arbitration under Section 17, you and Surge consent to the exclusive
+            For any disputes not subject to arbitration under Section 17, you and CraftLint consent to the exclusive
             jurisdiction of the state and federal courts located in Texas, and you waive any objection to
             jurisdiction or venue in those courts.
           </p>
@@ -603,7 +603,7 @@ export default function TermsPage() {
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
               <span className="text-text-primary font-medium">Entire agreement:</span> These Terms, together with
-              our Privacy Policy, constitute the entire agreement between you and Surge regarding the Service and
+              our Privacy Policy, constitute the entire agreement between you and CraftLint regarding the Service and
               supersede all prior agreements or communications on this subject.
             </li>
             <li>
@@ -614,7 +614,7 @@ export default function TermsPage() {
             <li>
               <span className="text-text-primary font-medium">Waiver:</span> Our failure to enforce any right or
               provision of these Terms does not constitute a waiver of that right or provision. Any waiver must be
-              in writing and signed by an authorized representative of Surge.
+              in writing and signed by an authorized representative of CraftLint.
             </li>
             <li>
               <span className="text-text-primary font-medium">Assignment:</span> You may not assign or transfer your
@@ -631,7 +631,7 @@ export default function TermsPage() {
               disasters, government actions, internet service disruptions, or acts of third parties.
             </li>
             <li>
-              <span className="text-text-primary font-medium">Notices:</span> Notices to Surge must be sent by email
+              <span className="text-text-primary font-medium">Notices:</span> Notices to CraftLint must be sent by email
               to{" "}
               <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
                 surgeprivacy@gmail.com
@@ -652,7 +652,7 @@ export default function TermsPage() {
             please contact:
           </p>
           <p className="text-text-primary">
-            Surge<br />
+            CraftLint<br />
             Email:{" "}
             <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
@@ -674,7 +674,7 @@ export default function TermsPage() {
         </Section>
 
         <div className="border-t border-border pt-6 text-xs text-text-muted text-center space-y-1">
-          <p>Surge Terms of Service &nbsp;·&nbsp; Effective June 26, 2026</p>
+          <p>CraftLint Terms of Service &nbsp;·&nbsp; Effective June 26, 2026</p>
           <p>
             See also our{" "}
             <Link href="/privacy" className="text-accent hover:underline">Privacy Policy</Link>.

@@ -2,7 +2,7 @@
 niches used for seed matching. The canonical label keeps seed bucketing
 deterministic; the raw text still goes to the analysis prompt for specificity.
 
-Honesty layer (#4, on top of #6): a niche Surge isn't sure about routes to the
+Honesty layer (#4, on top of #6): a niche CraftLint isn't sure about routes to the
 ``Uncategorized`` sentinel — which matches no NicheInsight / seed / TrendSummary,
 so grading falls back to the generic dimension hierarchy (neutral weights) — and
 flags ``needs_confirmation`` instead of silently scoring as the wrong niche.

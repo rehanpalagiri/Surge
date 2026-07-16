@@ -10,12 +10,12 @@ This file mirrors `AGENTS.md`. Keep both synchronized when repository guidance c
 
 ## Product contract
 
-Surge is an outcome-blind AI retention craft reviewer and post-experiment tracker. It is not a virality or retention predictor.
+CraftLint is an outcome-blind AI retention craft reviewer and post-experiment tracker. It is not a virality or retention predictor.
 
 - Gemini assesses six observable attention-retention craft dimensions: hook velocity, cut frequency, text scannability, curiosity gap, audio-visual sync, and ending strength (does the ending earn the finish — payoff, CTA, or a clean loop; internal key remains `loop_seamlessness` for data continuity).
 - Dimension values are subjective AI assessments, not retention, engagement, reach, or causal measurements.
 - Attention-risk maps are AI-estimated craft diagnostics by video section, not measured retention, watch time, or drop-off data.
-- Niche selection is optional friction, not source of truth. When no user hint is supplied, Surge auto-detects rubric context from the video/caption and falls back to a broad craft rubric on low confidence.
+- Niche selection is optional friction, not source of truth. When no user hint is supplied, CraftLint auto-detects rubric context from the video/caption and falls back to a broad craft rubric on low confidence.
 - Do not produce an aggregate Viral Score, predicted views/likes, projected verdict, or performance promise.
 - Recommendations are hypotheses for the creator's next controlled experiment. They must identify one change, what to hold constant, and what to observe.
 - Keep AI critique separate from observed platform outcomes in code, storage, API contracts, and UX.
@@ -66,7 +66,7 @@ Browser → Next.js (Vercel) → FastAPI (Railway) → Neon Postgres
 Key models in `models.py`:
 
 - `users`, `user_profiles`, `password_reset_tokens`, `email_verification_tokens`: identity, per-platform creator settings, age gate, and the password-reset + email-verification flows.
-- `user_analyses`: uploaded review, creator-facing `project_name`, update lineage, guest `claim_token` handoff secret, and full Gemini response. New reviews use `mode="craft_review"`; prediction/calibration columns are legacy compatibility fields.
+- `user_analyses`: uploaded review, creator-facing `project_name`, update lineage, guest `claim_token` handoff secret, and full Gemini response. New reviews use `mode="craft_review"`; prediction/calibration columns are legacy compatibility fields. Once a creator links the posted video and VERIFIED counts are fetched, `_sync_user_seed` promotes the (counts-blind) review into `seed_videos` as `source="user"` — rating derived in code from the real counts via `score_outcome`, idempotent through `promoted_seed_id`, gated off for minors and `seed_consent="no"`. This is how real outcomes — including Instagram, which has no admin seeds — start feeding niche synthesis. The admin **User Seeds** tab surfaces these uploads; the curated Seed Library view excludes `source="user"`.
 - `analysis_artifacts`: exact SHA-256, creator/post identity, and future perceptual/audio fingerprint slots.
 - `outcome_snapshots`: immutable public-metric observations with capture time, post age, maturity horizon, provenance, integrity flags, metric version, and payload hash.
 - `outcome_collection_jobs`: durable maturity-window jobs with bounded retry and missed-window handling; driven by `services/outcome_collection.py` (protected admin endpoint + in-process daily scheduler).
@@ -78,9 +78,9 @@ Key models in `models.py`:
 
 Key services and routes:
 
-- `routers/analyze.py`: upload/review, owner serialization, manual outcomes, provider links, and `GET /api/analyses/{id}/outcomes`.
+- `routers/analyze.py`: upload/review, owner serialization, manual outcomes, provider links, and `GET /api/analyses/{id}/outcomes`. On a VERIFIED provider link fetch it also promotes the upload into the seed pool via `_sync_user_seed` (see `user_analyses` below).
 - `services/gemini.py`: uploads media, runs a DETERMINISTIC agentic perception pass (temperature=0 + fixed seed pin the scores) plus a text-only reasoning pass, auto-detects rubric context when no niche hint is supplied, injects the niche-specific dimension-priority hierarchy and the niche emotional-target hint (from `niche_weights.py`) into the text reasoning pass only; the live review is otherwise blind to prior outcomes, seed labels, trend summaries, and channel history. It applies injection-resistant system/data separation and returns six retention craft dimensions (any deliberately marked not_applicable at `craft_review_version` ≥ 4), a section-level attention-risk map, qualitative critique, and a next experiment. It removes legacy aggregate/prediction fields from new output.
-- `services/niche_weights.py`, `niche_classifier.py`, `seed_insights.py`, `trend_insights.py`, `channel_profile.py`: build the injected scoring-intelligence blocks — per-niche dimension hierarchy, canonical niche (`Uncategorized` → neutral weights, never a guess), all-time niche intelligence, recent-trend delta, and the Deep-mode creator-history summary. Frame history honestly so the grader never mistakes Surge's own past opinions for external validation.
+- `services/niche_weights.py`, `niche_classifier.py`, `seed_insights.py`, `trend_insights.py`, `channel_profile.py`: build the injected scoring-intelligence blocks — per-niche dimension hierarchy, canonical niche (`Uncategorized` → neutral weights, never a guess), all-time niche intelligence, recent-trend delta, and the Deep-mode creator-history summary. Frame history honestly so the grader never mistakes CraftLint's own past opinions for external validation.
 - `services/outcome_collection.py`: durable due-job collection with bounded retry (3 attempts), row-locked finalization (no double-count), late jobs marked `missed`, and `collector_health()` (ok/degraded/failing/idle, derived from durable tables) exposed at `GET /health/collectors`.
 - `services/scheduler.py`: in-process APScheduler; the daily 06:00 UTC job calls `collect_due_outcomes()` then `summarize_run()`, which ERROR-logs a high-failure run so a 100%-failing collector can't hide as a quiet INFO.
 - `services/outcomes.py`: computes post age, assigns fixed maturity windows, and stores immutable snapshots.
@@ -91,10 +91,10 @@ Key services and routes:
 - `services/craft_insights.py`: descriptive craft-vs-verified-outcome aggregation for one creator (`GET /api/me/craft-insights`). Correlational only, gated by justified sample sizes; returns `observed_range` (or a labeled preliminary read from the first verified post), never a forecast.
 - `tools/craft_correlation.py`: offline, read-only, cross-user craft↔outcome correlation (Pearson r + 95% Fisher CI, Spearman rho, n, naive baselines, inter-dimension collinearity). The drift/validation gate that must exist and show real signal BEFORE the calibration path is ever enabled. Never in the request path.
 - `auth.py`: JWT helpers and the single canonical `is_minor()` / `is_pro()` / `is_comp()` implementations. `is_pro` reads `users.subscription_status` (Stripe states active/trialing/past_due) OR the comp allowlist.
-- `services/stripe_billing.py` + `routers/billing.py`: Surge Pro ($9.99/mo). Checkout/portal sessions + a SIGNATURE-VERIFIED webhook that is the ONLY writer of subscription state. Never trust the client for Pro status. Stripe `StripeObject` raises on `.get()` — use the `_g()` safe accessor on event data.
+- `services/stripe_billing.py` + `routers/billing.py`: CraftLint Pro ($9.99/mo). Checkout/portal sessions + a SIGNATURE-VERIFIED webhook that is the ONLY writer of subscription state. Never trust the client for Pro status. Stripe `StripeObject` raises on `.get()` — use the `_g()` safe accessor on event data.
 - `services/rate_limit.py`: the analysis allowance. Pro = unlimited; free = 3 analyses/calendar-month (UTC) + the earn-by-linking bonus. `get_rate_limit(user, db)` takes the User (needs `is_pro`). Failed (status="error") analyses never consume the allowance.
 - `routers/settings.py`: account deletion removes analyses, artifacts, snapshots, and usage events in FK-safe order.
-- `routers/admin.py`: password-gated (`ADMIN_PASSWORD`) operations — outcome collection (`/api/admin/outcomes/collect-due`, `/status`, `/health`), operations/cost reports, seed + harvest + trend management, and calibration/insight generation. Never exposed to normal users.
+- `routers/admin.py`: password-gated (`ADMIN_PASSWORD`) operations — outcome collection (`/api/admin/outcomes/collect-due`, `/status`, `/health`), operations/cost reports, seed + harvest + trend management, the `GET /api/admin/user-seeds` creator-upload console, and calibration/insight generation. Never exposed to normal users.
 - `routers/profile.py`: per-platform creator profile (`GET`/`PUT /api/profile/{platform}`).
 
 TikWM, HikerAPI, and RapidAPI are operational dependencies with rate-limit, schema-drift, availability, legal/ToS, and cost risks. Provider fields without local real-payload verification must be documented as “documented but not runtime-verified.” Store provenance and fail transparently.
@@ -103,9 +103,9 @@ New tables are created by `create_all`. Existing-column additions require model 
 
 ### Frontend
 
-**Before any visual, layout, styling, copy, or component work, read [`UX.md`](UX.md).** It is the design guardrail file — how to keep Surge from looking "AI-generated / vibe-coded" (no purple or gradient soup), the mandatory type/color rules, how to follow a user-provided design reference, and the desktop + mobile self-check that must pass before UI work is considered done.
+**Before any visual, layout, styling, copy, or component work, read [`UX.md`](UX.md).** It is the design guardrail file — how to keep CraftLint from looking "AI-generated / vibe-coded" (no purple or gradient soup), the mandatory type/color rules, how to follow a user-provided design reference, and the desktop + mobile self-check that must pass before UI work is considered done.
 
-- `app/page.tsx`: positions Surge as retention craft review plus learn-from-each-post experimentation; upload keeps niche/rubric hints optional.
+- `app/page.tsx`: positions CraftLint as retention craft review plus learn-from-each-post experimentation; upload keeps niche/rubric hints optional.
 - `app/results/[id]/page.tsx`: AI retention craft dimensions, attention-risk map, explicit evidence notice, recommended experiment, and a separate 24h/7d/30d outcome timeline.
 - `app/results/[id]/improve/page.tsx`: attention-risk map, editing hypotheses, and next experiment; no projected performance.
 - `app/projects/page.tsx`: named project history, with unlinked posts sorted first and then newest-first; mixed-age latest counts are not comparisons.
@@ -146,7 +146,7 @@ Next.js 15 App Router requires `"use client"` for hooks such as `useParams`, `us
 - Providers: `HIKERAPI_KEY` (harvest); `RAPIDAPI_KEY` + `RAPIDAPI_IG_HOST` + `RAPIDAPI_IG_PATH` (Instagram likes). Cloudflare R2 uploads use `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` (only if upload persistence is enabled).
 - `SURGE_CALIBRATION_ENABLED` (default OFF): master kill-switch for the dormant AI-audits-AI calibration path. Read at call time. Leave OFF until `tools/craft_correlation.py` shows real, sample-justified signal.
 - `TRUSTED_PROXY_HOPS` (default 1): trusted reverse-proxy hops in front of the app, used to read the real client IP from `X-Forwarded-For` for rate limiting. 1 is correct for Railway's single edge proxy; only raise it if you add more trusted proxies.
-- `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (Surge Pro billing): all optional — without them the `/api/billing/*` routes return 503 and the app is unaffected (configured-off, like Google sign-in). The publishable key is not needed (Stripe-hosted Checkout). See `STRIPE_SETUP.md`.
+- `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (CraftLint Pro billing): all optional — without them the `/api/billing/*` routes return 503 and the app is unaffected (configured-off, like Google sign-in). The publishable key is not needed (Stripe-hosted Checkout). See `STRIPE_SETUP.md`.
 - `COMP_PRO_EMAILS` (optional): comma-separated, case-insensitive allowlist of emails granted Pro (unlimited) for free with no Stripe. Operator-only (server-side); used for owner/tester comp accounts. `auth.is_comp()` / `is_pro()`.
 
 ## Legal documents

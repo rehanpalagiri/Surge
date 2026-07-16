@@ -4,14 +4,14 @@ import { useState } from "react";
 import { createCheckoutSession, apiErrorDetail } from "@/lib/api";
 
 /**
- * Starts a Surge Pro subscription: calls our backend to create a Stripe Checkout
+ * Starts a CraftLint Pro subscription: calls our backend to create a Stripe Checkout
  * Session, then redirects to the hosted checkout page. Never talks to Stripe
  * directly from the browser.
  */
 export default function UpgradeButton({
   className,
   children,
-  label = "Upgrade to Surge Pro",
+  label = "Upgrade to CraftLint Pro",
 }: {
   className?: string;
   children?: React.ReactNode;

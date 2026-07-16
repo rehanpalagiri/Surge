@@ -479,7 +479,7 @@ export default function UploadZone({ platform = "tiktok", initialFile = null, pa
         {loggedIn && rateLimit && (
           rateLimit.unlimited ? (
             <div className="bg-surface border border-accent/30 rounded-xl px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-accent">Surge Pro — unlimited analyses</span>
+              <span className="text-sm font-semibold text-accent">CraftLint Pro — unlimited analyses</span>
               <span className="text-[11px] text-text-muted">{rateLimit.used} this month</span>
             </div>
           ) : (() => {

@@ -167,9 +167,13 @@ class BillingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get("/api/billing/status")).status_code, 401)
 
     async def test_checkout_503_when_unconfigured(self):
-        # Default test env has no STRIPE_SECRET_KEY/PRICE_ID -> not configured.
+        # Force the unconfigured state rather than assuming the ambient env is
+        # empty: a local .env with real STRIPE_SECRET_KEY/PRICE_ID would flip
+        # is_configured() to True and make this exercise the wrong path.
         auth = {"Authorization": f"Bearer {self.token}"}
-        r = await self.client.post("/api/billing/checkout", headers=auth)
+        with patch.object(billing, "STRIPE_SECRET_KEY", ""), \
+             patch.object(billing, "STRIPE_PRICE_ID", ""):
+            r = await self.client.post("/api/billing/checkout", headers=auth)
         self.assertEqual(r.status_code, 503)
 
 

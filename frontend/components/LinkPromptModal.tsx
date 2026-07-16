@@ -111,7 +111,7 @@ export default function LinkPromptModal() {
               Welcome back!
             </p>
             <p className="text-sm text-text-muted leading-relaxed">
-              Any questions about your results? Reply to any Surge email — we read every one.
+              Any questions about your results? Reply to any CraftLint email — we read every one.
             </p>
           </div>
         </div>

@@ -40,7 +40,7 @@ export default function GlobalError({
             marginBottom: 48,
           }}
         >
-          Surge
+          CraftLint
         </div>
 
         <h1

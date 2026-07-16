@@ -1,4 +1,4 @@
-# Portable container for the ViralIQ FastAPI backend.
+# Portable container for the CraftLint FastAPI backend.
 # Works on Render, Fly.io, Railway, or any container host.
 FROM python:3.11-slim
 

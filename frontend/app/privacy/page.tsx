@@ -1,7 +1,7 @@
 import Link from "next/link";
 import BrandLogo from "@/components/BrandLogo";
 
-export const metadata = { title: "Privacy Policy — Surge" };
+export const metadata = { title: "Privacy Policy — CraftLint" };
 
 function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
@@ -29,7 +29,7 @@ export default function PrivacyPage() {
 
         <Section title="Who we are">
           <p>
-            Surge is a video analysis tool operated as a sole proprietorship in the
+            CraftLint is a video analysis tool operated as a sole proprietorship in the
             United States. Questions or requests about your data:{" "}
             <a href="mailto:surgeprivacy@gmail.com" className="text-accent hover:underline">
               surgeprivacy@gmail.com
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
           <p>
             Every video you upload is sent to Google Gemini for analysis and
             permanently deleted from our servers within seconds of the analysis
-            completing. There is no copy of your video on Surge&apos;s
+            completing. There is no copy of your video on CraftLint&apos;s
             infrastructure after that point.
           </p>
         </Section>
@@ -111,7 +111,7 @@ export default function PrivacyPage() {
 
         <Section title="Children">
           <p>
-            Surge is available to users 13 and older. Users under 13 may not create
+            CraftLint is available to users 13 and older. Users under 13 may not create
             an account. Public metrics from users aged 13–17 are excluded from
             measurement research and cannot be opted in.
           </p>
@@ -135,7 +135,7 @@ export default function PrivacyPage() {
         <Section title="Changes to this policy">
           <p>
             If we make material changes, we&apos;ll update the effective date at the
-            top of this page. Continued use of Surge after changes means you accept
+            top of this page. Continued use of CraftLint after changes means you accept
             the updated policy.
           </p>
         </Section>

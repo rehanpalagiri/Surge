@@ -149,9 +149,9 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
     async def test_comp_email_gets_unlimited(self):
         # Operator comp allowlist grants Pro with no Stripe — case-insensitive.
         now = utc_now_naive()
-        with patch.dict(os.environ, {"COMP_PRO_EMAILS": "owner@surge.com, vip@x.com"}):
+        with patch.dict(os.environ, {"COMP_PRO_EMAILS": "owner@craftlint.com, vip@x.com"}):
             async with self.Session() as db:
-                user = User(username="owner", email="Owner@Surge.com", password_hash="x")
+                user = User(username="owner", email="Owner@CraftLint.com", password_hash="x")
                 db.add(user)
                 await db.flush()
                 db.add_all([self._analysis(user.id, "complete", now - timedelta(hours=i + 1)) for i in range(10)])
@@ -163,7 +163,7 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_non_comp_email_stays_free(self):
         now = utc_now_naive()
-        with patch.dict(os.environ, {"COMP_PRO_EMAILS": "owner@surge.com"}):
+        with patch.dict(os.environ, {"COMP_PRO_EMAILS": "owner@craftlint.com"}):
             async with self.Session() as db:
                 user = User(username="rando", email="rando@x.com", password_hash="x")
                 db.add(user)

@@ -1,7 +1,7 @@
 """Per-user analysis allowance.
 
 Tiers (chosen 2026-06-30):
-  • Surge Pro  → UNLIMITED analyses.
+  • CraftLint Pro  → UNLIMITED analyses.
   • Free       → 3 analyses per CALENDAR MONTH (UTC), resetting on the 1st.
 
 Bonus credits (both tiers retain the engagement loop, though it's moot for Pro):

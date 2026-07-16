@@ -1,7 +1,7 @@
-# UX.md — design guardrails for Surge
+# UX.md — design guardrails for CraftLint
 
 Read this before any visual, layout, styling, copy, or component work. It exists so
-Surge never ships a page that reads as "AI-generated." If you are only touching
+CraftLint never ships a page that reads as "AI-generated." If you are only touching
 backend, tests, or non-visual code, you don't need this file.
 
 The single source of visual truth is the **"Noir"** design system in
@@ -18,7 +18,7 @@ A "vibe-coded" site is what you get when a model reaches for the nearest default
 It has a recognizable smell. Never produce any of these:
 
 - **Purple / violet / indigo anything.** No purple hero, no `#6366F1`/indigo-600,
-  no violet-to-blue or purple-to-pink gradient. Purple is THE tell. Surge's palette
+  no violet-to-blue or purple-to-pink gradient. Purple is THE tell. CraftLint's palette
   is true black/white neutrals + one magnetic pink on purpose — the pink is a
   *signal*, not a wash; never flood a surface with it. The ONLY sanctioned purple
   in the entire app is the Instagram brand wordmark gradient (purple→yellow),
@@ -92,7 +92,7 @@ is the brief. Do this before writing CSS:
 1. **Extract, don't vibe.** Name the specific things that make it work: layout grid,
    spacing rhythm, type scale and pairing, color restraint, the ONE accent, border/
    radius/shadow treatment, density, motion. Write those down, then build to them.
-2. **Translate into Surge tokens.** Keep the reference's *structure and taste*, but
+2. **Translate into CraftLint tokens.** Keep the reference's *structure and taste*, but
    render it in the Noir palette and fonts — don't paste in the reference's colors
    (especially not if they're purple).
 3. **Match the level of polish, not just the layout.** Alignment, optical spacing,

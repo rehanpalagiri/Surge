@@ -94,7 +94,7 @@ export default function PricingPage() {
           {/* ── Pro ── */}
           <div className="bg-card border-2 border-accent/40 rounded-2xl p-7 flex flex-col gap-6 relative">
             <span className="absolute -top-3 left-7 bg-accent text-background text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
-              Surge Pro
+              CraftLint Pro
             </span>
             <div>
               <h2 className="text-text-primary font-bold text-lg">Pro</h2>

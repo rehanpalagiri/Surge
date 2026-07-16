@@ -700,7 +700,7 @@ export default function AdminPage() {
                       </div>
 
                       <div className="bg-surface/60 border border-border rounded-xl px-4 py-3 text-xs text-text-muted">
-                        Legacy seed tool: Surge creates an observable craft record and attaches
+                        Legacy seed tool: CraftLint creates an observable craft record and attaches
                         an internal outcome band. These records do not affect new live craft reviews. The video is deleted afterward. If
                         analysis fails, the seed is not saved — just retry.
                       </div>

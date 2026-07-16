@@ -2,7 +2,7 @@
 
 Aggregates the `safe_to_learn_from=true` corrections written by `audit_prediction`
 (Build #5) into a single bounded calibration note per (platform, niche), or the
-literal "GLOBAL" pseudo-niche. The note tells the grader where Surge systematically
+literal "GLOBAL" pseudo-niche. The note tells the grader where CraftLint systematically
 over- or under-rates, as soft guidance — NOT hard math.
 
 The real danger here was never accuracy — it was runaway self-reinforcement and
@@ -137,8 +137,8 @@ def _build_calibration_prompt(
         for c in corrections
     ]
     corrections_json = json.dumps(slim, indent=2)
-    return f"""ROLE: You are a calibration auditor for the Surge video scoring AI. You are given a batch of
-post-hoc corrections — each one compares a past Surge prediction to the REAL outcome. Find ONLY
+    return f"""ROLE: You are a calibration auditor for the CraftLint video scoring AI. You are given a batch of
+post-hoc corrections — each one compares a past CraftLint prediction to the REAL outcome. Find ONLY
 systematic, consistent miscalibrations. The reader is another AI.
 
 NICHE: {niche}

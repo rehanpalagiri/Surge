@@ -1,4 +1,4 @@
-"""Surge Pro billing routes (Stripe).
+"""CraftLint Pro billing routes (Stripe).
 
 - POST /api/billing/checkout  (auth) → hosted Checkout URL to start a subscription
 - POST /api/billing/portal    (auth) → Stripe billing-portal URL (manage / cancel)
@@ -49,11 +49,11 @@ async def create_checkout(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Start a Surge Pro subscription. Returns a Stripe hosted-checkout URL."""
+    """Start a CraftLint Pro subscription. Returns a Stripe hosted-checkout URL."""
     if not billing.is_configured():
         raise HTTPException(status_code=503, detail="Billing isn't configured yet.")
     if is_pro(user):
-        raise HTTPException(status_code=409, detail="You're already on Surge Pro.")
+        raise HTTPException(status_code=409, detail="You're already on CraftLint Pro.")
     try:
         url = await billing.create_checkout_session(user, db)
     except Exception as exc:  # Stripe / network error — don't leak internals
@@ -116,15 +116,15 @@ async def stripe_webhook(
 
 
 async def _send_payment_failed_email(to_email: str, username: str) -> None:
-    """Notify a user their Surge Pro payment failed (uses the shared sender)."""
+    """Notify a user their CraftLint Pro payment failed (uses the shared sender)."""
     from routers.auth import _send_email, _FRONTEND_URL
     import html as _html
     safe = _html.escape(username)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#6d28d9">Your Surge Pro payment didn't go through</h2>
+      <h2 style="color:#6d28d9">Your CraftLint Pro payment didn't go through</h2>
       <p>Hi <strong>{safe}</strong>,</p>
-      <p>We couldn't process your latest Surge Pro payment. Your Pro access stays
+      <p>We couldn't process your latest CraftLint Pro payment. Your Pro access stays
          active while we retry, but please update your card to avoid losing it.</p>
       <p style="margin:24px 0">
         <a href="{_FRONTEND_URL}/settings"
@@ -132,13 +132,13 @@ async def _send_payment_failed_email(to_email: str, username: str) -> None:
           Update payment method →
         </a>
       </p>
-      <p style="color:#888;font-size:12px">— The Surge team</p>
+      <p style="color:#888;font-size:12px">— The CraftLint team</p>
     </div>
     """
     plain = (
         f"Hi {username},\n\n"
-        f"We couldn't process your latest Surge Pro payment. Your Pro access stays "
+        f"We couldn't process your latest CraftLint Pro payment. Your Pro access stays "
         f"active while we retry — update your card at {_FRONTEND_URL}/settings to keep it.\n\n"
-        f"— The Surge team"
+        f"— The CraftLint team"
     )
-    await _send_email(to_email, "Action needed: your Surge Pro payment failed", html, plain)
+    await _send_email(to_email, "Action needed: your CraftLint Pro payment failed", html, plain)

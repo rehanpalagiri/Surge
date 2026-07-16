@@ -1,4 +1,4 @@
-# Fly.io config for the ViralIQ backend — for the later transition off Render.
+# Fly.io config for the CraftLint backend — for the later transition off Render.
 # It reuses the same Dockerfile, so switching hosts needs no code changes.
 #
 # To deploy:

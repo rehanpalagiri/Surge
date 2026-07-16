@@ -1,4 +1,4 @@
-"""Load / stress test for the Surge API.
+"""Load / stress test for the CraftLint API.
 
 Fires a controlled number of concurrent requests at the read-path endpoints and
 reports throughput, latency percentiles, and error rate at several concurrency
@@ -185,7 +185,7 @@ def fmt_row(r: Result) -> str:
 
 
 async def main() -> int:
-    ap = argparse.ArgumentParser(description="Surge API load test")
+    ap = argparse.ArgumentParser(description="CraftLint API load test")
     ap.add_argument("--base", default="http://127.0.0.1:8000")
     ap.add_argument("--levels", default="1,100,1000",
                     help="comma-separated concurrency levels")
@@ -216,7 +216,7 @@ async def main() -> int:
                           max_keepalive_connections=max(levels) + 50)
     report: dict = {"base": args.base, "seed_id": seed_id, "scenarios": {}}
 
-    print(f"\nSurge API stress test → {args.base}")
+    print(f"\nCraftLint API stress test → {args.base}")
     print(f"levels={levels}  requests/conn={args.requests_per_conn}  "
           f"(capped at {args.max_total}/scenario-level)\n")
 

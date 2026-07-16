@@ -23,30 +23,30 @@ import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Surge — AI Retention Craft Review",
+  title: "CraftLint — AI Retention Craft Review",
   description:
     "Find attention risks in your TikTok or Instagram Reel before you post it.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Surge",
+    title: "CraftLint",
   },
   icons: {
     icon: [{ url: "/icon.png", sizes: "192x192", type: "image/png" }],
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
-    title: "Surge — Find retention risks before you post",
+    title: "CraftLint — Find retention risks before you post",
     description:
       "Review observable retention craft before posting, then track verified results at comparable post ages.",
     url: SITE_URL,
-    siteName: "Surge",
+    siteName: "CraftLint",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Surge — Find retention risks before you post",
+    title: "CraftLint — Find retention risks before you post",
     description:
       "Review observable retention craft before posting, then track verified results at comparable post ages.",
   },

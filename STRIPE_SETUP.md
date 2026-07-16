@@ -1,6 +1,6 @@
-# Surge Pro — Stripe setup
+# CraftLint Pro — Stripe setup
 
-The **code** for Surge Pro ($9.99/mo) is built, wired, and tested. What's left is
+The **code** for CraftLint Pro ($9.99/mo) is built, wired, and tested. What's left is
 the dashboard + environment work that can only be done in your accounts. This
 doc maps every step. Until the env vars are set, the billing routes return 503
 and nothing else is affected — so you can deploy the code first and flip billing
@@ -34,7 +34,7 @@ on whenever you're ready.
 
 ## Step 2 — Product & price (you)
 
-1. Product catalog → **Add product** → name **"Surge Pro"**.
+1. Product catalog → **Add product** → name **"CraftLint Pro"**.
 2. Add a **recurring** price: **$9.99 / month**.
 3. Copy the **Price ID** (`price_…`).
 
@@ -81,7 +81,7 @@ uvicorn main:app --reload --port 8000
 stripe listen --forward-to localhost:8000/api/billing/webhook
 
 # 3. From the app, click "Upgrade" → pay with 4242…  → you should land on
-#    /billing/success and Settings should show "Surge Pro ✦".
+#    /billing/success and Settings should show "CraftLint Pro ✦".
 ```
 
 ### Checklist (maps to your original list)

@@ -177,7 +177,7 @@ miscalibrated, and the confidence of that assessment.
 
 Use these in your SCORING CALIBRATION FOR THIS NICHE and DIMENSION WEIGHTS sections: if corrections
 show a consistent direction (over_rate/under_rate) across multiple entries for the same dimension,
-name the bias explicitly — e.g. "Historical bias: Surge over-rates hook_velocity in this niche —
+name the bias explicitly — e.g. "Historical bias: CraftLint over-rates hook_velocity in this niche —
 apply extra scrutiny to hook scores here." Only flag a bias if multiple corrections agree.
 """
     else:

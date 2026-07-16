@@ -88,7 +88,7 @@ function BillingCard() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-text-primary font-semibold text-lg flex items-center gap-2">
-            {status.is_pro ? <>Surge Pro <span className="text-accent">✦</span></> : "Plan"}
+            {status.is_pro ? <>CraftLint Pro <span className="text-accent">✦</span></> : "Plan"}
           </h2>
           {status.comp ? (
             <p className="text-text-muted text-sm mt-0.5">

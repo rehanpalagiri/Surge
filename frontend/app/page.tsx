@@ -328,7 +328,7 @@ function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; on
         {/* Footer */}
         <footer className="border-t border-border px-6 py-5">
           <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-text-muted/80">
-            <span>© {new Date().getFullYear()} Surge</span>
+            <span>© {new Date().getFullYear()} CraftLint</span>
             <div className="flex gap-4">
               <Link href="/pricing" className="hover:text-text-primary transition-colors">Pricing</Link>
               <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
@@ -397,7 +397,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         <div className="surge-progress" ref={progressRef} aria-hidden />
         <header className="surge-nav">
           <BrandLogo className="text-[21px]" />
-          <nav><a href="#how">How it works</a><a href="#report">Sample report</a><Link href="/login">Log in</Link><ThemeToggle/><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
+          <nav><a href="#how">How it works</a><Link href="/sample">Sample report</Link><Link href="/login">Log in</Link><ThemeToggle/><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
         </header>
 
         {deleted && <div className="surge-toast">Your account has been deleted.<button onClick={onDismissDeleted} aria-label="Dismiss">×</button></div>}
@@ -406,13 +406,13 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
           <div className="surge-hero-copy">
             <div className="surge-eyebrow"><Sparkles size={14}/> BUILT FOR SHORT-FORM CREATORS</div>
             <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
-            <p>Surge finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
-            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link><a className="surge-demo" href="#report"><span><Play size={14}/></span> See a sample report</a></div>
+            <p>CraftLint finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
+            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link><Link className="surge-demo" href="/sample"><span><Play size={14}/></span> See a sample report</Link></div>
             <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Tooltip label="Your uploaded video is analyzed privately"><Lock size={13}/></Tooltip> Videos stay private</span><span>No card</span></div>
           </div>
 
-          <div className="surge-monitor" aria-label="Example Surge craft review">
-            <div className="surge-monitor-bar"><span className="surge-dots">● ● ●</span><span>surge / craft review</span><span className="surge-live"><b/> Review ready</span></div>
+          <div className="surge-monitor" aria-label="Example CraftLint craft review">
+            <div className="surge-monitor-bar"><span className="surge-dots">● ● ●</span><span>craftlint / craft review</span><span className="surge-live"><b/> Review ready</span></div>
             <div className="surge-monitor-body">
               <div className="surge-video-frame"><div className="surge-video-copy">3 editing tricks<br/><b>nobody tells you</b></div><div className="surge-person"/><div className="surge-timeline"><span>0:09</span><i/></div><label><Tooltip label="AI-estimated craft issue"><Eye size={11}/></Tooltip> Attention risk</label></div>
               <div className="surge-analysis"><div className="surge-analysis-head"><span>Attention risk map <Tooltip label="AI-estimated craft diagnostic, not measured audience retention"><span className="surge-help">?</span></Tooltip></span><b>0:08–0:12</b></div><div className="surge-chart" aria-label="Attention risk drops around 0:09"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 0 14 L 29 18.5 L 55 23.5 L 64.5 37.5 L 100 46"/></svg><span className="surge-chart-marker" aria-hidden="true"/></div><div className="surge-finding"><span>HIGH RISK · TEXT SCANNABILITY</span><strong>Your caption sits in TikTok&apos;s UI zone.</strong><p>Move it to the upper third and tighten the pause.</p></div><button>Show me the fix <ArrowRight size={15}/></button></div>
@@ -421,11 +421,9 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
           </div>
         </section>
 
-        <section className="surge-how" id="how"><div className="surge-section-heading surge-left surge-reveal"><span>HOW IT WORKS</span><h2>From rough cut to<br/><em>ready to post.</em></h2></div><div className="surge-step-grid"><article className="surge-reveal"><b>01</b><div className="surge-step-art"><Upload size={25}/><i/><i/><i/></div><h3>Drop your draft</h3><p>Upload the version sitting in your camera roll. No account needed.</p></article><article className="surge-reveal"><b>02</b><div className="surge-step-art scan"><span>Scanning hook</span><i/></div><h3>Surge reads the edit</h3><p>We review hook, pacing, captions, tension, sync, and ending.</p></article><article className="surge-reveal"><b>03</b><div className="surge-step-art fix"><Check size={25}/><i/><i/><i/></div><h3>Fix what matters</h3><p>Get timestamped changes you can make before your next post.</p></article></div></section>
+        <section className="surge-how" id="how"><div className="surge-section-heading surge-left surge-reveal"><span>HOW IT WORKS</span><h2>From rough cut to<br/><em>ready to post.</em></h2></div><div className="surge-step-grid"><article className="surge-reveal"><b>01</b><div className="surge-step-art drop"><div className="drop-frame"><span className="drop-tile drop-tile-back"/><div className="drop-tile drop-tile-front"><span className="drop-play"><Play size={13}/></span><span className="drop-dur">0:14</span></div></div><span className="drop-badge"><Upload size={14}/></span></div><h3>Drop your draft</h3><p>Upload the version sitting in your camera roll. No account needed.</p></article><article className="surge-reveal"><b>02</b><div className="surge-step-art read"><div className="read-frame"><span className="read-tag"><Eye size={10}/> Reading hook</span><span className="read-scan"/><div className="read-cap"><i/><i/></div><div className="read-wave"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div></div><h3>CraftLint reads the edit</h3><p>We review hook, pacing, captions, tension, sync, and ending.</p></article><article className="surge-reveal"><b>03</b><div className="surge-step-art fix"><Check size={25}/><i/><i/><i/></div><h3>Fix what matters</h3><p>Get timestamped changes you can make before your next post.</p></article></div></section>
 
-        <section className="surge-report" id="report"><div className="surge-report-inner"><div className="surge-report-copy surge-reveal"><span>AN ACTUAL SURGE REPORT</span><h2>Feedback that speaks<br/>creator, <em>not corporate.</em></h2><p>Every review turns six craft signals into one clear next experiment.</p><div className="surge-score-list">{SAMPLE_SCORES.slice(0, 4).map((sc) => <div key={sc.label}><span>{sc.label}</span><b>{sc.score}/10</b><i><em style={{ width: `${sc.score * 10}%` }}/></i></div>)}</div></div><div className="surge-report-card surge-reveal"><div><span>BIGGEST ATTENTION LEAK · {SAMPLE_RISK.section}</span><h3>Make the moment easier to read.</h3><p>{SAMPLE_RISK.reason}</p></div><a href="/sample">Explore the full sample report <ArrowRight size={16}/></a></div></div></section>
-
-        <footer className="surge-footer"><BrandLogo className="text-[21px]" /><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} Surge</small></footer>
+        <footer className="surge-footer"><BrandLogo className="text-[21px]" /><span>Make every second count.</span><div><Link href="/pricing">Pricing</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div><small>© {new Date().getFullYear()} CraftLint</small></footer>
       </main>
     </>
   );
@@ -510,7 +508,7 @@ export default function Home() {
       {/* ── Footer ── */}
       <footer className="border-t border-border px-4 py-8">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-text-muted">
-          <span>© {new Date().getFullYear()} Surge</span>
+          <span>© {new Date().getFullYear()} CraftLint</span>
           <div className="flex items-center gap-4">
             <Link href="/pricing" className="hover:text-text-primary transition-colors">Pricing</Link>
             <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy Policy</Link>

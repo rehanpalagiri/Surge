@@ -1,4 +1,4 @@
-# Surge — Performance, Load & Rendering Notes
+# CraftLint — Performance, Load & Rendering Notes
 
 A from-the-ground audit of the analyze flow, the API under load, and the
 frontend's rendering model — plus the changes made and how to reproduce the

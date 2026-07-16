@@ -14,7 +14,7 @@ export default function BillingCancelPage() {
           Upgrade any time for unlimited.
         </p>
         <div className="flex flex-col items-center gap-3">
-          <UpgradeButton label="Try Surge Pro again" />
+          <UpgradeButton label="Try CraftLint Pro again" />
           <Link href="/" className="text-text-muted hover:text-text-primary text-sm">
             Back to dashboard
           </Link>

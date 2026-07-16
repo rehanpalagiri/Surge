@@ -1,4 +1,4 @@
-export const metadata = { title: "Log in — Surge" };
+export const metadata = { title: "Log in — CraftLint" };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

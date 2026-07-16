@@ -1,4 +1,4 @@
-"""Stripe billing for Surge Pro ($9.99/mo).
+"""Stripe billing for CraftLint Pro ($9.99/mo).
 
 Design rules (mirrors the rest of the codebase):
   - The signature-verified webhook is the ONLY writer of subscription state.

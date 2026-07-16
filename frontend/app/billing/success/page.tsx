@@ -35,7 +35,7 @@ function SuccessInner() {
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center bg-card border border-accent/30 rounded-2xl p-8 shadow-xl shadow-black/5">
         <div className="text-5xl mb-4">🎉</div>
-        <h1 className="text-2xl font-extrabold text-text-primary mb-2">Welcome to Surge Pro</h1>
+        <h1 className="text-2xl font-extrabold text-text-primary mb-2">Welcome to CraftLint Pro</h1>
         <p className="text-text-muted text-sm mb-6">
           You now have <span className="text-accent font-semibold">unlimited analyses</span>.
           {confirmed ? " Your account is upgraded and ready." : " We're finalizing your account…"}

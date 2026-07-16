@@ -99,7 +99,7 @@ function SignupForm() {
       return;
     }
     if (calcAge(bd) < 13) {
-      setError("You must be 13 or older to use Surge.");
+      setError("You must be 13 or older to use CraftLint.");
       return;
     }
     if (!agreed) {
@@ -252,7 +252,7 @@ function SignupForm() {
                 return <p className="text-danger text-xs mt-1.5">That date doesn&apos;t exist — double-check it.</p>;
               }
               if (calcAge(bd) < 13) {
-                return <p className="text-danger text-xs mt-1.5">You must be 13 or older to use Surge.</p>;
+                return <p className="text-danger text-xs mt-1.5">You must be 13 or older to use CraftLint.</p>;
               }
               return null;
             })()}
@@ -266,7 +266,7 @@ function SignupForm() {
               className="mt-0.5 accent-accent"
             />
             <span className="text-text-muted text-xs leading-relaxed">
-              I agree to Surge&apos;s{" "}
+              I agree to CraftLint&apos;s{" "}
               <Link href="/terms" target="_blank" className="text-accent hover:underline">
                 Terms of Service
               </Link>{" "}

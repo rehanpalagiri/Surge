@@ -1,6 +1,6 @@
 {
-  "name": "Surge",
-  "short_name": "Surge",
+  "name": "CraftLint",
+  "short_name": "CraftLint",
   "description": "AI-assisted retention craft review and post experiment tracking",
   "start_url": "/",
   "display": "standalone",

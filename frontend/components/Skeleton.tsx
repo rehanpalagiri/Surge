@@ -100,7 +100,7 @@ export function SkeletonMedia({ className = "" }: { className?: string }) {
 
 export function LandingSkeleton() {
   return (
-    <main className="surge-skeleton min-h-screen bg-background" aria-busy="true" aria-label="Loading Surge">
+    <main className="surge-skeleton min-h-screen bg-background" aria-busy="true" aria-label="Loading CraftLint">
       <header className="surge-skeleton-nav">
         <Skeleton className="h-8 w-28 rounded-lg" />
         <Skeleton className="h-9 w-24 rounded-lg" />

@@ -6,19 +6,19 @@ type BrandLogoProps = {
   ariaLabel?: string;
 };
 
-/** The canonical Surge wordmark used everywhere in the product. */
+/** The canonical CraftLint wordmark used everywhere in the product. */
 export default function BrandLogo({
   className = "",
   href = "/",
-  ariaLabel = "Surge home",
+  ariaLabel = "CraftLint home",
 }: BrandLogoProps) {
   const classes = `surge-wordmark ${className}`.trim();
 
-  if (!href) return <span className={classes}>Surge</span>;
+  if (!href) return <span className={classes}>CraftLint</span>;
 
   return (
     <Link href={href} className={classes} aria-label={ariaLabel}>
-      Surge
+      CraftLint
     </Link>
   );
 }

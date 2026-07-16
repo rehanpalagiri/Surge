@@ -741,7 +741,7 @@ export async function getRateLimit(): Promise<RateLimitStatus> {
   return handleResponse<RateLimitStatus>(res);
 }
 
-// ── Billing (Surge Pro) ────────────────────────────────────────────────────
+// ── Billing (CraftLint Pro) ────────────────────────────────────────────────────
 export interface BillingStatus {
   plan: "free" | "pro";
   is_pro: boolean;
@@ -758,7 +758,7 @@ export async function getBillingStatus(): Promise<BillingStatus> {
   return handleResponse<BillingStatus>(res);
 }
 
-/** Start a Surge Pro subscription — returns the Stripe hosted-checkout URL. */
+/** Start a CraftLint Pro subscription — returns the Stripe hosted-checkout URL. */
 export async function createCheckoutSession(): Promise<{ url: string }> {
   const res = await fetch(`${BASE}/api/billing/checkout`, {
     method: "POST",

@@ -179,7 +179,7 @@ async def _ensure_columns(conn):
         await conn.exec_driver_sql(
             "ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 1"
         )
-    # --- users: Stripe billing (Surge Pro) ---
+    # --- users: Stripe billing (CraftLint Pro) ---
     for col, ddl in (
         ("stripe_customer_id", "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT"),
         ("stripe_subscription_id", "ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT"),
@@ -245,7 +245,7 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS seed_consent VARCHAR DEFAULT 'ask'",
         # DEFAULT TRUE grandfathers existing accounts as verified.
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE",
-        # Stripe billing (Surge Pro). Written only by the verified webhook.
+        # Stripe billing (CraftLint Pro). Written only by the verified webhook.
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR",
@@ -357,7 +357,7 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_wrapper)
 
 
-app = FastAPI(title="Surge API", lifespan=lifespan)
+app = FastAPI(title="CraftLint API", lifespan=lifespan)
 
 # Compress JSON/text responses on the wire. Analysis payloads (scores_json with
 # the full critique + improvement plan) are ~8–20 KB of highly repetitive JSON;

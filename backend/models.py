@@ -71,7 +71,7 @@ class User(Base):
     # 6-digit code; the migration backfills existing accounts to True so they
     # are never locked out by this feature.
     email_verified = Column(Boolean, nullable=False, default=False)
-    # ── Billing (Surge Pro via Stripe) ──────────────────────────────────────
+    # ── Billing (CraftLint Pro via Stripe) ──────────────────────────────────────
     # subscription_status is Stripe's raw value ("active", "trialing",
     # "past_due", "canceled", …) and is the single source of truth for Pro
     # access — see auth.is_pro(). All four fields are written ONLY by the

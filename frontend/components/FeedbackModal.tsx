@@ -98,7 +98,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
           </p>
         )}
         <p className="text-text-muted text-sm mt-1">
-          This helps Surge evaluate whether its craft assessments are useful.
+          This helps CraftLint evaluate whether its craft assessments are useful.
           {fetchedStats && " You can refresh these stats from Projects as your video grows."}
         </p>
       </div>
@@ -113,7 +113,7 @@ export default function FeedbackModal({ analysisId, platform = "tiktok", onSubmi
       <p className="text-text-muted text-sm mb-4">
         {isTikTok
           ? manualMode
-              ? "Share your observed stats to help evaluate Surge's craft assessments."
+              ? "Share your observed stats to help evaluate CraftLint's craft assessments."
             : "Paste your posted TikTok link and we'll pull the real numbers — no typing, always current."
           : manualMode
             ? "Enter the Reel's observed public likes. Instagram views are not used until their meaning is verified."

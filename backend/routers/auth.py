@@ -32,7 +32,7 @@ _SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 _SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 _SMTP_USER = os.getenv("SMTP_USER", "")
 _SMTP_PASS = os.getenv("SMTP_PASS", "")
-_EMAIL_FROM = os.getenv("EMAIL_FROM", f"Surge <{_SMTP_USER}>" if _SMTP_USER else "")
+_EMAIL_FROM = os.getenv("EMAIL_FROM", f"CraftLint <{_SMTP_USER}>" if _SMTP_USER else "")
 _FRONTEND_URL = os.getenv("FRONTEND_URL", "https://surge-chi-khaki.vercel.app")
 # Brevo HTTP API key (xkeysib-...). Preferred transport: HTTPS/443 works on hosts
 # like Railway that block all outbound SMTP ports (587/2525/465/25). SMTP is the
@@ -112,7 +112,7 @@ async def signup(payload: SignupIn, request: Request, background_tasks: Backgrou
         raise HTTPException(status_code=400, detail="Please enter a valid date of birth.")
     age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
     if age < 13:
-        raise HTTPException(status_code=403, detail="You must be 13 or older to use Surge.")
+        raise HTTPException(status_code=403, detail="You must be 13 or older to use CraftLint.")
 
     existing_email = await db.execute(
         select(User).where(func.lower(User.email) == email)
@@ -249,7 +249,7 @@ async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, 
             raise HTTPException(status_code=400, detail="Please enter a valid date of birth.")
         age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
         if age < 13:
-            raise HTTPException(status_code=403, detail="You must be 13 or older to use Surge.")
+            raise HTTPException(status_code=403, detail="You must be 13 or older to use CraftLint.")
         birth_year, birth_date = bd.year, payload.birth_date
         consent = "no" if age < 18 else "ask"
 
@@ -461,12 +461,12 @@ async def reset_password(payload: ResetPasswordIn, request: Request, db: AsyncSe
 
 
 def _parse_sender(raw: str) -> tuple[str, str]:
-    """Split 'Surge <foo@bar.com>' into ('Surge', 'foo@bar.com'). Falls back to the
+    """Split 'CraftLint <foo@bar.com>' into ('CraftLint', 'foo@bar.com'). Falls back to the
     raw value as the address with a default display name."""
     m = re.match(r"^\s*(.*?)\s*<\s*([^>]+?)\s*>\s*$", raw)
     if m:
-        return (m.group(1) or "Surge"), m.group(2)
-    return "Surge", raw.strip()
+        return (m.group(1) or "CraftLint"), m.group(2)
+    return "CraftLint", raw.strip()
 
 
 async def _send_via_brevo_api(to_email: str, subject: str, html: str, plain: str) -> bool:
@@ -558,26 +558,26 @@ async def _send_reset_email(to_email: str, username: str, code: str) -> None:
     safe_username = _html.escape(username)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#6d28d9">Surge — Password Reset</h2>
+      <h2 style="color:#6d28d9">CraftLint — Password Reset</h2>
       <p>Hi <strong>{safe_username}</strong>,</p>
       <p>Your password reset code is:</p>
       <p style="margin:24px 0;text-align:center">
         <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#6d28d9">{code}</span>
       </p>
       <p style="color:#888;font-size:13px">
-        Enter this code on the Surge reset page. It expires in 1 hour.
+        Enter this code on the CraftLint reset page. It expires in 1 hour.
         If you didn't request this, ignore this email — your password won't change.
       </p>
-      <p style="color:#888;font-size:12px">— The Surge team</p>
+      <p style="color:#888;font-size:12px">— The CraftLint team</p>
     </div>
     """
     plain = (
         f"Hi {username},\n\n"
-        f"Your Surge password reset code is: {code}\n\n"
+        f"Your CraftLint password reset code is: {code}\n\n"
         f"It expires in 1 hour. If you didn't request this, ignore this email.\n\n"
-        f"— The Surge team"
+        f"— The CraftLint team"
     )
-    await _send_email(to_email, "Reset your Surge password", html, plain)
+    await _send_email(to_email, "Reset your CraftLint password", html, plain)
 
 
 async def _send_verification_email(to_email: str, username: str, code: str) -> None:
@@ -586,30 +586,30 @@ async def _send_verification_email(to_email: str, username: str, code: str) -> N
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Confirm your email</h2>
       <p>Hi <strong>{safe_username}</strong>,</p>
-      <p>Welcome to Surge! Enter this code to confirm your email address:</p>
+      <p>Welcome to CraftLint! Enter this code to confirm your email address:</p>
       <p style="margin:24px 0;text-align:center">
         <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#6d28d9">{code}</span>
       </p>
       <p style="color:#888;font-size:13px">
-        This code expires in 24 hours. If you didn't create a Surge account, ignore this email.
+        This code expires in 24 hours. If you didn't create a CraftLint account, ignore this email.
       </p>
-      <p style="color:#888;font-size:12px">— The Surge team</p>
+      <p style="color:#888;font-size:12px">— The CraftLint team</p>
     </div>
     """
     plain = (
         f"Hi {username},\n\n"
-        f"Welcome to Surge! Your email confirmation code is: {code}\n\n"
+        f"Welcome to CraftLint! Your email confirmation code is: {code}\n\n"
         f"It expires in 24 hours. If you didn't create an account, ignore this email.\n\n"
-        f"— The Surge team"
+        f"— The CraftLint team"
     )
-    await _send_email(to_email, "Confirm your Surge email", html, plain)
+    await _send_email(to_email, "Confirm your CraftLint email", html, plain)
 
 
 async def _send_welcome_email(to_email: str, username: str) -> None:
     safe_username = _html.escape(username)
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#6d28d9">Welcome to Surge, {safe_username}!</h2>
+      <h2 style="color:#6d28d9">Welcome to CraftLint, {safe_username}!</h2>
       <p>You're all set. Upload your first video for an AI-assisted craft review and a clear experiment to test.</p>
       <p style="margin:24px 0">
         <a href="{_FRONTEND_URL}"
@@ -621,13 +621,13 @@ async def _send_welcome_email(to_email: str, username: str) -> None:
         Upgrade to <strong>Thinking</strong> or <strong>Deep</strong> mode for a detailed breakdown
         and personalised tips based on your channel's history.
       </p>
-      <p style="color:#888;font-size:12px">— The Surge team</p>
+      <p style="color:#888;font-size:12px">— The CraftLint team</p>
     </div>
     """
     plain = (
-        f"Welcome to Surge, {username}!\n\n"
+        f"Welcome to CraftLint, {username}!\n\n"
         f"You're all set. Upload your first video at {_FRONTEND_URL} "
         f"for an AI-assisted craft review and a clear experiment to test.\n\n"
-        f"— The Surge team"
+        f"— The CraftLint team"
     )
-    await _send_email(to_email, "Welcome to Surge 🎬", html, plain)
+    await _send_email(to_email, "Welcome to CraftLint 🎬", html, plain)

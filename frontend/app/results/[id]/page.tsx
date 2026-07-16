@@ -222,7 +222,7 @@ function SeedConsentBanner({ analysis }: { analysis: AnalysisOut }) {
       <div>
         <p className="text-text-primary font-semibold">Help other creators?</p>
         <p className="text-text-muted text-sm mt-1">
-          Your post got {views}. With your permission, Surge can retain the public metrics
+          Your post got {views}. With your permission, CraftLint can retain the public metrics
           as research data. They are not treated as proof that a specific edit caused the result.
         </p>
       </div>

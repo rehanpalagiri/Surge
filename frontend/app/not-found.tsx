@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
       <Link href="/" className="font-extrabold text-xl text-text-primary tracking-tight mb-12 font-display">
-        Surge
+        CraftLint
       </Link>
 
       <p className="text-7xl sm:text-8xl font-extrabold text-text-primary tracking-tight">404</p>

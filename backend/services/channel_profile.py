@@ -9,7 +9,7 @@ system's own past opinions for external validation:
 
   A. VERIFIED PERFORMANCE — only rows with a real `actual_views` logged. The gold
      anchor for predictions. Needs >= 2 such rows.
-  B. SELF-ASSESSMENT TRENDS — derived from past `scores_json` (Surge's own prior
+  B. SELF-ASSESSMENT TRENDS — derived from past `scores_json` (CraftLint's own prior
      scoring). Explicitly labelled as internal opinion, used only to flag recurring
      patterns.
 
@@ -127,7 +127,7 @@ def build_channel_profile(analyses: list) -> str | None:
             )
 
     trends_block = (
-        "SELF-ASSESSMENT TRENDS (Surge's own prior scoring of this creator — "
+        "SELF-ASSESSMENT TRENDS (CraftLint's own prior scoring of this creator — "
         "internal opinion, NOT external proof):\n" + "\n".join(trend_lines)
         if trend_lines else ""
     )
@@ -153,7 +153,7 @@ def build_channel_profile(analyses: list) -> str | None:
 
     blocks = [
         "CREATOR CHANNEL PROFILE (this creator's own history — personalize to it, "
-        "but treat Surge's past scores as opinion, not validation):",
+        "but treat CraftLint's past scores as opinion, not validation):",
         verified_block,
         trends_block,
         history_block,

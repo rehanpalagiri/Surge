@@ -99,7 +99,7 @@ async def _pop_pending(db: AsyncSession, r2_key: str) -> Optional[tuple[int | No
 
 
 def _limit_message(rl: dict) -> str:
-    """Friendly 429 copy. Free users who hit the monthly cap are steered to Surge
+    """Friendly 429 copy. Free users who hit the monthly cap are steered to CraftLint
     Pro (and the earn-by-linking bonus); a Pro user who trips the daily fair-use
     ceiling gets a distinct message that never implies they should 'upgrade'."""
     if rl.get("tier") == "pro" and rl.get("limit_reason") == "fair_use":
@@ -108,7 +108,7 @@ def _limit_message(rl: dict) -> str:
             resets = f" It resets on {str(rl['fair_use_resets_at'])[:10]} (UTC)."
         return (
             f"You've reached today's fair-use limit of {rl.get('fair_use_daily_limit')} "
-            f"analyses on Surge Pro.{resets} This keeps the service fast for everyone — "
+            f"analyses on CraftLint Pro.{resets} This keeps the service fast for everyone — "
             f"reach out if you routinely need a higher daily volume."
         )
     limit = rl.get("effective_limit")
@@ -121,7 +121,7 @@ def _limit_message(rl: dict) -> str:
         resets = f" Your free analyses reset on {str(rl['resets_at'])[:10]}."
     return (
         f"You've used all {limit} free analyses this month. "
-        f"Upgrade to Surge Pro for unlimited analyses.{bonus_tip}{resets}"
+        f"Upgrade to CraftLint Pro for unlimited analyses.{bonus_tip}{resets}"
     )
 
 
@@ -487,7 +487,7 @@ async def analyze(
     if _explicit_secondary and _explicit_secondary.lower() != raw_niche.lower():
         secondary_niche = _match_canonical(_explicit_secondary) or _explicit_secondary
     # Rides along in scores_json (no schema change) so the frontend can prompt the
-    # user to confirm/correct a niche Surge wasn't sure about (#4).
+    # user to confirm/correct a niche CraftLint wasn't sure about (#4).
     niche_needs_confirmation = niche_class["needs_confirmation"]
 
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")

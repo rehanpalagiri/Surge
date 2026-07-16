@@ -17,7 +17,7 @@ export default function Error({
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center">
       <Link href="/" className="font-extrabold text-xl text-text-primary tracking-tight mb-12 font-display">
-        Surge
+        CraftLint
       </Link>
 
       <h1 className="mt-4 text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">

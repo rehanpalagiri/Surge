@@ -137,7 +137,7 @@ export default function SamplePage() {
 
         <div className="text-center pb-4">
           <Link href="/" className="text-text-muted text-sm hover:text-text-primary transition-colors">
-            ← Back to Surge
+            ← Back to CraftLint
           </Link>
         </div>
       </div>

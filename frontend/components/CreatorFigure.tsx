@@ -1,5 +1,5 @@
 // Cinematic creator silhouette used inside the landing "video" surfaces
-// (the hero craft-review frame and the "Surge reads the edit" scan card).
+// (the hero craft-review frame and the "CraftLint reads the edit" scan card).
 // Rendered as a single self-contained SVG so it stays crisp at any size and
 // theme-aware via CSS tokens. It reads as a real short-form video still:
 // a ring-lit portrait with a pink key-light tracing the figure (pink = the

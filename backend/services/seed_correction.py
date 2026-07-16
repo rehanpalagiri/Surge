@@ -26,7 +26,7 @@ def _build_correction_prompt(prediction: dict, actual_views, actual_likes, niche
         outcome_line = f"Likes: {actual_likes:,} (views hidden — like-rate uncomputable)"
         rate_note = "No like-rate available → you cannot reliably audit content; set gap_explained_by='unclear'."
 
-    return f"""ROLE: You are auditing ONE past Surge prediction against the real outcome to find where our scoring was miscalibrated. The reader is another AI. Be conservative and honest.
+    return f"""ROLE: You are auditing ONE past CraftLint prediction against the real outcome to find where our scoring was miscalibrated. The reader is another AI. Be conservative and honest.
 
 NICHE: {niche}
 

@@ -106,7 +106,7 @@ function VerifyEmailInner() {
         </div>
 
         <div className="mt-4 flex items-center justify-center gap-3 text-xs text-text-muted">
-          {/* Escape hatch: verification isn't required to use Surge, so a user
+          {/* Escape hatch: verification isn't required to use CraftLint, so a user
               whose code is delayed or undelivered is never trapped here. */}
           <button type="button" onClick={() => router.replace(dest)} className="hover:text-text-primary">
             Skip for now →

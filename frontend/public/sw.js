@@ -1,4 +1,4 @@
-// Surge service worker
+// CraftLint service worker
 // Responsibilities:
 //   1. Cache-first for immutable Next.js static assets (/_next/static/)
 //   2. Network-first for everything else

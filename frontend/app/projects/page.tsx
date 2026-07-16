@@ -181,7 +181,7 @@ function PostLinkRow({
         )}
         {platform === "instagram" && (
           <p className="text-[11px] text-text-muted">
-            Instagram likes are recorded as observations; Surge does not infer reach from them.
+            Instagram likes are recorded as observations; CraftLint does not infer reach from them.
           </p>
         )}
         {error && <p className={`text-xs ${error.includes("saved") ? "text-warning" : "text-danger"}`}>{error}</p>}
@@ -332,7 +332,7 @@ function PostLinkRow({
         {error && <p className="text-danger text-xs">{error}</p>}
         {platform === "instagram" && !error && (
           <p className="text-[11px] text-text-muted">
-            Instagram likes are recorded as observations; Surge does not infer reach from them.
+            Instagram likes are recorded as observations; CraftLint does not infer reach from them.
           </p>
         )}
         <button
