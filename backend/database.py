@@ -49,8 +49,14 @@ def _build_engine(raw_url: str):
     ssl_ctx = ssl.create_default_context(cafile=certifi.where())
     connect_args: dict = {"ssl": ssl_ctx}
 
-    # 4. pgbouncer (pooler URLs) doesn't support prepared statements
-    if "-pooler" in raw_url:
+    # 4. Transaction-mode poolers (pgbouncer / Supavisor) don't support prepared
+    #    statements. Neon's pooler host contains "-pooler"; Supabase's Supavisor
+    #    pooler host is "...pooler.supabase.com" (transaction mode on :6543).
+    #    Disable asyncpg's statement cache for either. Harmless on session-mode or
+    #    direct URLs (minor perf only), so it's safe to match broadly.
+    #    NOTE: for a long-lived process like this one, prefer Supabase's SESSION
+    #    pooler (:5432) or the direct URL over the transaction pooler (:6543).
+    if "-pooler" in raw_url or "pooler.supabase.com" in raw_url:
         connect_args["statement_cache_size"] = 0
 
     return create_async_engine(
