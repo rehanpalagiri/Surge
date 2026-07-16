@@ -20,7 +20,7 @@ jobs:
       - name: Health check
         run: |
           for i in 1 2 3; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://surge-production-8973.up.railway.app/health)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://craftlint.onrender.com/health)
             if [ "$STATUS" = "200" ]; then
               echo "Backend healthy (attempt $i)"
               break
@@ -41,7 +41,7 @@ jobs:
             -H "X-Admin-Password: $ADMIN_PASSWORD" \
             -H "Content-Type: application/json" \
             -d '{"min_views": ${{ github.event.inputs.min_views || 500000 }}, "max_per_niche": ${{ github.event.inputs.max_per_niche || 3 }}}' \
-            https://surge-production-8973.up.railway.app/api/admin/harvest)
+            https://craftlint.onrender.com/api/admin/harvest)
           CODE=$(printf '%s' "$RESPONSE" | tail -n1)
           BODY=$(printf '%s' "$RESPONSE" | sed '$d')
           echo "HTTP $CODE"
@@ -62,7 +62,7 @@ jobs:
             sleep 10
             STATUS_JSON=$(curl -sS \
               -H "X-Admin-Password: $ADMIN_PASSWORD" \
-              https://surge-production-8973.up.railway.app/api/admin/harvest/status)
+              https://craftlint.onrender.com/api/admin/harvest/status)
             TIKTOK_STATUS=$(printf '%s' "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tiktok',{}).get('status','?'))" 2>/dev/null || echo "?")
             echo "[$i] tiktok harvest status: $TIKTOK_STATUS"
             if [ "$TIKTOK_STATUS" != "running" ]; then

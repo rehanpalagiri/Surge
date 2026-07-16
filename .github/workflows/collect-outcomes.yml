@@ -2,14 +2,12 @@ name: Daily Outcome Collection
 
 on:
   schedule:
-    # 07:00 UTC — deliberately ONE HOUR AFTER the in-process APScheduler (06:00)
-    # so this acts as a reliable catch-up net instead of racing it. Running both
-    # at 06:00 made each due job get fetched twice (the collector hits the
-    # provider before claiming the row), wasting tikwm/rapidapi calls. By 07:00
-    # the in-process run has already finalized that morning's jobs, so this run
-    # mostly finds nothing due — and still covers the case where the Railway
-    # process was asleep/restarting at 06:00 (well within the 24h/7d/30d
-    # tolerance windows).
+    # 07:00 UTC. On Render's free tier the instance SLEEPS when idle, so the
+    # in-process APScheduler (06:00) usually can't run — this cron is now the
+    # PRIMARY driver of outcome collection, not just a catch-up net. It still
+    # can't double-fetch (the collector claims each row before hitting the
+    # provider), and 07:00 stays well within the 24h/7d/30d tolerance windows.
+    # The "Wake backend" step below absorbs the ~50s cold start before collecting.
     - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
@@ -23,14 +21,15 @@ jobs:
     steps:
       - name: Wake backend
         run: |
-          for i in 1 2 3; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://surge-production-8973.up.railway.app/health)
+          # Render free tier cold-starts (~50s), so give it up to 6 tries.
+          for i in 1 2 3 4 5 6; do
+            STATUS=$(curl -s -m 60 -o /dev/null -w "%{http_code}" https://craftlint.onrender.com/health)
             if [ "$STATUS" = "200" ]; then
               echo "Backend healthy (attempt $i)"
               break
             fi
-            echo "Attempt $i: status=$STATUS — waiting 10s"
-            sleep 10
+            echo "Attempt $i: status=$STATUS — waiting 15s"
+            sleep 15
           done
 
       - name: Collect due outcomes
@@ -50,7 +49,7 @@ jobs:
             -H "X-Admin-Password: $ADMIN_PASSWORD" \
             -H "Content-Type: application/json" \
             -d '{"limit": ${{ github.event.inputs.limit || 100 }}}' \
-            https://surge-production-8973.up.railway.app/api/admin/outcomes/collect-due)
+            https://craftlint.onrender.com/api/admin/outcomes/collect-due)
           CODE=$(printf '%s' "$RESPONSE" | tail -n1)
           BODY=$(printf '%s' "$RESPONSE" | sed '$d')
           echo "HTTP $CODE"
