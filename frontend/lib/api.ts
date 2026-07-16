@@ -826,6 +826,19 @@ export interface CraftPattern {
   direction: "higher" | "lower" | "flat";
 }
 
+export interface CraftInsightPending {
+  analysis_id: number;
+  project_name: string | null;
+  platform: string;
+  // instagram_no_views: provider never returns view counts — permanent, not a wait.
+  // low_views: has a checked-in snapshot but it's under the reliable-rate view floor.
+  // awaiting_checkpoint: linked, waiting on its next 24h/7d/30d collection job.
+  reason: "instagram_no_views" | "low_views" | "awaiting_checkpoint";
+  eta: string | null; // ISO timestamp of the next collection job's due date, if any
+  eta_horizon: "24h" | "7d" | "30d" | null;
+  overdue?: boolean; // true if eta has passed and the daily collector hasn't run yet
+}
+
 export interface CraftInsights {
   total_analyses: number;
   with_verified_outcome: number;
@@ -844,6 +857,7 @@ export interface CraftInsights {
         preliminary?: { n: number; horizon: string; median: number; min: number; max: number };
       }
     | { available: true; n: number; horizon: string; p25: number; median: number; p75: number; min: number; max: number };
+  pending: CraftInsightPending[];
   notice: string;
 }
 

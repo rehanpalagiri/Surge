@@ -6,7 +6,7 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import { Link2 } from "lucide-react";
 import { getToken } from "@/lib/auth";
-import { getCraftInsights, CraftInsights } from "@/lib/api";
+import { getCraftInsights, CraftInsights, CraftInsightPending } from "@/lib/api";
 
 const DIMENSION_ORDER = [
   ["hook_velocity", "Hook"],
@@ -20,6 +20,72 @@ const DIMENSION_ORDER = [
 const HORIZON_LABEL: Record<string, string> = {
   "24h": "24-hour", "7d": "7-day", "30d": "30-day",
 };
+
+function etaDateLabel(eta: string | null): string | null {
+  if (!eta) return null;
+  return new Date(eta).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function pendingMessage(p: CraftInsightPending): string {
+  const etaStr = etaDateLabel(p.eta);
+  if (p.reason === "instagram_no_views") {
+    return "Instagram doesn't share view counts with us, so a like rate can't be computed for this post.";
+  }
+  if (p.reason === "low_views") {
+    return etaStr
+      ? `Verified, but still under the reliable-rate view floor — next check-in around ${etaStr}.`
+      : "Verified, but still under the reliable-rate view floor.";
+  }
+  if (p.overdue) {
+    return "Its check-in window has passed — this updates automatically within a day.";
+  }
+  const horizon = p.eta_horizon ? HORIZON_LABEL[p.eta_horizon] : null;
+  return etaStr
+    ? `Waiting for its ${horizon ?? "next"} check-in, around ${etaStr}.`
+    : "Waiting on its next check-in.";
+}
+
+function PendingList({ pending, totalAnalyses }: { pending: CraftInsightPending[]; totalAnalyses: number }) {
+  // "instagram_no_views" is a permanent provider limitation, not something still
+  // processing — only show the spinner/"verifying" framing when at least one
+  // post is actually waiting on a future check-in.
+  const anyInProgress = pending.some((p) => p.reason !== "instagram_no_views");
+  const title = anyInProgress ? "Verifying your linked posts" : "Like-rate insights aren't available yet";
+  const subtitle = anyInProgress
+    ? `You've linked ${pending.length === 1 ? "a post" : `${pending.length} posts`} — insights show up ` +
+      "once its verified counts clear the same-age comparison window. Nothing to do here, this updates on its own."
+    : "Instagram doesn't expose view counts through our provider, so a like rate can't be computed for the post(s) below yet.";
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-2.5">
+        {anyInProgress && <span className="pending-spinner text-accent-2 shrink-0" aria-hidden="true" />}
+        <h2 className="text-text-primary font-semibold">{title}</h2>
+      </div>
+      <p className="text-text-muted text-sm leading-relaxed">{subtitle}</p>
+      <ul className="space-y-3">
+        {pending.map((p) => (
+          <li key={p.analysis_id} className="border-t border-border/60 pt-3 first:border-0 first:pt-0">
+            <Link
+              href={`/results/${p.analysis_id}`}
+              className="text-text-primary text-sm font-medium hover:text-accent"
+            >
+              {p.project_name || `${p.platform} post`}
+            </Link>
+            <p className="text-text-muted text-xs mt-0.5">{pendingMessage(p)}</p>
+          </li>
+        ))}
+      </ul>
+      {totalAnalyses > pending.length && (
+        <p className="text-text-muted/70 text-xs border-t border-border pt-3">
+          Link more posts from{" "}
+          <Link href="/projects" className="text-accent hover:underline">your projects</Link> to build a
+          bigger picture faster.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function Notice({ text }: { text: string }) {
   return (
@@ -111,7 +177,9 @@ export default function InsightsPage() {
           </p>
         </header>
 
-        {verified === 0 ? (
+        {verified === 0 && data.pending.length > 0 ? (
+          <PendingList pending={data.pending} totalAnalyses={data.total_analyses} />
+        ) : verified === 0 ? (
           /* ── Empty: ghost the real view so linking has a visible payoff ── */
           <div className="relative">
             <div className="space-y-6 blur-[3px] opacity-50 pointer-events-none select-none" aria-hidden="true">

@@ -21,7 +21,8 @@ import json
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import OutcomeSnapshot, UserAnalysis
+from models import OutcomeCollectionJob, OutcomeSnapshot, UserAnalysis
+from services.clock import utc_now_naive
 
 DIMENSIONS = (
     "hook_velocity", "cut_frequency", "text_scannability",
@@ -99,6 +100,78 @@ def _craft_scores(scores_json: str) -> dict | None:
     return out
 
 
+async def _pending_breakdown(analyses: list[UserAnalysis], db: AsyncSession) -> list[dict]:
+    """Explain, per linked-but-unverified post, why it isn't in the insights yet.
+
+    Only covers analyses that were actually linked (video_url + counts_fetched_at
+    set by the video-link flow) — an analysis nobody has linked simply isn't
+    "pending", it just hasn't been started, which the empty state already covers.
+    """
+    linked = [a for a in analyses if a.video_url and a.counts_fetched_at]
+    if not linked:
+        return []
+    ids = [a.id for a in linked]
+
+    all_snaps = (await db.execute(
+        select(OutcomeSnapshot).where(OutcomeSnapshot.analysis_id.in_(ids))
+    )).scalars().all()
+    snaps_by_analysis: dict[int, list[OutcomeSnapshot]] = {}
+    for s in all_snaps:
+        snaps_by_analysis.setdefault(s.analysis_id, []).append(s)
+
+    pending_jobs = (await db.execute(
+        select(OutcomeCollectionJob).where(
+            OutcomeCollectionJob.analysis_id.in_(ids),
+            OutcomeCollectionJob.status == "pending",
+        )
+    )).scalars().all()
+    next_job_by_analysis: dict[int, OutcomeCollectionJob] = {}
+    for j in pending_jobs:
+        cur = next_job_by_analysis.get(j.analysis_id)
+        if cur is None or j.due_at < cur.due_at:
+            next_job_by_analysis[j.analysis_id] = j
+
+    now = utc_now_naive()
+    out = []
+    for a in linked:
+        next_job = next_job_by_analysis.get(a.id)
+        eta = next_job.due_at.isoformat() if next_job else None
+        eta_horizon = next_job.horizon if next_job else None
+        overdue = bool(next_job and next_job.due_at < now)
+
+        if (a.platform or "tiktok") == "instagram":
+            # Instagram never exposes view counts, so the like-rate metric
+            # (likes / views) can never be computed for these posts — permanent,
+            # not a "wait longer" state.
+            out.append({
+                "analysis_id": a.id, "project_name": a.project_name,
+                "platform": "instagram", "reason": "instagram_no_views",
+                "eta": None, "eta_horizon": None,
+            })
+            continue
+
+        matched = [
+            s for s in snaps_by_analysis.get(a.id, [])
+            if s.horizon and s.views is not None and s.likes is not None
+            and s.source in VERIFIED_SOURCES
+        ]
+        if matched and all(s.views < MIN_VIEWS_FOR_RATE for s in matched):
+            out.append({
+                "analysis_id": a.id, "project_name": a.project_name,
+                "platform": a.platform or "tiktok", "reason": "low_views",
+                "eta": eta, "eta_horizon": eta_horizon,
+            })
+        elif not matched:
+            out.append({
+                "analysis_id": a.id, "project_name": a.project_name,
+                "platform": a.platform or "tiktok", "reason": "awaiting_checkpoint",
+                "eta": eta, "eta_horizon": eta_horizon, "overdue": overdue,
+            })
+        # else: this post already has a qualifying snapshot — inconsistent with
+        # the caller only invoking this when with_verified_outcome == 0, so skip.
+    return out
+
+
 async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
     """Aggregate the creator's craft scores against their verified results.
 
@@ -124,6 +197,7 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
         "patterns": [],
         "pattern_min": PATTERN_MIN,
         "observed_range": {"available": False, "need": FORECAST_MIN, "have": 0},
+        "pending": [],
         "notice": (
             "Patterns are correlations on your own posts at the same post age — "
             "not proof that an edit caused a result, and not a performance guarantee."
@@ -162,6 +236,7 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
         buckets.setdefault(horizon, []).append((by_id[analysis_id], s, scores))
 
     if not buckets:
+        empty["pending"] = await _pending_breakdown(analyses, db)
         return empty
 
     # Use the best-populated window (tie → the more mature one).
@@ -253,5 +328,6 @@ async def build_craft_insights(user_id: int, db: AsyncSession) -> dict:
         "patterns": patterns,
         "pattern_min": PATTERN_MIN,
         "observed_range": observed_range,
+        "pending": [],
         "notice": empty["notice"],
     }

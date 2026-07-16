@@ -12,7 +12,7 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, OutcomeSnapshot, UserAnalysis
+from models import Base, OutcomeCollectionJob, OutcomeSnapshot, UserAnalysis
 from services.craft_insights import (
     FORECAST_MIN, MIN_VIEWS_FOR_RATE, PATTERN_MIN, SPLIT_MIN_PER_SIDE,
     build_craft_insights,
@@ -210,6 +210,93 @@ class CraftInsightsTest(unittest.IsolatedAsyncioTestCase):
             await db.commit()
             out = await build_craft_insights(USER, db)
         self.assertNotIn("preliminary", out["observed_range"])
+
+    async def test_pending_empty_when_no_posts_linked(self):
+        # Analyses exist but the creator never went through the video-link flow —
+        # this is the plain "nothing started yet" case, not a pending state.
+        async with self.Session() as db:
+            await self._add_post(db, 7, views=None, likes=None)
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+        self.assertEqual(out["with_verified_outcome"], 0)
+        self.assertEqual(out["pending"], [])
+
+    async def test_pending_awaiting_checkpoint_for_fresh_link(self):
+        # The common case: a user links a video right after posting it. The
+        # synchronous fetch stores a snapshot but it's too fresh for any
+        # maturity window (horizon=None), and a 24h collection job is queued.
+        async with self.Session() as db:
+            a = UserAnalysis(
+                user_id=USER, platform="tiktok", filename="v.mp4", niche="Fitness",
+                scores_json=_scores(7), verdict="Developing craft", mode="craft_review",
+                status="complete", video_url="https://tiktok.com/@x/video/1",
+                counts_fetched_at=utc_now_naive(),
+            )
+            db.add(a)
+            await db.flush()
+            db.add(OutcomeSnapshot(
+                analysis_id=a.id, platform="tiktok", source="tikwm",
+                observed_at=utc_now_naive(), horizon=None, views=500, likes=20,
+                metric_version="observed_response_v1",
+            ))
+            due = utc_now_naive() + timedelta(hours=20)
+            db.add(OutcomeCollectionJob(
+                analysis_id=a.id, horizon="24h", due_at=due, tolerance_hours=6,
+                status="pending",
+            ))
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+        self.assertEqual(out["with_verified_outcome"], 0)
+        self.assertEqual(len(out["pending"]), 1)
+        p = out["pending"][0]
+        self.assertEqual(p["reason"], "awaiting_checkpoint")
+        self.assertEqual(p["eta_horizon"], "24h")
+        self.assertFalse(p["overdue"])
+        self.assertIsNotNone(p["eta"])
+
+    async def test_pending_instagram_permanently_lacks_views(self):
+        async with self.Session() as db:
+            a = UserAnalysis(
+                user_id=USER, platform="instagram", filename="v.mp4", niche="Fitness",
+                scores_json=_scores(7), verdict="Developing craft", mode="craft_review",
+                status="complete", video_url="https://instagram.com/reel/abc",
+                counts_fetched_at=utc_now_naive(),
+            )
+            db.add(a)
+            await db.flush()
+            db.add(OutcomeSnapshot(
+                analysis_id=a.id, platform="instagram", source="rapidapi",
+                observed_at=utc_now_naive(), horizon="24h", views=None, likes=40,
+                metric_version="observed_response_v1",
+            ))
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+        self.assertEqual(len(out["pending"]), 1)
+        p = out["pending"][0]
+        self.assertEqual(p["reason"], "instagram_no_views")
+        self.assertIsNone(p["eta"])
+
+    async def test_pending_low_views_below_reliable_floor(self):
+        async with self.Session() as db:
+            a = UserAnalysis(
+                user_id=USER, platform="tiktok", filename="v.mp4", niche="Fitness",
+                scores_json=_scores(7), verdict="Developing craft", mode="craft_review",
+                status="complete", video_url="https://tiktok.com/@x/video/2",
+                counts_fetched_at=utc_now_naive(),
+            )
+            db.add(a)
+            await db.flush()
+            db.add(OutcomeSnapshot(
+                analysis_id=a.id, platform="tiktok", source="tikwm",
+                observed_at=utc_now_naive(), horizon="24h",
+                views=MIN_VIEWS_FOR_RATE - 1, likes=1,
+                metric_version="observed_response_v1",
+            ))
+            await db.commit()
+            out = await build_craft_insights(USER, db)
+        self.assertEqual(out["with_verified_outcome"], 0)
+        self.assertEqual(len(out["pending"]), 1)
+        self.assertEqual(out["pending"][0]["reason"], "low_views")
 
     async def test_other_users_data_excluded(self):
         async with self.Session() as db:
