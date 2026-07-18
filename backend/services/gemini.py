@@ -73,14 +73,14 @@ _SCORING_SEED = 7
 _PERCEPTION_VIDEO_FPS = 4.0
 _PERCEPTION_MEDIA_RESOLUTION = types.MediaResolution.MEDIA_RESOLUTION_LOW
 
-# On the single-worker free tier one shared key is rate-limited across users, so a
-# first-time upload can hit a transient 429 that clears in seconds. A bounded
-# backoff on the perception call self-heals those bursts instead of turning a new
-# user's very first analysis into a dead-end error. After the final attempt the
+# On the single-worker free tier one shared key is rate-limited across users, and
+# gemini-2.5-flash itself intermittently returns 503 "high demand" on Google's side.
+# A bounded backoff on the perception call self-heals those bursts instead of turning
+# a new user's very first analysis into a dead-end error. After the final attempt the
 # original error propagates, so the existing 429/403 → 503 handling still applies.
 _GEMINI_RETRY_CODES = (429, 503)
-_GEMINI_MAX_RETRIES = 2
-_GEMINI_RETRY_BACKOFF_BASE = 1.5
+_GEMINI_MAX_RETRIES = 4
+_GEMINI_RETRY_BACKOFF_BASE = 2.0
 
 _SCORE_KEYS = (
     "hook_velocity",
@@ -457,8 +457,8 @@ async def analyze_video(
                 return _error_dict("Gemini failed to process the video file.")
             if waited >= max_wait:
                 return _error_dict("Video processing timed out.")
-            await asyncio.sleep(5)
-            waited += 5
+            await asyncio.sleep(2)
+            waited += 2
             uploaded = await client.aio.files.get(name=uploaded.name)
 
         # ---- PASS 1: perception (video). DESCRIBE-ONLY — no scores. The expensive,
