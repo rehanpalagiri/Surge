@@ -463,13 +463,15 @@ function ProjectCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  async function handleDelete(e: React.MouseEvent) {
+  function handleTrashClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
+    setConfirmDelete((v) => !v);
+  }
+
+  async function handleConfirmDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
     setDeleting(true);
     try {
       await deleteAnalysis(a.id, getToken());
@@ -504,8 +506,12 @@ function ProjectCard({
             </div>
           </div>
           {needsLink && (
-            <span className="rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent">
-              Needs link
+            <span
+              title="No post linked yet — use “Did you post this?” below to track real stats"
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-text-muted/50" />
+              Not linked
             </span>
           )}
         </div>
@@ -547,32 +553,40 @@ function ProjectCard({
         <PostLinkRow a={a} platform={a.platform} onUpdated={onUpdated} />
       )}
 
-      {/* Delete button — appears on hover */}
-      {!confirmDelete ? (
-        <button
-          onClick={handleDelete}
-          aria-label={`Delete ${projectName}`}
-          className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-lg border border-border bg-card text-text-muted opacity-100 hover:border-danger hover:text-danger sm:opacity-0 sm:group-hover:opacity-100"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      ) : (
-        <div className="absolute top-3 right-3 flex items-center gap-1 bg-card border border-danger rounded-lg px-2 py-1 shadow-lg">
-          <span className="text-danger text-xs font-semibold mr-1">Sure?</span>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-danger text-xs font-bold hover:underline disabled:opacity-50"
-          >
-            {deleting ? "…" : "Yes"}
-          </button>
-          <span className="text-text-muted text-xs">·</span>
-          <button
-            onClick={handleCancelDelete}
-            className="text-text-muted text-xs hover:text-text-primary"
-          >
-            No
-          </button>
+      {/* Delete button — appears on hover; confirmation drops down below it so it
+          never collides with the "Not linked" badge sharing the top-right corner. */}
+      <button
+        onClick={handleTrashClick}
+        aria-label={confirmDelete ? "Cancel delete" : `Delete ${projectName}`}
+        aria-expanded={confirmDelete}
+        className={`absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-lg border bg-card text-text-muted transition-colors ${
+          confirmDelete
+            ? "border-danger text-danger opacity-100"
+            : "border-border opacity-100 hover:border-danger hover:text-danger sm:opacity-0 sm:group-hover:opacity-100"
+        }`}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+      {confirmDelete && (
+        <div className="absolute right-3 top-12 z-30 flex flex-col gap-2 rounded-lg border border-danger bg-card px-3 py-2 shadow-lg motion-pop">
+          <span className="whitespace-nowrap text-xs font-semibold text-text-primary">
+            Delete this project?
+          </span>
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={handleCancelDelete}
+              className="text-xs font-medium text-text-muted hover:text-text-primary"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+              className="text-xs font-bold text-danger hover:underline disabled:opacity-50"
+            >
+              {deleting ? "…" : "Delete"}
+            </button>
+          </div>
         </div>
       )}
     </article>
