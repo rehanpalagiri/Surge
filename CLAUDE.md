@@ -19,7 +19,6 @@ CraftLint is an outcome-blind AI retention craft reviewer and post-experiment tr
 - Do not produce an aggregate Viral Score, predicted views/likes, projected verdict, or performance promise.
 - Recommendations are hypotheses for the creator's next controlled experiment. They must identify one change, what to hold constant, and what to observe.
 - Keep AI critique separate from observed platform outcomes in code, storage, API contracts, and UX.
-- The read-only insights surface (`GET /api/me/craft-insights`, `app/insights`) MAY relate a creator's craft scores to THEIR OWN verified outcomes as descriptive statistics — observed like rate at a single maturity window, creator-grouped, explicit sample sizes. It stays correlational: never a causal claim, never a pixel-based or aggregate "viral" forecast. Per-dimension patterns require ≥6 verified age-matched posts (a non-degenerate median split needs ≥3 per side); the empirical like-rate range requires ≥8 (interquartile band spans ≥4 points). Below the range floor it may show a clearly-labeled preliminary median/min/max, never a percentile band.
 - Compare outcomes only at compatible maturity windows: 24h (±6h), 7d (±24h), and 30d (±72h). Off-window observations remain timestamped but unlabelled.
 - Likes/views is only an observed like rate. Never call it content quality, retention, or causal impact.
 - Instagram metrics are likes-only unless provider fields are runtime-verified. Never infer reach from likes.
@@ -93,7 +92,7 @@ Key services and routes:
 - `services/clock.py`: single source of truth for the clock — `utc_now_naive()`. Never mix aware/naive datetimes or call deprecated `datetime.utcnow()`.
 - `services/tiktok_fetch.py` / `instagram_fetch.py`: untrusted provider adapters. Missing required counts fail closed; optional fields stay NULL.
 - `services/telemetry.py` / `services/economics.py`: provider/model telemetry and the admin operations report. Do not claim cost or margin until pricing and payloads are verified.
-- `services/craft_insights.py`: `GET /api/me/craft-insights` — descriptive craft-vs-verified-outcome aggregation for one creator, correlational only, gated by justified sample sizes; returns `observed_range` (or a labeled preliminary read from the first verified post), never a forecast.
+- `services/craft_insights.py`: shared dimension constants and score-parsing helper (`DIMENSIONS`, `DIMENSION_LABELS`, `_craft_scores`, verified-source list, view-rate floor) read by `tools/craft_correlation.py`, `tools/score_distribution.py`, and `services/seed_statistics.py`. The user-facing "Craft vs. Your Results" insights tab that used to live on top of this was removed (low usage, gated too often on sparse data); this module now exists only to keep those offline tools' dimension sets and thresholds consistent.
 - `tools/craft_correlation.py`: offline, read-only, cross-user craft↔outcome correlation (Pearson r + 95% Fisher CI, Spearman rho, n, naive baselines, collinearity). Must show real signal before the calibration path is ever enabled. Never in the request path.
 - `auth.py`: JWT helpers and the single canonical `is_minor()` / `is_pro()` / `is_comp()`. `is_pro` reads `users.subscription_status` OR the comp allowlist.
 - `services/stripe_billing.py` + `routers/billing.py`: adult-only hosted Checkout/portal sessions + a SIGNATURE-VERIFIED, target-price-validated webhook that is the ONLY writer of subscription state. The durable `stripe_webhook_events` ledger suppresses duplicate deliveries, every subscription event reconciles the customer's current Stripe state so out-of-order/old-subscription events cannot revoke a newer plan, and account deletion cancels Stripe first so it cannot orphan a still-charging subscription. Never trust the client or success URL for Pro status. Stripe `StripeObject` raises on `.get()` — use the `_g()` safe accessor.
@@ -112,7 +111,6 @@ Design system is **"Noir"**: true black/white neutrals, one pink accent used spa
 
 - `app/page.tsx`, `app/results/[id]/page.tsx`, `app/results/[id]/improve/page.tsx`: the craft review flow — six dimensions, attention-risk map, explicit evidence notice, next experiment, and a separate 24h/7d/30d outcome timeline. No projected performance anywhere.
 - `app/projects/page.tsx`: unlinked posts sorted first then newest-first; mixed-age latest counts are not comparisons.
-- `app/insights/page.tsx`: "Craft vs. Your Results" — a preliminary read from the first verified post, upgrading to an empirical like-rate range at n≥8, always with a correlation-not-causation notice.
 - `components/FeedbackModal.tsx`: manual unverified observations; provider fetches are preferred where available.
 - `components/ProfileNudgeModal.tsx`: one-time post-signup nudge, shown once on first dashboard arrival.
 - `lib/api.ts`: typed review/outcome contracts plus local anonymous-analysis claim-token storage.

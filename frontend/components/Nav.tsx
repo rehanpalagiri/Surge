@@ -63,7 +63,6 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
             <>
               <Link href="/" className="text-text-muted hover:text-text-primary transition-colors">Dashboard</Link>
               <Link href="/projects" className="text-text-muted hover:text-text-primary transition-colors">Projects</Link>
-              <Link href="/insights" className="text-text-muted hover:text-text-primary transition-colors">Insights</Link>
               <Link href="/settings" className="text-text-muted hover:text-text-primary transition-colors">Settings</Link>
             </>
           ) : (
@@ -95,7 +94,6 @@ export default function Nav({ subtitle }: { subtitle?: string }) {
                 <>
                   <Link href="/" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Dashboard</Link>
                   <Link href="/projects" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Projects</Link>
-                  <Link href="/insights" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Insights</Link>
                   <Link href="/settings" className="px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface transition-colors">Settings</Link>
                 </>
               ) : (

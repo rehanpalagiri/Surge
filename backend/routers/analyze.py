@@ -26,7 +26,6 @@ from services.niche_classifier import classify_niche, _match_canonical
 from services.tiktok_fetch import fetch_tiktok, is_tiktok_url, download_tiktok_video
 from services.instagram_fetch import fetch_instagram_likes, is_instagram_url
 from services.rate_limit import get_rate_limit, MAX_BONUS
-from services.craft_insights import build_craft_insights
 from services.outcomes import (
     add_outcome_snapshot, post_id_from_url, schedule_outcome_jobs, sha256_file,
     upsert_artifact, utc_now_naive,
@@ -737,19 +736,6 @@ async def my_rate_limit(
     user: User = Depends(require_user),
 ):
     return await get_rate_limit(user, db)
-
-
-@router.get("/me/craft-insights")
-async def my_craft_insights(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_user),
-):
-    """Craft assessments grounded against the creator's OWN verified outcomes.
-
-    Descriptive only — observed like rate at a single maturity window, with
-    explicit sample sizes. Never a causal claim or a pixel-based forecast.
-    """
-    return await build_craft_insights(user.id, db)
 
 
 @router.get("/analyses/{analysis_id}/outcomes", response_model=list[OutcomeSnapshotOut])
