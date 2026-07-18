@@ -22,13 +22,15 @@ log = logging.getLogger("usage_telemetry")
 _DEFAULT_FLASH_INPUT_PER_MTOK = 0.30
 _DEFAULT_FLASH_OUTPUT_PER_MTOK = 2.50
 
-# Claude Sonnet 5 list price (USD per 1M tokens) for the scoring pass. These are the
-# STANDARD post-introductory rates ($3/$15) — deliberately NOT the temporary intro
-# rate ($2/$10 through 2026-08-31), so a cost baseline built now doesn't understate
-# steady-state spend. Overridable per contracted rate with
-# ANTHROPIC_SONNET_INPUT_PRICE_PER_MTOK / ANTHROPIC_SONNET_OUTPUT_PRICE_PER_MTOK.
-_DEFAULT_SONNET_INPUT_PER_MTOK = 3.00
-_DEFAULT_SONNET_OUTPUT_PER_MTOK = 15.00
+# Claude Sonnet 5 list price (USD per 1M tokens) for the scoring pass. Set to the
+# CURRENT introductory rate ($2/$10, in effect through 2026-08-31) so the admin cost
+# view and the rolling cost-window limiter reflect what Anthropic actually bills today.
+# ⚠️ REVERTS to the standard $3/$15 on 2026-08-31 — on that date either bump these
+# constants back to 3.00/15.00 or set the env overrides below, otherwise the estimate
+# (and therefore the Pro cost-window cap) will UNDER-count real spend. Overridable per
+# contracted rate with ANTHROPIC_SONNET_INPUT_PRICE_PER_MTOK / _OUTPUT_PRICE_PER_MTOK.
+_DEFAULT_SONNET_INPUT_PER_MTOK = 2.00
+_DEFAULT_SONNET_OUTPUT_PER_MTOK = 10.00
 
 
 def _price_per_mtok(env_key: str, default: float) -> float:

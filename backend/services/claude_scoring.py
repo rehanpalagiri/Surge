@@ -32,14 +32,18 @@ from services.telemetry import record_usage_event, estimate_anthropic_cost_micro
 
 # Claude Sonnet 5: near-Opus quality on structured judgment from a provided
 # description at ~40% of Opus's per-token price — and this call runs on every graded
-# video, not as an occasional admin task. effort="medium" (not the Sonnet-5 default of
-# "high") trades a little critique depth for latency/cost in this user-facing
-# wait-for-results flow; raise it only if critique quality suffers. Sampling params
-# (temperature/top_p/top_k) are intentionally absent — Sonnet 5 rejects them with a
-# 400, so score reproducibility is bounded by the provider, not pinnable here (the
-# Gemini description pass is still pinned; see services/gemini.py).
+# video, not as an occasional admin task. Effort is TIERED by the caller: free-tier
+# analyses run at the default "medium" (trades a little critique depth for latency/cost
+# in this user-facing wait-for-results flow); Pro analyses run at "high" for a deeper
+# critique. Effort drives adaptive-thinking depth and so is the main output-token (cost)
+# lever. Sampling params (temperature/top_p/top_k) are intentionally absent — Sonnet 5
+# rejects them with a 400, so score reproducibility is bounded by the provider, not
+# pinnable here (the Gemini description pass is still pinned; see services/gemini.py).
 _SCORING_MODEL = "claude-sonnet-5"
-_SCORING_EFFORT = "medium"
+_DEFAULT_SCORING_EFFORT = "medium"
+# Sonnet 5's accepted effort levels. An out-of-set value would 400 the whole call and
+# fail every analysis at that tier, so an unexpected value falls back to the default.
+_VALID_EFFORTS = ("low", "medium", "high", "xhigh", "max")
 # Generous ceiling: the JSON itself is small, but adaptive thinking shares this budget,
 # so keep headroom to avoid a stop_reason="max_tokens" truncation of the JSON. Still
 # well under the SDK's non-streaming timeout guard, so no streaming needed.
@@ -350,13 +354,19 @@ async def score_from_perception(
     platform: str = "tiktok",
     analysis_id: int | None = None,
     niche_synthesis_block: str = "",
+    effort: str = _DEFAULT_SCORING_EFFORT,
 ) -> tuple[dict | None, str | None]:
     """Score the six dimensions and write the critique from Gemini's description.
+
+    ``effort`` is the Sonnet-5 thinking-depth level (tiered by the caller: "medium"
+    free, "high" Pro). An unrecognized value falls back to the default rather than
+    400-ing the call.
 
     Returns ``(scoring_dict, None)`` on success or ``(None, user_message)`` on ANY
     failure — the caller turns the message into an error dict (status="error"), never a
     fabricated scorecard. Records its own usage event either way.
     """
+    effort = effort if effort in _VALID_EFFORTS else _DEFAULT_SCORING_EFFORT
     if not (os.getenv("ANTHROPIC_API_KEY") or "").strip():
         # Configured-off: fail closed with an operator-facing message rather than
         # burning a call that would 401.
@@ -375,7 +385,7 @@ async def score_from_perception(
             system=_SCORING_SYSTEM_INSTRUCTION,
             thinking={"type": "adaptive"},
             output_config={
-                "effort": _SCORING_EFFORT,
+                "effort": effort,
                 "format": {"type": "json_schema", "schema": _SCORING_SCHEMA},
             },
             messages=[{

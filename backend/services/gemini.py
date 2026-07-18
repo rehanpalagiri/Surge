@@ -441,6 +441,7 @@ async def analyze_video(
     niche_raw: str = "",
     secondary_niche: str = "",
     analysis_id: int | None = None,
+    scoring_effort: str = "medium",
 ) -> dict:
     started = time.perf_counter()
     input_bytes = os.path.getsize(video_path) if os.path.exists(video_path) else None
@@ -544,6 +545,7 @@ async def analyze_video(
             platform,
             analysis_id=analysis_id,
             niche_synthesis_block=niche_synthesis_block,
+            effort=scoring_effort,
         )
         if scoring is None:
             return _error_dict(scoring_error or "Scoring failed — please try again.")

@@ -32,7 +32,7 @@ from services.outcomes import (
     upsert_artifact, utc_now_naive,
 )
 from services.throttle import check_rate, client_ip
-from auth import optional_user, require_user, is_minor
+from auth import optional_user, require_user, is_minor, is_pro
 import services.r2 as r2
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -261,6 +261,7 @@ async def _finalize_analysis(
     niche_needs_confirmation: bool = False,
     secondary_niche: Optional[str] = None,
     r2_key: Optional[str] = None,
+    scoring_effort: str = "medium",
 ) -> None:
     """Run the Gemini review for a file already on local disk, persist the result,
     and clean up. The single shared code path for "write the Gemini result and
@@ -285,6 +286,7 @@ async def _finalize_analysis(
             niche_raw=raw_niche,
             secondary_niche=secondary_niche or "",
             analysis_id=analysis_id,
+            scoring_effort=scoring_effort,
         )
         async with AsyncSessionLocal() as db:
             row = (await db.execute(select(UserAnalysis).where(UserAnalysis.id == analysis_id))).scalar_one_or_none()
@@ -344,6 +346,7 @@ async def _run_r2_analysis(
     niche_needs_confirmation: bool = False,
     secondary_niche: Optional[str] = None,
     parent_id: Optional[int] = None,
+    scoring_effort: str = "medium",
 ) -> None:
     file_path = os.path.join(uploads_dir, f"{uuid.uuid4()}_r2upload.mp4")
     await _set_analysis_status(analysis_id, "processing")
@@ -386,6 +389,7 @@ async def _run_r2_analysis(
         niche_needs_confirmation,
         secondary_niche,
         r2_key=r2_key,
+        scoring_effort=scoring_effort,
     )
 
 
@@ -398,6 +402,7 @@ async def _run_local_analysis(
     platform: str,
     niche_needs_confirmation: bool = False,
     secondary_niche: Optional[str] = None,
+    scoring_effort: str = "medium",
 ) -> None:
     """Background finalize for the direct upload / TikTok-URL path. The file is
     already on local disk (the request handler streamed it there), so this skips
@@ -412,6 +417,7 @@ async def _run_local_analysis(
         platform,
         niche_needs_confirmation,
         secondary_niche,
+        scoring_effort=scoring_effort,
     )
 
 
@@ -590,6 +596,8 @@ async def analyze(
             niche_needs_confirmation,
             secondary_niche,
             resolved_parent_id,
+            # Pro analyses get a deeper (costlier) critique; free stays at medium.
+            scoring_effort="high" if is_pro(user) else "medium",
         )
         out = {"id": analysis.id, "status": "pending"}
         if analysis.guest_claim_token:
@@ -692,6 +700,8 @@ async def analyze(
         platform,
         niche_needs_confirmation,
         secondary_niche,
+        # Pro analyses get a deeper (costlier) critique; free stays at medium.
+        scoring_effort="high" if is_pro(user) else "medium",
     )
     out = {"id": analysis.id, "status": "pending"}
     if analysis.guest_claim_token:
