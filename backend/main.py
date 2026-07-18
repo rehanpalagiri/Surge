@@ -185,6 +185,14 @@ async def _ensure_columns(conn):
         ("stripe_subscription_id", "ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT"),
         ("subscription_status", "ALTER TABLE users ADD COLUMN subscription_status TEXT"),
         ("subscription_current_period_end", "ALTER TABLE users ADD COLUMN subscription_current_period_end DATETIME"),
+        (
+            "subscription_cancel_at_period_end",
+            "ALTER TABLE users ADD COLUMN subscription_cancel_at_period_end BOOLEAN NOT NULL DEFAULT 0",
+        ),
+        (
+            "stripe_last_payment_action_id",
+            "ALTER TABLE users ADD COLUMN stripe_last_payment_action_id TEXT",
+        ),
     ):
         if col not in user_cols:
             await conn.exec_driver_sql(ddl)
@@ -250,6 +258,8 @@ async def _ensure_columns_pg(conn):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMP",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_last_payment_action_id VARCHAR",
         "CREATE INDEX IF NOT EXISTS ix_users_stripe_customer_id ON users (stripe_customer_id)",
         # Session epoch for token invalidation on password change/reset.
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0",

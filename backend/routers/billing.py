@@ -15,7 +15,7 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import is_comp, is_pro, require_user
+from auth import is_comp, is_minor, is_pro, require_user
 from database import get_db
 from models import User
 from services import stripe_billing as billing
@@ -37,8 +37,10 @@ async def billing_status(user: User = Depends(require_user)):
         "comp": comp,  # complimentary Pro (operator grant) — no Stripe to manage
         "subscription_status": user.subscription_status,
         "current_period_end": user.subscription_current_period_end,
+        "cancel_at_period_end": bool(user.subscription_cancel_at_period_end),
         "has_customer": bool(user.stripe_customer_id),
         "price": PRICE_DISPLAY,
+        "eligible_for_paid": not is_minor(user),
         # Comp users see the Pro UI even before Stripe is wired up.
         "configured": billing.is_configured() or comp,
     }
@@ -52,14 +54,43 @@ async def create_checkout(
     """Start a CraftLint Pro subscription. Returns a Stripe hosted-checkout URL."""
     if not billing.is_configured():
         raise HTTPException(status_code=503, detail="Billing isn't configured yet.")
+    if is_minor(user):
+        raise HTTPException(
+            status_code=403,
+            detail="CraftLint Pro subscriptions are available only to users 18 or older.",
+        )
     if is_pro(user):
         raise HTTPException(status_code=409, detail="You're already on CraftLint Pro.")
     try:
         url = await billing.create_checkout_session(user, db)
+    except billing.ExistingSubscriptionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except Exception as exc:  # Stripe / network error — don't leak internals
         logger.error("Checkout session creation failed for user %s: %r", user.id, exc)
         raise HTTPException(status_code=502, detail="Couldn't start checkout. Please try again.")
     return {"url": url}
+
+
+@router.get("/checkout-session/{session_id}")
+async def get_checkout_session(
+    session_id: str,
+    user: User = Depends(require_user),
+):
+    """Verify that the signed-in user's hosted Checkout really completed."""
+    if not billing.is_configured():
+        raise HTTPException(status_code=503, detail="Billing isn't configured yet.")
+    try:
+        return await billing.checkout_session_status(user, session_id)
+    except billing.CheckoutSessionAccessError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.error(
+            "Checkout session lookup failed for user %s: %r", user.id, exc
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't verify the checkout. Please try again.",
+        )
 
 
 @router.post("/portal")
@@ -106,25 +137,41 @@ async def stripe_webhook(
         logger.error("Stripe webhook apply failed for %s: %r", etype, exc)
         raise HTTPException(status_code=500, detail="Webhook processing error.")
 
-    if result == "payment_failed":
+    if result in {
+        "payment_failed",
+        "payment_action_required",
+        "async_payment_failed",
+    }:
         cust = billing._g(event["data"]["object"], "customer")
         user = await billing._user_by_customer(db, cust)
         if user and user.email:
-            background_tasks.add_task(_send_payment_failed_email, user.email, user.username)
+            background_tasks.add_task(
+                _send_payment_failed_email,
+                user.email,
+                user.username,
+                result == "payment_action_required",
+            )
 
     return {"received": True, "result": result}
 
 
-async def _send_payment_failed_email(to_email: str, username: str) -> None:
+async def _send_payment_failed_email(
+    to_email: str, username: str, action_required: bool = False
+) -> None:
     """Notify a user their CraftLint Pro payment failed (uses the shared sender)."""
     from routers.auth import _send_email, _FRONTEND_URL
     import html as _html
     safe = _html.escape(username)
+    issue = (
+        "Your bank requires you to confirm the payment."
+        if action_required
+        else "We couldn't process your latest payment."
+    )
     html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#6d28d9">Your CraftLint Pro payment didn't go through</h2>
       <p>Hi <strong>{safe}</strong>,</p>
-      <p>We couldn't process your latest CraftLint Pro payment. Your Pro access stays
+      <p>{issue} Your Pro access stays
          active while we retry, but please update your card to avoid losing it.</p>
       <p style="margin:24px 0">
         <a href="{_FRONTEND_URL}/settings"
@@ -137,7 +184,7 @@ async def _send_payment_failed_email(to_email: str, username: str) -> None:
     """
     plain = (
         f"Hi {username},\n\n"
-        f"We couldn't process your latest CraftLint Pro payment. Your Pro access stays "
+        f"{issue} Your Pro access stays "
         f"active while we retry — update your card at {_FRONTEND_URL}/settings to keep it.\n\n"
         f"— The CraftLint team"
     )

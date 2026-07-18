@@ -10,6 +10,7 @@ from models import (
 )
 from schemas import ConsentIn
 from auth import require_user, hash_password_async, verify_password_async, is_minor, create_access_token
+from services import stripe_billing
 
 router = APIRouter(prefix="/api/me", tags=["settings"])
 
@@ -111,6 +112,27 @@ async def delete_account(
 ):
     if not await verify_password_async(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect password.")
+
+    # Never delete the local customer while leaving a paid Stripe subscription
+    # charging with no account to manage it. Account deletion ends service
+    # immediately and therefore cancels Stripe immediately (ordinary portal
+    # cancellation still remains end-of-period).
+    if user.stripe_subscription_id and user.subscription_status not in (
+        "canceled",
+        "incomplete_expired",
+    ):
+        if not stripe_billing.is_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="Billing is temporarily unavailable. Your account was not deleted; please retry shortly.",
+            )
+        try:
+            await stripe_billing.cancel_for_account_deletion(user)
+        except Exception:
+            raise HTTPException(
+                status_code=502,
+                detail="We couldn't cancel your subscription, so your account was not deleted. Please retry or contact support.",
+            )
 
     # Delete in FK order. Account deletion removes analyses and their measurement
     # artifacts; it does not silently retain them as anonymous research data.

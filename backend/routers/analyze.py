@@ -102,7 +102,8 @@ async def _pop_pending(db: AsyncSession, r2_key: str) -> Optional[tuple[int | No
 def _limit_message(rl: dict) -> str:
     """Friendly 429 copy. Free users who hit the monthly cap are steered to CraftLint
     Pro (and the earn-by-linking bonus); a Pro user who trips the daily fair-use
-    ceiling gets a distinct message that never implies they should 'upgrade'."""
+    ceiling or the rolling cost-window cap gets a distinct message that never
+    implies they should 'upgrade'."""
     if rl.get("tier") == "pro" and rl.get("limit_reason") == "fair_use":
         resets = ""
         if rl.get("fair_use_resets_at"):
@@ -111,6 +112,14 @@ def _limit_message(rl: dict) -> str:
             f"You've reached today's fair-use limit of {rl.get('fair_use_daily_limit')} "
             f"analyses on CraftLint Pro.{resets} This keeps the service fast for everyone — "
             f"reach out if you routinely need a higher daily volume."
+        )
+    if rl.get("tier") == "pro" and rl.get("limit_reason") == "cost_window":
+        hours = rl.get("cost_window_hours")
+        budget = (rl.get("cost_window_budget_micros") or 0) / 1_000_000
+        return (
+            f"You've reached CraftLint Pro's rolling {hours}-hour spend limit "
+            f"(${budget:.2f}). This resets gradually as usage from the last {hours} "
+            f"hours ages out — try again shortly."
         )
     limit = rl.get("effective_limit")
     bonus_tip = (
@@ -256,8 +265,12 @@ async def _finalize_analysis(
     """Run the Gemini review for a file already on local disk, persist the result,
     and clean up. The single shared code path for "write the Gemini result and
     clean up" — used by both the R2 background path and the direct-upload
-    background path. The live review is deliberately blind to prior outcomes, seed
-    labels, channel history, trends, and calibration notes.
+    background path. The live review is deliberately blind to prior individual
+    outcomes, seed labels, channel history, and calibration notes. The one
+    exception: when NICHE_SYNTHESIS_ENABLED is on, services.gemini.analyze_video
+    injects the weekly, code-validated admin-seed niche/trend synthesis (never raw
+    seed data, never per-video corrections) as prioritization context only — see
+    services/niche_synthesis.py.
 
     Always removes the temp file (and the R2 object, when ``r2_key`` is given) in
     the finally, whether the review succeeded, failed, or raised.

@@ -86,7 +86,7 @@ def score_outcome(view_count: Optional[int], like_count: int) -> tuple[int, str,
     return 3, "content", "high"              # modest reach + <2% likes → genuinely weak content
 
 
-# The six craft dimensions the niche synthesis reads back (services.seed_insights._DIMS).
+# The six craft dimensions the niche synthesis reads back (services.craft_insights.DIMENSIONS).
 _CRAFT_DIMS = (
     "hook_velocity", "cut_frequency", "text_scannability",
     "curiosity_gap", "audio_visual_sync", "loop_seamlessness",
@@ -102,7 +102,8 @@ def build_user_seed_analysis(review: dict, driver: str, driver_confidence: str) 
     craft record — the exact guarantee the admin/harvest seed-analysis pass provides.
     ``performance_driver`` / ``driver_confidence`` are the CODE-derived outcome labels
     from ``score_outcome()`` (never the model's guess), matching the seed pipeline's
-    craft-blind / code-rated split. Shape is what ``seed_insights._fmt_seed`` reads.
+    craft-blind / code-rated split. Shape is what ``seed_statistics._dimension_scores``
+    and ``score_outcome``-derived ``rating`` on the stored ``SeedVideo`` row read.
     """
     blob: dict = {d: review[d] for d in _CRAFT_DIMS if isinstance(review.get(d), (int, float))}
     blob["performance_driver"] = driver

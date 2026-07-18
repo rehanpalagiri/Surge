@@ -775,9 +775,11 @@ export interface BillingStatus {
   comp: boolean;
   subscription_status: string | null;
   current_period_end: string | null;
+  cancel_at_period_end: boolean;
   has_customer: boolean;
   price: string;
   configured: boolean;
+  eligible_for_paid: boolean;
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {
@@ -792,6 +794,17 @@ export async function createCheckoutSession(): Promise<{ url: string }> {
     headers: authHeaders(),
   });
   return handleResponse<{ url: string }>(res);
+}
+
+/** Verify a hosted Checkout Session owned by the signed-in user. */
+export async function getCheckoutSessionStatus(
+  sessionId: string
+): Promise<{ status: string | null; payment_status: string | null }> {
+  const res = await fetch(
+    `${BASE}/api/billing/checkout-session/${encodeURIComponent(sessionId)}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse<{ status: string | null; payment_status: string | null }>(res);
 }
 
 /** Open the Stripe billing portal to manage/cancel — returns its URL. */

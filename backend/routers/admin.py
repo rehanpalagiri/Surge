@@ -23,6 +23,7 @@ from services.seed_harvest import harvest_all, get_last_harvest, NICHE_KEYWORDS
 from services.instagram_harvest import harvest_instagram_all, get_last_instagram_harvest
 from services.trend_harvest import harvest_trending, get_last_trend_harvest
 from services.trend_insights import generate_trend_insight
+from services.niche_synthesis import niche_synthesis_enabled, run_weekly_niche_synthesis
 from services.outcome_collection import collect_due_outcomes, collection_status, collector_health
 from services.economics import build_operations_report
 from services.telemetry import gemini_price_source
@@ -97,9 +98,9 @@ async def get_per_analysis_cost(
 ):
     """Real measured Gemini cost per completed analysis over a recent window.
 
-    Sums the perception + reasoning cost per analysis_id (from token counts × list
-    price), then reports the distribution so a $9.99 unlimited seat can be checked
-    against actual spend. Only analyses with recorded token cost are included."""
+    Sums the perception (Gemini) + scoring (Claude) cost per analysis_id (from token
+    counts × list price), then reports the distribution so a $9.99 unlimited seat can be
+    checked against actual spend. Only analyses with recorded token cost are included."""
     days = max(1, min(days, 365))
     since = utc_now_naive() - timedelta(days=days)
     per_analysis = (await db.execute(
@@ -110,7 +111,11 @@ async def get_per_analysis_cost(
             func.sum(UsageEvent.output_tokens),
         )
         .where(
-            UsageEvent.operation.in_(("video_craft_perception", "video_craft_reasoning")),
+            # "video_craft_reasoning" is the pre-split Gemini reasoning op, kept so any
+            # dev-era rows still sum; "video_craft_scoring" is the current Claude pass.
+            UsageEvent.operation.in_(
+                ("video_craft_perception", "video_craft_scoring", "video_craft_reasoning")
+            ),
             UsageEvent.analysis_id.isnot(None),
             UsageEvent.estimated_cost_micros.isnot(None),
             UsageEvent.created_at >= since,
@@ -869,13 +874,8 @@ async def generate_trends(
             results.append({"niche": n, "status": "error", "reason": str(e)})
             continue
 
-        from datetime import timezone, timedelta
-        from services.trend_insights import RECENT_WINDOW_DAYS, ESTABLISHED_MIN_DAYS, _ref_date
-        now_utc = datetime.now(timezone.utc)
-        recent_cutoff = now_utc - timedelta(days=RECENT_WINDOW_DAYS)
-        established_cutoff = now_utc - timedelta(days=ESTABLISHED_MIN_DAYS)
-        recent_count = sum(1 for s in seeds if _ref_date(s) and _ref_date(s) >= recent_cutoff)
-        established_count = sum(1 for s in seeds if _ref_date(s) and _ref_date(s) < established_cutoff)
+        from services.trend_insights import count_recent_established
+        recent_count, established_count = count_recent_established(seeds)
 
         existing_result = await db.execute(
             select(TrendSummary).where(
@@ -927,6 +927,27 @@ async def get_trends(
         }
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Weekly admin-seed niche + trend synthesis (services/niche_synthesis.py) —
+# the same generate_niche_insight/generate_trend_insight above, run across every
+# niche at once and stored the same way. Automatic weekly cadence lives in
+# services/scheduler.py; this manual trigger is for ops verification between runs.
+# ---------------------------------------------------------------------------
+
+@router.post("/niche-synthesis/run")
+async def trigger_niche_synthesis(_: None = Depends(check_admin)):
+    """Manually run the weekly niche+trend synthesis pass now, instead of waiting
+    for Monday 07:00 UTC. Honors the same NICHE_SYNTHESIS_ENABLED gate as the
+    scheduler — returns {"status": "disabled"} rather than generating anything
+    when the flag is off, so this can't be used to bypass the kill switch."""
+    return await run_weekly_niche_synthesis()
+
+
+@router.get("/niche-synthesis/status")
+async def get_niche_synthesis_status(_: None = Depends(check_admin)):
+    return {"enabled": niche_synthesis_enabled()}
 
 
 @router.get("/api-usage")

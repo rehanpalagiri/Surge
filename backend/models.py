@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import BigInteger, Column, Integer, String, Boolean, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 from services.clock import utc_now_naive
 
@@ -74,18 +74,39 @@ class User(Base):
     # ── Billing (CraftLint Pro via Stripe) ──────────────────────────────────────
     # subscription_status is Stripe's raw value ("active", "trialing",
     # "past_due", "canceled", …) and is the single source of truth for Pro
-    # access — see auth.is_pro(). All four fields are written ONLY by the
+    # access — see auth.is_pro(). Subscription fields are written ONLY by the
     # signature-verified Stripe webhook, never trusted from the client.
     stripe_customer_id = Column(String, nullable=True, index=True)
     stripe_subscription_id = Column(String, nullable=True)
     subscription_status = Column(String, nullable=True)
     subscription_current_period_end = Column(DateTime, nullable=True)
+    subscription_cancel_at_period_end = Column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    stripe_last_payment_action_id = Column(String, nullable=True)
     # Session epoch for stateless-token invalidation. Incremented on password
     # change/reset so any JWT minted before the change stops validating (a stolen
     # token cannot outlive a credential reset) — see auth.create_access_token /
     # auth.require_user. NOT NULL default 0; legacy tokens carry ver=0 and match.
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, default=utc_now_naive)
+
+
+class StripeWebhookEvent(Base):
+    """Minimal durable idempotency ledger for Stripe's at-least-once webhooks.
+
+    No payload, email, card data, or customer data is retained here. Keeping the
+    Stripe event id prevents duplicate state transitions and duplicate payment
+    failure emails when Stripe retries an already-processed delivery.
+    """
+
+    __tablename__ = "stripe_webhook_events"
+
+    id = Column(String, primary_key=True)
+    event_type = Column(String, nullable=False)
+    event_created = Column(BigInteger, nullable=True)
+    result = Column(String, nullable=True)
+    processed_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
 
 class SeedVideo(Base):

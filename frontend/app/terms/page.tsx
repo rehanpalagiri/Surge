@@ -193,28 +193,60 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section number="Section 6" title="Usage Limits">
+        <Section number="Section 6" title="Plans, Billing, Cancellation, and Usage Limits">
           <p>
-            The Service operates under a rolling usage limit system to ensure fair access for all users:
+            CraftLint offers a free plan and an optional CraftLint Pro subscription. Paid subscriptions are
+            available only to account holders who are at least 18 years old.
           </p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>
-              <span className="text-text-primary font-medium">Base limit:</span> Authenticated users may upload up to
-              10 videos per 3-hour rolling window.
+              <span className="text-text-primary font-medium">Free:</span> Three craft reviews per calendar month
+              (UTC), plus any earned linked-post bonus reviews shown in the Service.
             </li>
             <li>
-              <span className="text-text-primary font-medium">Bonus credits:</span> Users who have previously linked
-              a verified social media post earn +1 bonus upload credit per unique verified post, up to a maximum of
-              +10 bonus credits. The maximum effective upload limit is therefore 20 uploads per 3-hour window.
+              <span className="text-text-primary font-medium">CraftLint Pro:</span> $9.99 USD per month with no
+              monthly review-count cap, subject to reasonable fair-use, security, abuse-prevention, and
+              service-protection limits.
             </li>
             <li>
-              <span className="text-text-primary font-medium">Guest uploads:</span> Videos submitted without a
-              registered account cannot be linked to social media posts or saved to project history.
+              <span className="text-text-primary font-medium">Automatic renewal:</span> Pro renews every month using
+              the payment method on file until canceled. There is no free trial.
+            </li>
+            <li>
+              <span className="text-text-primary font-medium">Payment processor:</span> Stripe securely processes
+              payments, stores payment-method details, issues enabled receipts, and may request additional cardholder
+              authentication. CraftLint does not receive or store your complete card number or security code.
+            </li>
+            <li>
+              <span className="text-text-primary font-medium">Promotion codes:</span> Checkout may display a
+              promotion-code field. A code has no effect unless CraftLint has created and activated it in Stripe.
+            </li>
+            <li>
+              <span className="text-text-primary font-medium">Cancellation:</span> You may cancel through Settings.
+              Cancellation takes effect at the end of the current paid billing period, and Pro access continues
+              through that date. Canceling does not retroactively refund the current period. Permanently deleting
+              your CraftLint account instead cancels an active subscription immediately and ends access immediately.
+            </li>
+            <li>
+              <span className="text-text-primary font-medium">Refunds:</span> Payments are non-refundable and no
+              prorated credits are provided, except where a refund or cancellation right is required by applicable
+              law.
+            </li>
+            <li>
+              <span className="text-text-primary font-medium">Failed payments:</span> Stripe may retry a failed
+              payment and CraftLint may ask you to update or authenticate your payment method. Access may continue
+              during the configured retry period and ends if the subscription becomes unpaid, expires, or is
+              canceled.
+            </li>
+            <li>
+              <span className="text-text-primary font-medium">Taxes:</span> Applicable taxes, if any, may be added
+              and displayed during checkout based on your location and CraftLint&apos;s tax obligations.
             </li>
           </ul>
           <p>
-            Usage limits may change at any time with advance notice where reasonably practicable. You may not attempt
-            to circumvent usage limits by any technical or other means.
+            Prices and plan limits may change with the advance notice described in Section 2. A price change applies
+            no earlier than a future renewal unless you expressly agree otherwise. You may not circumvent plan,
+            security, or fair-use limits.
           </p>
           <p>
             We reserve the right to impose additional limits, throttle access, or suspend accounts that consume

@@ -57,3 +57,9 @@ services:
         sync: false          # e.g. "CraftLint <noreply@yourdomain.com>"
       - key: FRONTEND_URL
         sync: false          # e.g. https://surge-chi-khaki.vercel.app
+      - key: STRIPE_SECRET_KEY
+        sync: false          # server-only sk_test_... for demo; replace with sk_live_... at launch
+      - key: STRIPE_PRICE_ID
+        sync: false          # active recurring $9.99 USD/month price in the same Stripe mode
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false          # whsec_... for https://craftlint.onrender.com/api/billing/webhook

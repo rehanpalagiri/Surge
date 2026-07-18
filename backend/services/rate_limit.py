@@ -17,6 +17,11 @@ Pro is monthly-unlimited but carries a SOFT DAILY fair-use ceiling: at
 ~1.5–3¢/analysis, a 30+/day agency seat would run the Gemini bill underwater on a
 $9.99/mo flat price. The ceiling only bites at agency-scale abuse; a normal Pro
 creator never approaches it, and it resets every UTC day.
+
+Pro also carries a rolling 5-hour cost-window cap (services/cost_window.py),
+independent of the daily fair-use count above — see that module's docstring.
+It bounds actual estimated spend rather than analysis count, which matters once
+per-analysis cost varies by provider mix.
 """
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
@@ -27,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth import is_pro
 from models import User, UserAnalysis
 from services.clock import utc_now_naive
+from services.cost_window import get_cost_window_status, PRO_COST_WINDOW_HOURS
 from services.outcomes import post_id_from_url
 
 FREE_MONTHLY_LIMIT = 3
@@ -130,8 +136,20 @@ async def get_rate_limit(user: User, db: AsyncSession) -> dict:
             )
         )).scalar() or 0
         within_fair_use = used_today < PRO_FAIR_USE_DAILY
+        # Skip the cost-window query entirely once fair-use already blocks — the
+        # overall "allowed" is False either way, so the extra join+sum would be
+        # wasted work on exactly the requests hitting this path most (an
+        # already-throttled agency-scale seat retrying).
+        cost_window = await get_cost_window_status(user.id, db) if within_fair_use else None
+
+        limit_reason = None
+        if not within_fair_use:
+            limit_reason = "fair_use"
+        elif not cost_window["allowed"]:
+            limit_reason = "cost_window"
+
         return {
-            "allowed": within_fair_use,
+            "allowed": within_fair_use and (cost_window is None or cost_window["allowed"]),
             "tier": "pro",
             "unlimited": True,
             "used": used,
@@ -146,7 +164,13 @@ async def get_rate_limit(user: User, db: AsyncSession) -> dict:
             "used_today": used_today,
             "fair_use_remaining": max(0, PRO_FAIR_USE_DAILY - used_today),
             "fair_use_resets_at": _next_day_start(now).isoformat(),
-            "limit_reason": None if within_fair_use else "fair_use",
+            # Rolling 5-hour cost-window (Pro only): estimated-spend ceiling status.
+            # None for used/budget when already blocked by fair-use above — not
+            # queried in that case (see the skip comment near cost_window).
+            "cost_window_hours": PRO_COST_WINDOW_HOURS,
+            "cost_window_used_micros": cost_window["used_micros"] if cost_window else None,
+            "cost_window_budget_micros": cost_window["budget_micros"] if cost_window else None,
+            "limit_reason": limit_reason,
         }
 
     effective_limit = FREE_MONTHLY_LIMIT + bonus

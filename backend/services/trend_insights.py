@@ -1,157 +1,122 @@
-"""Trend Intelligence — synthesize a "what's changed recently" delta block.
+"""Trend Intelligence — narrate code-validated recent-vs-established seed-pool
+statistics into a "what's changed recently" delta block.
 
-Compares seeds published/harvested in the last 30 days against older seeds to
-identify format, topic, and structural shifts. The result is stored in
-trend_summaries and injected into the scoring prompt ALONGSIDE niche intelligence
-so Gemini knows what's working RIGHT NOW — not just what historically works.
+Same architecture requirement as services/seed_insights.py: statistics are computed
+in CODE first (services/seed_statistics.py), and Claude Opus 4.8 only narrates
+those already-validated numbers — never a freeform read of raw seed text. See
+seed_insights.py's module docstring for the full rationale.
 
-Unlike niche intelligence (which covers all-time patterns), this is only about delta.
+Unlike niche intelligence (all-time patterns), this is only about the delta between
+seeds posted in the last RECENT_WINDOW_DAYS and older "established" seeds.
 """
 
-import json
-import os
-from datetime import datetime, timedelta, timezone
+from services import seed_statistics
+from services.claude_client import tracked_claude_message
 
-from google import genai
-from google.genai import types
-from services.gemini import _GRADING_SYSTEM_INSTRUCTION
-from services.telemetry import tracked_generate_content
-
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-MIN_RECENT_SEEDS = 3
-RECENT_WINDOW_DAYS = 30
-ESTABLISHED_MIN_DAYS = 30
+# Re-exported so existing importers (routers/admin.py) don't need to change.
+RECENT_WINDOW_DAYS = seed_statistics.RECENT_WINDOW_DAYS
+ESTABLISHED_MIN_DAYS = seed_statistics.ESTABLISHED_MIN_DAYS
+MIN_RECENT_SEEDS = seed_statistics.MIN_RECENT_SEEDS
+_ref_date = seed_statistics._ref_date
 
 
-def _ref_date(s):
-    ref = s.posted_at or s.created_at
-    if ref and ref.tzinfo is None:
-        ref = ref.replace(tzinfo=timezone.utc)
-    return ref
+def count_recent_established(seeds: list) -> tuple[int, int]:
+    """(recent_count, established_count) for a seed list, using the same cutoffs
+    generate_trend_insight's compute_trend_seed_stats applies. Shared by every
+    caller that persists these counts alongside the trend text (routers/admin.py's
+    manual trigger, services/niche_synthesis.py's weekly run) so the stored counts
+    can't drift from what the narration was actually computed over."""
+    from datetime import datetime, timedelta, timezone
+    now_utc = datetime.now(timezone.utc)
+    recent_cutoff = now_utc - timedelta(days=RECENT_WINDOW_DAYS)
+    established_cutoff = now_utc - timedelta(days=ESTABLISHED_MIN_DAYS)
+    recent = sum(1 for s in seeds if _ref_date(s) and _ref_date(s) >= recent_cutoff)
+    established = sum(1 for s in seeds if _ref_date(s) and _ref_date(s) < established_cutoff)
+    return recent, established
+
+_NARRATION_SYSTEM = (
+    "You are a technical writer producing a trend-delta report for a video scoring "
+    "AI. Your ONLY source of truth is the validated recent-vs-established statistics "
+    "table you are given — every number was computed in code before this "
+    "conversation started. Restate and explain those numbers. Do NOT invent a "
+    "format, hook, topic, or technique that is not directly derivable from the "
+    "numbers — you were not shown any individual video. Where a shift is not "
+    "reportable (too few seeds on one side), say so plainly instead of speculating "
+    "about what might be changing."
+)
 
 
-def _age_label(s) -> str:
-    now = datetime.now(timezone.utc)
-    ref = _ref_date(s)
-    if not ref:
-        return "age unknown"
-    days = (now - ref).days
-    if days <= 7:
-        return f"{days}d old"
-    if days <= 30:
-        return f"{days // 7}w old"
-    return f"{days // 30}mo old"
+def _fmt_shift_row(d: dict) -> str:
+    if not d["shift_reportable"]:
+        return (
+            f"{d['label']} ({d['dimension']}): NOT REPORTABLE (n_recent={d['n_recent']}, "
+            f"n_established={d['n_established']}, need >= {seed_statistics.MIN_RECENT_SEEDS} on each side)."
+        )
+    delta = d["delta"]
+    direction = "up" if (delta or 0) > 0 else "down" if (delta or 0) < 0 else "flat"
+    r_note = (
+        f" Recent-window correlation with rating: r={d['recent_r']:+.3f} (n={d['recent_r_n']})"
+        + (" — insufficient n for confidence." if d["recent_r_insufficient"] else ".")
+        if d["recent_r"] is not None else ""
+    )
+    return (
+        f"{d['label']} ({d['dimension']}): recent mean {d['recent_mean']} (n={d['n_recent']}) vs "
+        f"established mean {d['established_mean']} (n={d['n_established']}) — delta {delta:+.2f} ({direction})."
+        f"{r_note}"
+    )
 
 
-def _fmt_seed(s) -> str:
-    try:
-        data = json.loads(s.gemini_analysis) if s.gemini_analysis else {}
-    except (ValueError, TypeError):
-        data = {}
+def _fmt_trend_table(stats: dict) -> str:
+    lines = [_fmt_shift_row(d) for d in stats["dimensions"]]
+    return f"""Recent window: last {seed_statistics.RECENT_WINDOW_DAYS} days ({stats['n_recent']} rated seeds).
+Established baseline: older than {seed_statistics.ESTABLISHED_MIN_DAYS} days ({stats['n_established']} rated seeds).
 
-    views_str = f"{s.view_count:,} views, " if s.view_count is not None else ""
-    parts = [f"[{views_str}{s.like_count:,} likes | Rating {s.rating}/10 | {_age_label(s)}]"]
+PER-DIMENSION RECENT-VS-ESTABLISHED SHIFT (computed in code):
+{chr(10).join(lines)}
 
-    for field in ("what_happens", "performance_reason"):
-        val = (data.get(field) or "").strip()
-        if val:
-            parts.append(f"{field}: {val}")
-
-    _DIMS = ("hook_velocity", "cut_frequency", "text_scannability",
-             "curiosity_gap", "audio_visual_sync", "loop_seamlessness")
-    dim_scores = [f"{d}={data[d]}" for d in _DIMS if data.get(d) is not None]
-    if dim_scores:
-        parts.append("Dims: " + ", ".join(dim_scores))
-
-    patterns = data.get("patterns") or {}
-    if patterns.get("replicate"):
-        parts.append("Replicate: " + "; ".join(patterns["replicate"][:3]))
-
-    return "\n".join(parts)
+{stats['caveats']}"""
 
 
 async def generate_trend_insight(seeds: list, platform: str, niche: str) -> str:
     """Synthesize a trend delta from recent vs established seeds for a (platform, niche).
 
-    Raises ValueError if there aren't enough recent seeds or Gemini returns empty.
+    Computes validated statistics in code first (services.seed_statistics), then has
+    Claude Opus 4.8 narrate only those numbers.
+
+    Raises ValueError if there aren't enough recent seeds. Raises RuntimeError if
+    ANTHROPIC_API_KEY isn't configured.
     """
-    now = datetime.now(timezone.utc)
-    recent_cutoff = now - timedelta(days=RECENT_WINDOW_DAYS)
-    established_cutoff = now - timedelta(days=ESTABLISHED_MIN_DAYS)
-
-    rated = [s for s in seeds if s.rating is not None]
-    recent = [s for s in rated if _ref_date(s) and _ref_date(s) >= recent_cutoff]
-    established = [s for s in rated if _ref_date(s) and _ref_date(s) < established_cutoff]
-
-    if len(recent) < MIN_RECENT_SEEDS:
-        raise ValueError(
-            f"Not enough recent seeds for {platform}/{niche} — "
-            f"{len(recent)} found (need {MIN_RECENT_SEEDS} posted in last {RECENT_WINDOW_DAYS} days). "
-            "Run a Trend Harvest first."
-        )
-
+    stats = seed_statistics.compute_trend_seed_stats(seeds, platform, niche)
     pname = "TikTok" if platform == "tiktok" else "Instagram Reels"
+    stats_block = _fmt_trend_table(stats)
 
-    recent_high = sorted([s for s in recent if s.rating >= 6], key=lambda s: s.rating, reverse=True)
-    recent_low = sorted([s for s in recent if s.rating <= 4], key=lambda s: s.rating)
-    est_high = sorted([s for s in established if s.rating >= 6], key=lambda s: s.rating, reverse=True)[:8]
+    prompt = f"""NICHE: {niche}   PLATFORM: {pname}
 
-    recent_block = "\n\n".join(_fmt_seed(s) for s in recent_high[:10]) if recent_high else "None yet."
-    recent_low_block = "\n\n".join(_fmt_seed(s) for s in recent_low[:5]) if recent_low else "None yet."
-    established_block = (
-        "\n\n".join(_fmt_seed(s) for s in est_high)
-        if est_high else "No established baseline yet — all data is new."
+VALIDATED RECENT-VS-ESTABLISHED STATISTICS (computed in code — this is your only source):
+{stats_block}
+
+Write a TREND INTELLIGENCE REPORT a video-scoring AI will read alongside the all-time niche intelligence
+report. Focus ONLY on the deltas in the table above — do not repeat general patterns, and do not describe
+what any specific video does.
+
+Structure it as:
+
+WHAT SHIFTED: for each reportable dimension, one sentence stating the direction and size of the shift and
+whether the recent-window correlation with rating still holds. If a dimension is not reportable, say so.
+
+WHAT TO FLAG RIGHT NOW: up to 3 sentences translating the reportable shifts into what a grader should watch
+for — phrased as "recent seeds in this niche score higher/lower on X than established ones," never as a
+description of specific creative technique you were not shown.
+
+If nothing is reportable, say plainly that there isn't enough recent data yet to identify a trend — do not
+manufacture one."""
+
+    return await tracked_claude_message(
+        operation="trend_insight_synthesis",
+        system=_NARRATION_SYSTEM,
+        user_prompt=prompt,
+        # Generous headroom: adaptive thinking shares this budget with the answer, and
+        # a truncated response is now treated as a hard failure (see claude_client.py)
+        # rather than silently stored — better to overprovision than truncate.
+        max_tokens=4096,
     )
-
-    prompt = f"""You are analyzing trend shifts for a video scoring AI. Your job is to identify what has CHANGED in the {niche} niche on {pname} in the last {RECENT_WINDOW_DAYS} days.
-
-Data summary:
-- {len(recent)} videos published in the last {RECENT_WINDOW_DAYS} days ({len(recent_high)} high performers, {len(recent_low)} low performers)
-- {len(established)} established videos from before {RECENT_WINDOW_DAYS} days ago (the baseline for comparison)
-
-RECENT HIGH PERFORMERS (last {RECENT_WINDOW_DAYS} days — what is working NOW):
-{recent_block}
-
-RECENT LOW PERFORMERS (last {RECENT_WINDOW_DAYS} days — what is failing NOW):
-{recent_low_block}
-
-ESTABLISHED HIGH PERFORMERS (older baseline — what WAS working):
-{established_block}
-
-Write a TREND INTELLIGENCE REPORT. Focus ONLY on what is DIFFERENT between recent and established performers. A future AI reading this also has the full niche intelligence report (covering all-time patterns) — so do NOT repeat general patterns that appear in both groups. This report is specifically about what has CHANGED.
-
-If there is no meaningful difference between recent and established, say so honestly — do not manufacture trends that are not in the data.
-
-RISING NOW:
-What formats, hooks, topics, or structures appear in recent winners that were absent or rare in the established set? Be specific: not "better hooks" but "creators are opening with [specific format] — a technique that rarely appeared in the established baseline." Name actual visual styles, script structures, topics, or pacing choices. Target 250 words. If nothing is rising, say "No clear emerging pattern — recent and established winners use similar approaches."
-
-FADING:
-What patterns were common in established winners but absent from recent winners? These may be losing effectiveness on {pname} right now. Be equally specific. Target 250 words. If nothing is clearly fading, say so.
-
-VELOCITY SIGNALS:
-Which videos in the recent data are going viral unusually fast (high views relative to their age)? What do the fastest-moving videos have in common — what specific format or hook is driving their velocity? If no velocity outliers exist in the data, say "No velocity outliers in current dataset." Target 200 words.
-
-WHAT TO FLAG RIGHT NOW:
-3-5 specific signals a scoring AI should recognize in a new {niche} video on {pname}. Format as actionable flags:
-- "FLAG POSITIVE: if the video [specific pattern] — this matches what is going viral this month in this niche"
-- "FLAG NEGATIVE: if the creator uses [specific pattern] — this approach dominated 60+ days ago but is underrepresented in recent top performers"
-Only write flags grounded in the data above. Do not invent flags from general knowledge. Target 250 words."""
-
-    response = await tracked_generate_content(
-        client,
-        operation="legacy_trend_insight",
-        model="gemini-2.5-flash",
-        contents=[prompt],
-        config=types.GenerateContentConfig(
-            response_mime_type="text/plain",
-            system_instruction=_GRADING_SYSTEM_INSTRUCTION,
-        ),
-    )
-
-    text = (response.text or "").strip()
-    if not text:
-        raise ValueError(
-            f"Gemini returned empty response for {platform}/{niche} trend synthesis. Try again."
-        )
-    return text

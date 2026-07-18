@@ -22,7 +22,7 @@ const PRO_FEATURES = [
   "Unlimited craft reviews",
   "Everything in Free — same full report",
   "Review every draft, not just the final cut",
-  "Cancel anytime from Settings",
+  "Cancel anytime; access continues through the paid period",
 ];
 
 export default function PricingPage() {
@@ -40,6 +40,7 @@ export default function PricingPage() {
   const price = billing?.price || FALLBACK_PRICE;
   const isPro = billing?.is_pro ?? false;
   const configured = billing?.configured ?? false;
+  const eligibleForPaid = billing?.eligible_for_paid ?? true;
 
   return (
     <main className="min-h-screen bg-background">
@@ -130,11 +131,28 @@ export default function PricingPage() {
               >
                 You&apos;re on Pro — manage in Settings
               </Link>
+            ) : !eligibleForPaid ? (
+              <div className="space-y-2">
+                <button
+                  disabled
+                  className="w-full border border-border text-text-muted font-semibold py-3 rounded-xl text-sm cursor-not-allowed"
+                >
+                  Pro is available to adults
+                </button>
+                <p className="text-text-muted text-xs text-center">
+                  Paid subscriptions require an account holder age 18 or older.
+                </p>
+              </div>
             ) : configured ? (
-              <UpgradeButton
-                label={`Go unlimited — ${price}`}
-                className="gradient-btn text-white font-bold py-3 rounded-xl w-full"
-              />
+              <div className="space-y-2">
+                <UpgradeButton
+                  label={`Go unlimited — ${price}`}
+                  className="gradient-btn text-white font-bold py-3 rounded-xl w-full"
+                />
+                <p className="text-text-muted text-xs text-center">
+                  Have a promotion code? Enter it securely during Stripe checkout.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 <button
@@ -154,7 +172,8 @@ export default function PricingPage() {
         <p className="text-text-muted/80 text-xs text-center max-w-lg mx-auto">
           Reviews are AI assessments of observable craft — never a promise of reach.
           Free quota resets on the 1st of each month (UTC). Linked-post bonus reviews
-          stack on top of the monthly 3.
+          stack on top of the monthly 3. Pro is $9.99 USD each month, automatically
+          renewing until canceled.
         </p>
       </div>
     </main>

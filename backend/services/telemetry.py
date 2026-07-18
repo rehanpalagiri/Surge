@@ -22,6 +22,14 @@ log = logging.getLogger("usage_telemetry")
 _DEFAULT_FLASH_INPUT_PER_MTOK = 0.30
 _DEFAULT_FLASH_OUTPUT_PER_MTOK = 2.50
 
+# Claude Sonnet 5 list price (USD per 1M tokens) for the scoring pass. These are the
+# STANDARD post-introductory rates ($3/$15) — deliberately NOT the temporary intro
+# rate ($2/$10 through 2026-08-31), so a cost baseline built now doesn't understate
+# steady-state spend. Overridable per contracted rate with
+# ANTHROPIC_SONNET_INPUT_PRICE_PER_MTOK / ANTHROPIC_SONNET_OUTPUT_PRICE_PER_MTOK.
+_DEFAULT_SONNET_INPUT_PER_MTOK = 3.00
+_DEFAULT_SONNET_OUTPUT_PER_MTOK = 15.00
+
 
 def _price_per_mtok(env_key: str, default: float) -> float:
     raw = os.getenv(env_key)
@@ -50,6 +58,28 @@ def estimate_gemini_cost_micros(input_tokens: int | None, output_tokens: int | N
         return None
     in_rate = _price_per_mtok("GEMINI_FLASH_INPUT_PRICE_PER_MTOK", _DEFAULT_FLASH_INPUT_PER_MTOK)
     out_rate = _price_per_mtok("GEMINI_FLASH_OUTPUT_PRICE_PER_MTOK", _DEFAULT_FLASH_OUTPUT_PER_MTOK)
+    cost_usd = (int(input_tokens or 0) / 1_000_000) * in_rate + (int(output_tokens or 0) / 1_000_000) * out_rate
+    return round(cost_usd * 1_000_000)
+
+
+def anthropic_price_source() -> dict:
+    """The Claude scoring-pass pricing actually in effect, for the admin cost view."""
+    return {
+        "input_usd_per_mtok": _price_per_mtok("ANTHROPIC_SONNET_INPUT_PRICE_PER_MTOK", _DEFAULT_SONNET_INPUT_PER_MTOK),
+        "output_usd_per_mtok": _price_per_mtok("ANTHROPIC_SONNET_OUTPUT_PRICE_PER_MTOK", _DEFAULT_SONNET_OUTPUT_PER_MTOK),
+        "source": "claude-sonnet-5 standard list price (override via env for contracted rate)",
+    }
+
+
+def estimate_anthropic_cost_micros(input_tokens: int | None, output_tokens: int | None) -> int | None:
+    """Per-call cost in micro-USD for the Claude scoring pass, from token counts ×
+    list price. Same honesty contract as the Gemini estimator: None when BOTH counts
+    are missing, never a fabricated 0. Thinking tokens are billed as output tokens by
+    Anthropic and are already folded into ``output_tokens`` by the SDK usage block."""
+    if input_tokens is None and output_tokens is None:
+        return None
+    in_rate = _price_per_mtok("ANTHROPIC_SONNET_INPUT_PRICE_PER_MTOK", _DEFAULT_SONNET_INPUT_PER_MTOK)
+    out_rate = _price_per_mtok("ANTHROPIC_SONNET_OUTPUT_PRICE_PER_MTOK", _DEFAULT_SONNET_OUTPUT_PER_MTOK)
     cost_usd = (int(input_tokens or 0) / 1_000_000) * in_rate + (int(output_tokens or 0) / 1_000_000) * out_rate
     return round(cost_usd * 1_000_000)
 

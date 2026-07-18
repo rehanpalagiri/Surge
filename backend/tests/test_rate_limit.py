@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from models import Base, User, UserAnalysis
+from models import Base, User, UsageEvent, UserAnalysis
 from services.clock import utc_now_naive
 from services.rate_limit import (
     get_rate_limit, FREE_MONTHLY_LIMIT, PRO_FAIR_USE_DAILY, _month_start, _day_start,
@@ -145,6 +145,95 @@ class RateLimitTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(rl["limit_reason"])
         self.assertEqual(rl["used_today"], 5)
         self.assertEqual(rl["fair_use_remaining"], PRO_FAIR_USE_DAILY - 5)
+
+    async def test_pro_cost_window_blocks(self):
+        # Rolling 5h estimated spend at/over the default $1.00 budget blocks Pro,
+        # independent of the (unrelated) daily fair-use count.
+        now = utc_now_naive()
+        async with self.Session() as db:
+            user = await self._user(db, subscription_status="active")
+            analysis = self._analysis(user.id, "complete", now - timedelta(minutes=30))
+            db.add(analysis)
+            await db.flush()
+            db.add(UsageEvent(
+                analysis_id=analysis.id, operation="video_craft_perception",
+                provider="google_gemini", success=True, latency_ms=100,
+                estimated_cost_micros=1_200_000, created_at=now - timedelta(minutes=10),
+            ))
+            await db.commit()
+            rl = await get_rate_limit(user, db)
+        self.assertEqual(rl["tier"], "pro")
+        self.assertFalse(rl["allowed"])
+        self.assertEqual(rl["limit_reason"], "cost_window")
+        self.assertEqual(rl["cost_window_used_micros"], 1_200_000)
+        self.assertEqual(rl["cost_window_hours"], 5)
+
+    async def test_pro_cost_window_under_budget_allowed(self):
+        now = utc_now_naive()
+        async with self.Session() as db:
+            user = await self._user(db, subscription_status="active")
+            analysis = self._analysis(user.id, "complete", now - timedelta(minutes=30))
+            db.add(analysis)
+            await db.flush()
+            db.add(UsageEvent(
+                analysis_id=analysis.id, operation="video_craft_perception",
+                provider="google_gemini", success=True, latency_ms=100,
+                estimated_cost_micros=50_000, created_at=now - timedelta(minutes=10),
+            ))
+            await db.commit()
+            rl = await get_rate_limit(user, db)
+        self.assertTrue(rl["allowed"])
+        self.assertIsNone(rl["limit_reason"])
+
+    async def test_pro_fair_use_takes_priority_when_both_block(self):
+        # When both the daily fair-use count and the cost-window budget are
+        # exceeded, limit_reason stays "fair_use" (existing behavior/priority
+        # unchanged by the new cost-window addition).
+        now = utc_now_naive()
+        day = _day_start(now)
+        async with self.Session() as db:
+            user = await self._user(db, subscription_status="active")
+            analyses = [
+                self._analysis(user.id, "complete", day + timedelta(seconds=i))
+                for i in range(PRO_FAIR_USE_DAILY)
+            ]
+            db.add_all(analyses)
+            await db.flush()
+            db.add(UsageEvent(
+                analysis_id=analyses[0].id, operation="video_craft_perception",
+                provider="google_gemini", success=True, latency_ms=100,
+                estimated_cost_micros=5_000_000, created_at=now - timedelta(minutes=10),
+            ))
+            await db.commit()
+            rl = await get_rate_limit(user, db)
+        self.assertFalse(rl["allowed"])
+        self.assertEqual(rl["limit_reason"], "fair_use")
+        # The cost-window query is skipped once fair-use already blocks (it can't
+        # change the outcome) — used/budget stay None rather than a real query result.
+        self.assertIsNone(rl["cost_window_used_micros"])
+        self.assertIsNone(rl["cost_window_budget_micros"])
+        self.assertEqual(rl["cost_window_hours"], 5)
+
+    async def test_free_tier_unaffected_by_cost_window(self):
+        # A free-tier user's usage_events cost is never consulted — the cost-window
+        # limiter is Pro-only and must not stack on the free monthly count.
+        now = utc_now_naive()
+        month_start = _month_start(now)
+        async with self.Session() as db:
+            user = await self._user(db)
+            analysis = self._analysis(user.id, "complete", month_start + timedelta(hours=1))
+            db.add(analysis)
+            await db.flush()
+            db.add(UsageEvent(
+                analysis_id=analysis.id, operation="video_craft_perception",
+                provider="google_gemini", success=True, latency_ms=100,
+                estimated_cost_micros=50_000_000, created_at=now - timedelta(minutes=10),
+            ))
+            await db.commit()
+            rl = await get_rate_limit(user, db)
+        self.assertEqual(rl["tier"], "free")
+        self.assertTrue(rl["allowed"])
+        self.assertNotIn("cost_window_used_micros", rl)
 
     async def test_comp_email_gets_unlimited(self):
         # Operator comp allowlist grants Pro with no Stripe — case-insensitive.

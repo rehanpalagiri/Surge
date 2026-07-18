@@ -6,6 +6,7 @@ asyncpg
 certifi
 python-multipart
 google-genai
+anthropic
 python-dotenv
 pydantic
 httpx
@@ -14,4 +15,4 @@ passlib[bcrypt]
 PyJWT
 boto3
 apscheduler
-stripe
+stripe==15.3.0

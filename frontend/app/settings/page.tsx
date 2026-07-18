@@ -99,9 +99,15 @@ function BillingCard() {
               Unlimited analyses.
               {status.subscription_status === "past_due"
                 ? " ⚠ Last payment failed — please update your card."
+                : status.cancel_at_period_end && renews
+                ? ` Your subscription ends ${renews}.`
                 : renews
                 ? ` Renews ${renews}.`
                 : ""}
+            </p>
+          ) : !status.eligible_for_paid ? (
+            <p className="text-text-muted text-sm mt-0.5">
+              Free plan — paid subscriptions are available to users 18 or older.
             </p>
           ) : (
             <p className="text-text-muted text-sm mt-0.5">
@@ -121,8 +127,12 @@ function BillingCard() {
           >
             {portalBusy ? "Opening…" : "Manage subscription"}
           </button>
-        ) : (
+        ) : status.eligible_for_paid ? (
           <UpgradeButton label="Upgrade to Pro" />
+        ) : (
+          <span className="text-text-muted text-xs font-medium">
+            Adults only
+          </span>
         )}
       </div>
       {error && <p className="text-danger text-xs mt-3">{error}</p>}

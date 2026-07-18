@@ -2,12 +2,13 @@
 
 Asserts that with SURGE_CALIBRATION_ENABLED unset (the default):
   - the live grading path applies NO calibration nudge (calibration_version 0,
-    scores equal the raw perception scores);
+    scores equal the raw Claude scoring output);
   - the grade-time note read (load_calibration_note) returns None even when a note
     exists in the table — and returns it once the flag is on, proving the flag is
     the gate;
   - the note generator and the correction audit refuse to produce AI opinion;
-  - grading has no import wire to the calibration path at all (the "grep" check).
+  - grading has no import wire to the calibration path at all (the "grep" check),
+    across BOTH provider modules.
 """
 import os
 import tempfile
@@ -16,12 +17,14 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
+os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ.pop("SURGE_CALIBRATION_ENABLED", None)  # default OFF for this suite
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 import services.gemini as gemini
+import services.claude_scoring as claude_scoring
 import services.seed_correction as seed_correction
 from models import Base, CalibrationNote, UserAnalysis
 from services.calibration import (
@@ -31,17 +34,35 @@ from services.calibration import (
 )
 from services.gemini import _SCORE_KEYS, analyze_video
 
+# DESCRIBE-ONLY perception (Gemini): no scores.
 _PERCEPTION = """{
   "rubric_context": {"primary_niche": "NONE", "secondary_niche": "NONE",
     "format": "x", "intent": "y", "confidence": "low", "evidence": []},
-  "hook_velocity": 7, "cut_frequency": 6, "text_scannability": 5,
-  "curiosity_gap": 8, "audio_visual_sync": 6, "loop_seamlessness": 4,
-  "not_applicable": {},
+  "dimension_observations": {"hook_velocity": "a", "cut_frequency": "b", "text_scannability": "c",
+    "curiosity_gap": "d", "audio_visual_sync": "e", "loop_seamlessness": "f"},
   "section_observations": [
     {"section": "0-2s", "observation": "a"}, {"section": "2-5s", "observation": "b"},
     {"section": "middle", "observation": "c"}, {"section": "ending/loop", "observation": "d"}],
   "emotional_read": {"target_emotions": ["curiosity"], "achieved_score": 6,
     "what_lands": "x", "what_misses": "y"}
+}"""
+# The Claude scoring pass produces the scores; the test asserts they pass through unnudged.
+_SCORING = """{
+  "dimension_reasoning": {"hook_velocity":"m","cut_frequency":"c","text_scannability":"t",
+    "curiosity_gap":"q","audio_visual_sync":"s","loop_seamlessness":"e"},
+  "hook_velocity": 7, "cut_frequency": 6, "text_scannability": 5,
+  "curiosity_gap": 8, "audio_visual_sync": 6, "loop_seamlessness": 4,
+  "not_applicable": {"cut_frequency": "", "text_scannability": ""},
+  "strengths": ["s"], "improvements": ["a","b","c"], "analysis_summary": "One. Two. Three.",
+  "improvement_plan": [{"area":"Ending Strength","priority":1,"current_score":4,"problem":"p","fix":"f","pattern":"x"}],
+  "caption_rewrite": "c", "hook_rewrite": "h",
+  "attention_risk_map": [
+    {"section":"0-2s","risk":"low","reason":"r","fix":"f"},
+    {"section":"2-5s","risk":"medium","reason":"r","fix":"f"},
+    {"section":"middle","risk":"medium","reason":"r","fix":"f"},
+    {"section":"ending/loop","risk":"high","reason":"r","fix":"f"}],
+  "recommended_experiment": {"change":"c","keep_constant":"k","observe":"o"},
+  "how_to_amplify": ["a","b"]
 }"""
 _EXPECTED_SCORES = {"hook_velocity": 7, "cut_frequency": 6, "text_scannability": 5,
                     "curiosity_gap": 8, "audio_visual_sync": 6, "loop_seamlessness": 4}
@@ -50,6 +71,8 @@ _EXPECTED_SCORES = {"hook_velocity": 7, "cut_frequency": 6, "text_scannability":
 class _FakeFile:
     state = _types.SimpleNamespace(name="ACTIVE")
     name = "files/x"
+    uri = "https://generativelanguage.googleapis.com/v1beta/files/x"
+    mime_type = "video/mp4"
 
 
 class _FakeResp:
@@ -60,8 +83,6 @@ class _FakeResp:
 
 class _FakeAio:
     def __init__(self):
-        outer = self
-
         class F:
             async def upload(self, file):
                 return _FakeFile()
@@ -74,21 +95,37 @@ class _FakeAio:
 
         class M:
             async def generate_content(self, model, contents, config):
-                # Perception first, then a reasoning failure (empty) → validator fills
-                # defaults from the perception scores. Scores must survive untouched.
-                outer._n += 1
-                if outer._n == 1:
-                    return _FakeResp(_PERCEPTION)
-                raise RuntimeError("reasoning intentionally skipped for this test")
+                # One Gemini call now: the describe-only perception pass.
+                return _FakeResp(_PERCEPTION)
 
-        self._n = 0
         self.files = F()
         self.models = M()
 
 
-class _FakeClient:
+class _FakeGeminiClient:
     def __init__(self):
         self.aio = _FakeAio()
+
+
+class _FakeClaudeMessage:
+    def __init__(self, text):
+        self.content = [_types.SimpleNamespace(type="text", text=text)]
+        self.usage = _types.SimpleNamespace(input_tokens=10, output_tokens=20)
+        self.model = "claude-sonnet-5"
+        self.stop_reason = "end_turn"
+
+
+class _FakeClaudeMessages:
+    def __init__(self, text):
+        self._text = text
+
+    async def create(self, **kwargs):
+        return _FakeClaudeMessage(self._text)
+
+
+class _FakeClaudeClient:
+    def __init__(self, text=_SCORING):
+        self.messages = _FakeClaudeMessages(text)
 
 
 class GradingUnnudgedTest(unittest.IsolatedAsyncioTestCase):
@@ -109,14 +146,16 @@ class GradingUnnudgedTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(calibration_enabled())
 
     async def test_grading_applies_no_calibration_nudge(self):
-        with patch.object(gemini, "client", _FakeClient()), \
-             patch.object(gemini, "record_usage_event", new=AsyncMock()):
+        with patch.object(gemini, "client", _FakeGeminiClient()), \
+             patch.object(claude_scoring, "client", _FakeClaudeClient()), \
+             patch.object(gemini, "record_usage_event", new=AsyncMock()), \
+             patch.object(claude_scoring, "record_usage_event", new=AsyncMock()):
             result = await analyze_video(self._tmp.name, niche="Uncategorized")
         self.assertNotIn("error", result)
         self.assertEqual(result["calibration_version"], 0)
         for key in _SCORE_KEYS:
             self.assertEqual(result[key], _EXPECTED_SCORES[key],
-                             f"{key} was nudged away from the raw perception score")
+                             f"{key} was nudged away from the raw scoring output")
 
     async def _seed_note(self, db):
         db.add(CalibrationNote(
@@ -168,13 +207,14 @@ class GradingUnnudgedTest(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(a.correction_json)
 
     def test_grading_has_no_calibration_import_wire(self):
-        # Operationalizes "grep confirms no live import path enables it": the grading
-        # module must not import or call into the calibration path.
-        with open(gemini.__file__) as fh:
-            src = fh.read()
-        self.assertNotIn("from services.calibration", src)
-        self.assertNotIn("import calibration", src)
-        self.assertNotIn("load_calibration_note", src)
+        # Operationalizes "grep confirms no live import path enables it": NEITHER
+        # provider module may import or call into the calibration path.
+        for mod in (gemini, claude_scoring):
+            with open(mod.__file__) as fh:
+                src = fh.read()
+            self.assertNotIn("from services.calibration", src, mod.__file__)
+            self.assertNotIn("import calibration", src, mod.__file__)
+            self.assertNotIn("load_calibration_note", src, mod.__file__)
 
 
 if __name__ == "__main__":
