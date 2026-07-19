@@ -2,6 +2,7 @@ import os
 import math
 import json
 import asyncio
+import logging
 import time
 from google import genai
 from google.genai import types
@@ -10,6 +11,8 @@ from services.niche_weights import NICHE_PROFILES
 from services.niche_synthesis import load_niche_synthesis_block
 from services.telemetry import record_usage_event, response_token_usage, estimate_gemini_cost_micros
 from services.claude_scoring import score_from_perception
+
+logger = logging.getLogger(__name__)
 
 # http_options timeout (ms) caps any single Gemini call so a hung request can't
 # pin a worker forever — a timeout raises, which analyze_video catches and turns
@@ -573,7 +576,13 @@ async def analyze_video(
             raise  # quota or bad key — router returns 503 without storing broken data
         # Any other API error (400/404/500/503, etc.) degrades gracefully — without
         # this return the function would fall through to None and crash the router.
-        return _error_dict(f"Gemini API error ({e.code}): {e}")
+        # The router's /status endpoint surfaces scores_json.error VERBATIM to the
+        # end user (so a real "we're at capacity" reason isn't hidden behind a
+        # generic message) — so the raw SDK exception (auth internals, service
+        # hostnames, etc.) must never land in that field. Log the real detail for
+        # ops and store only a clean, user-safe message.
+        logger.warning("Gemini perception call failed (analysis %s): %r", analysis_id, e)
+        return _error_dict("We couldn't complete this analysis. Please try again in a moment.")
     except json.JSONDecodeError as e:
         await record_usage_event(
             operation="video_craft_perception", provider="google_gemini",
@@ -581,7 +590,8 @@ async def analyze_video(
             latency_ms=(time.perf_counter() - started) * 1000, input_bytes=input_bytes,
             error_code="invalid_json",
         )
-        return _error_dict(f"Failed to parse Gemini response as JSON: {e}")
+        logger.warning("Gemini perception response wasn't valid JSON (analysis %s): %r", analysis_id, e)
+        return _error_dict("We couldn't complete this analysis. Please try again in a moment.")
     except Exception as e:
         await record_usage_event(
             operation="video_craft_perception", provider="google_gemini",
@@ -589,7 +599,8 @@ async def analyze_video(
             latency_ms=(time.perf_counter() - started) * 1000, input_bytes=input_bytes,
             error_code=type(e).__name__,
         )
-        return _error_dict(str(e))
+        logger.warning("Gemini perception call raised unexpectedly (analysis %s): %r", analysis_id, e)
+        return _error_dict("We couldn't complete this analysis. Please try again in a moment.")
     finally:
         # Delete the uploaded file regardless of outcome — Gemini auto-purges after
         # 48h, but we clean up early so users' video data isn't stored longer than needed.
