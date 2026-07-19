@@ -125,8 +125,9 @@ async def signup(payload: SignupIn, request: Request, background_tasks: Backgrou
         raise HTTPException(status_code=409, detail="Username already taken.")
 
     # 13–17: seed consent is permanently "no" (enforced again in the consent
-    # endpoint and in seed_promote — defense in depth). 18+: default "ask".
-    consent = "no" if age < 18 else "ask"
+    # endpoint and in seed_promote — defense in depth). 18+: default "yes",
+    # changeable any time in Settings.
+    consent = "no" if age < 18 else "yes"
 
     user = User(
         username=username,
@@ -238,7 +239,7 @@ async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, 
     # leave it unset otherwise (is_minor treats unknown as adult — see note in PR).
     birth_year = None
     birth_date = None
-    consent = "ask"
+    consent = "yes"
     if payload.birth_date:
         try:
             bd = date.fromisoformat(payload.birth_date)
@@ -251,7 +252,7 @@ async def google_auth(payload: GoogleAuthIn, background_tasks: BackgroundTasks, 
         if age < 13:
             raise HTTPException(status_code=403, detail="You must be 13 or older to use CraftLint.")
         birth_year, birth_date = bd.year, payload.birth_date
-        consent = "no" if age < 18 else "ask"
+        consent = "no" if age < 18 else "yes"
 
     # Username from the Google display name (or email local part), de-duplicated.
     base = (info.get("name") or email.split("@")[0]).strip()[:30] or "creator"
