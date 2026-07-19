@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Privacy Policy</h1>
-          <p className="text-text-muted text-sm mt-1">Effective date: June 10, 2026</p>
+          <p className="text-text-muted text-sm mt-1">Effective date: July 18, 2026</p>
         </div>
 
         <Section title="Who we are">
@@ -54,22 +54,27 @@ export default function PrivacyPage() {
 
         <Section title="What we do NOT collect or store">
           <p className="text-text-primary font-medium">
-            We never retain your video files.
+            We do not keep a permanent copy of your video files.
           </p>
           <p>
-            Every video you upload is sent to Google Gemini for analysis and
-            permanently deleted from our servers within seconds of the analysis
-            completing. There is no copy of your video on CraftLint&apos;s
+            Every video you upload is held only for as long as it takes to run your
+            analysis: it is sent to Google Gemini for processing and removed from
+            our storage immediately after the analysis completes — or automatically
+            within a few minutes if an upload is never completed or an analysis is
+            never started. There is no copy of your video on CraftLint&apos;s
             infrastructure after that point.
           </p>
         </Section>
 
         <Section title="Google Gemini">
           <p>
-            Videos are processed by Google&apos;s Gemini API. Google&apos;s privacy
-            policy applies to that processing. We have no control over Google&apos;s
-            handling of data sent to their API. You can review Google&apos;s policy
-            at{" "}
+            Videos are processed by Google&apos;s Gemini API, which may retain an
+            uploaded file on Google&apos;s own infrastructure for a short period
+            (per Google&apos;s published limits, up to 48 hours) before Google
+            deletes it — independent of, and in addition to, our own deletion
+            described above. Google&apos;s privacy policy applies to that
+            processing; we have no control over Google&apos;s handling of data sent
+            to their API. You can review Google&apos;s policy at{" "}
             <a
               href="https://policies.google.com/privacy"
               target="_blank"
