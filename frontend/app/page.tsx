@@ -242,12 +242,6 @@ function LegacyLandingHero({ deleted, onDismissDeleted }: { deleted: boolean; on
               >
                 Review My Video →
               </button>
-              <Link
-                href="/sample"
-                className="btn-soft block w-full text-center text-text-primary font-semibold py-3 rounded-2xl text-sm"
-              >
-                See a sample review
-              </Link>
             </form>
 
             {/* Trust signals */}
@@ -397,7 +391,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
         <div className="surge-progress" ref={progressRef} aria-hidden />
         <header className="surge-nav">
           <BrandLogo className="text-[21px]" />
-          <nav><a href="#how">How it works</a><Link href="/sample">Sample report</Link><Link href="/login">Log in</Link><ThemeToggle/><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
+          <nav><a href="#how">How it works</a><Link href="/login">Log in</Link><ThemeToggle/><Link className="surge-nav-cta" href="/signup" {...navCta}>Sign up free <ArrowRight size={15}/></Link></nav>
         </header>
 
         {deleted && <div className="surge-toast">Your account has been deleted.<button onClick={onDismissDeleted} aria-label="Dismiss">×</button></div>}
@@ -407,7 +401,7 @@ function LandingHero({ deleted, onDismissDeleted }: { deleted: boolean; onDismis
             <div className="surge-eyebrow"><Sparkles size={14}/> BUILT FOR SHORT-FORM CREATORS</div>
             <h1>Your next post<br/>shouldn&apos;t lose them <em>here.</em></h1>
             <p>CraftLint finds the exact moments costing you attention—and tells you what to change <strong>before you post.</strong></p>
-            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link><Link className="surge-demo" href="/sample"><span><Play size={14}/></span> See a sample report</Link></div>
+            <div className="surge-actions"><Link className="surge-primary" href="/analyze" {...heroCta}>Analyze my video <ArrowRight size={18}/></Link></div>
             <div className="surge-trust"><span><Check size={13}/> 3 free analyses</span><span><Tooltip label="Your uploaded video is analyzed privately"><Lock size={13}/></Tooltip> Videos stay private</span><span>No card</span></div>
           </div>
 
