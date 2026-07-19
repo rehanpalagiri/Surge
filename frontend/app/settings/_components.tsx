@@ -1,0 +1,652 @@
+"use client";
+
+import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
+import { getToken, clearToken, setToken } from "@/lib/auth";
+import {
+  changeUsername, changePassword, deleteAccount, getConsent, updateConsent,
+  ConsentStatus, getBillingStatus, createPortalSession, BillingStatus,
+  apiErrorDetail, getMe,
+} from "@/lib/api";
+import { SettingsPrivacySkeleton } from "@/components/Skeleton";
+import UpgradeButton from "@/components/UpgradeButton";
+
+export function ProfileCard() {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg">Profile</h2>
+          <p className="text-text-muted text-sm mt-0.5">Manage your public handle and display name.</p>
+        </div>
+        <Link
+          href="/profile"
+          className="gradient-btn text-white font-semibold px-5 py-2 rounded-xl transition-colors text-sm"
+        >
+          Edit profile
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+export function BillingCard() {
+  const [status, setStatus] = useState<BillingStatus | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getBillingStatus()
+      .then(setStatus)
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  async function openPortal() {
+    setPortalBusy(true);
+    setError("");
+    try {
+      const { url } = await createPortalSession();
+      window.location.href = url;
+    } catch (err) {
+      setError(apiErrorDetail(err, "Couldn't open the billing portal. Please try again."));
+      setPortalBusy(false);
+    }
+  }
+
+  if (!loaded || !status) return null;
+
+  if (!status.configured) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-text-primary font-semibold text-lg">Plan</h2>
+            <p className="text-text-muted text-sm mt-0.5">
+              Free plan — 3 analyses a month, plus earn-by-linking bonuses.
+            </p>
+          </div>
+          <Link
+            href="/pricing"
+            className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-accent/50 transition-colors text-sm"
+          >
+            See plans →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const renews = status.current_period_end
+    ? new Date(status.current_period_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg flex items-center gap-2">
+            {status.is_pro ? <>CraftLint Pro <span className="text-accent">✦</span></> : "Plan"}
+          </h2>
+          {status.comp ? (
+            <p className="text-text-muted text-sm mt-0.5">
+              Complimentary Pro — unlimited analyses, no billing.
+            </p>
+          ) : status.is_pro ? (
+            <p className="text-text-muted text-sm mt-0.5">
+              Unlimited analyses.
+              {status.subscription_status === "past_due"
+                ? " ⚠ Last payment failed — please update your card."
+                : status.cancel_at_period_end && renews
+                ? ` Your subscription ends ${renews}.`
+                : renews
+                ? ` Renews ${renews}.`
+                : ""}
+            </p>
+          ) : !status.eligible_for_paid ? (
+            <p className="text-text-muted text-sm mt-0.5">
+              Free plan — paid subscriptions are available to users 18 or older.
+            </p>
+          ) : (
+            <p className="text-text-muted text-sm mt-0.5">
+              Free plan — 3 analyses per month. Upgrade to {status.price} for unlimited.
+            </p>
+          )}
+        </div>
+        {status.comp ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent">
+            ✦ Complimentary
+          </span>
+        ) : status.is_pro ? (
+          <button
+            onClick={openPortal}
+            disabled={portalBusy}
+            className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-text-muted/60 transition-colors text-sm disabled:opacity-60"
+          >
+            {portalBusy ? "Opening…" : "Manage subscription"}
+          </button>
+        ) : status.eligible_for_paid ? (
+          <UpgradeButton label="Upgrade to Pro" />
+        ) : (
+          <span className="text-text-muted text-xs font-medium">
+            Adults only
+          </span>
+        )}
+      </div>
+      {error && <p className="text-danger text-xs mt-3">{error}</p>}
+    </div>
+  );
+}
+
+export function LogOutCard() {
+  const router = useRouter();
+
+  function handleLogOut() {
+    clearToken();
+    router.push("/");
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg">Log out</h2>
+          <p className="text-text-muted text-sm mt-0.5">Sign out of your account on this device.</p>
+        </div>
+        <button
+          onClick={handleLogOut}
+          className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-text-muted/60 transition-colors text-sm"
+        >
+          Log out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function ForgotPasswordCard() {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg">Forgot your password?</h2>
+          <p className="text-text-muted text-sm mt-0.5">
+            Can&apos;t remember your current password? Reset it by email instead.
+          </p>
+        </div>
+        <Link
+          href="/forgot-password"
+          className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-accent/50 transition-colors text-sm whitespace-nowrap"
+        >
+          Reset password
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+const CONSENT_OPTIONS: { value: "yes" | "ask" | "no"; label: string }[] = [
+  { value: "yes", label: "Yes — my linked public metrics can be retained for measurement research" },
+  { value: "ask", label: "Ask me each time — I'll decide when I link a video" },
+  { value: "no", label: "No — do not retain my metrics for research" },
+];
+
+export function DataPrivacyCard() {
+  const [consent, setConsent] = useState<ConsentStatus | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadConsent = useCallback(async () => {
+    setConsent(null);
+    setLoadFailed(false);
+    try {
+      setConsent(await getConsent());
+    } catch {
+      setLoadFailed(true);
+    }
+  }, []);
+
+  useEffect(() => { void loadConsent(); }, [loadConsent]);
+
+  async function pick(value: "yes" | "no" | "ask") {
+    if (!consent || consent.is_minor || saving) return;
+    const prev = consent;
+    setConsent({ ...consent, seed_consent: value });
+    setSaving(true);
+    setError("");
+    try {
+      await updateConsent(value);
+    } catch {
+      setConsent(prev);
+      setError("Couldn't save your preference — please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4" aria-busy={saving}>
+      <div>
+        <h2 className="text-text-primary font-semibold text-lg">Data &amp; Privacy</h2>
+        <p className="text-text-muted text-sm mt-0.5">Choose whether linked public metrics may support measurement research</p>
+      </div>
+
+      {!consent && loadFailed ? (
+        <div className="rounded-xl border border-danger/30 bg-danger/5 p-4 space-y-3">
+          <p className="text-danger text-sm" role="alert">
+            Couldn&apos;t load your privacy preference. Your existing choice has not changed.
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadConsent()}
+            className="border border-border text-text-primary text-sm font-semibold px-4 py-2 rounded-lg hover:border-accent/60"
+          >
+            Try again
+          </button>
+        </div>
+      ) : !consent ? (
+        <SettingsPrivacySkeleton />
+      ) : consent.is_minor ? (
+        <p className="text-text-muted text-sm">
+          Your data is not used for measurement research (accounts under 18 are
+          automatically excluded).
+        </p>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {CONSENT_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  consent.seed_consent === opt.value
+                    ? "border-accent/50 bg-accent/5"
+                    : "border-border hover:border-text-muted/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="seed_consent"
+                  checked={consent.seed_consent === opt.value}
+                  onChange={() => pick(opt.value)}
+                  className="mt-0.5 accent-accent"
+                />
+                <span className="text-text-primary text-sm">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+          {error && <p className="text-danger text-sm">{error}</p>}
+          {saving && <p className="text-text-muted text-xs" role="status"><span className="pending-spinner mr-1.5 align-[-0.1em]" aria-hidden="true" />Saving preference…</p>}
+          <p className="text-text-muted/60 text-xs">
+            Research data may include public counts, observation time, post URL, and content niche—never
+            your uploaded video. Metrics are not treated as proof that an edit caused an outcome.{" "}
+            <Link href="/privacy#seed-pool" className="text-accent hover:underline">
+              Learn more
+            </Link>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Shared re-auth gate for Change Username / Change Password ──
+// Progressive disclosure: the card starts collapsed, then asks the creator to
+// re-type their current username + current password before revealing the
+// actual edit field. The re-entered password is carried into the final
+// submit so they never have to type it twice.
+type ReauthStep = "locked" | "verify" | "edit";
+
+function ReauthGate({
+  title,
+  description,
+  editLabel,
+  onVerified,
+  children,
+}: {
+  title: string;
+  description: string;
+  editLabel: string;
+  onVerified: (currentPassword: string) => void;
+  children: ReactNode;
+}) {
+  const [step, setStep] = useState<ReauthStep>("locked");
+  const [actualUsername, setActualUsername] = useState<string | null>(null);
+  const [typedUsername, setTypedUsername] = useState("");
+  const [typedPassword, setTypedPassword] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  async function startVerify() {
+    setStep("verify");
+    setError("");
+    if (actualUsername === null) {
+      try {
+        const me = await getMe(getToken());
+        setActualUsername(me.username);
+      } catch {
+        // Fall through — verify() below will just fail closed with a generic error.
+      }
+    }
+  }
+
+  function verify(e: React.FormEvent) {
+    e.preventDefault();
+    setChecking(true);
+    setError("");
+    if (actualUsername !== null && typedUsername.trim().toLowerCase() !== actualUsername.toLowerCase()) {
+      setError("That doesn't match your current username.");
+      setChecking(false);
+      return;
+    }
+    if (!typedPassword) {
+      setError("Enter your current password.");
+      setChecking(false);
+      return;
+    }
+    setChecking(false);
+    onVerified(typedPassword);
+    setStep("edit");
+  }
+
+  if (step === "locked") {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-text-primary font-semibold text-lg">{title}</h2>
+            <p className="text-text-muted text-sm mt-0.5">{description}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void startVerify()}
+            className="border border-border text-text-primary font-semibold px-5 py-2 rounded-xl hover:border-accent/50 transition-colors text-sm whitespace-nowrap"
+          >
+            {editLabel}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "verify") {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-6 space-y-4 motion-pop">
+        <div>
+          <h2 className="text-text-primary font-semibold text-lg">{title}</h2>
+          <p className="text-text-muted text-sm mt-0.5">Confirm it&apos;s you before making a change.</p>
+        </div>
+        <form onSubmit={verify} className="space-y-3">
+          <input
+            type="text"
+            placeholder="Current username"
+            value={typedUsername}
+            onChange={(e) => setTypedUsername(e.target.value)}
+            required
+            autoFocus
+            autoComplete="username"
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+          />
+          <PasswordInput
+            placeholder="Current password"
+            value={typedPassword}
+            onChange={(e) => setTypedPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+          <Link href="/forgot-password" className="block text-accent text-sm hover:underline">
+            Forgot your password?
+          </Link>
+          {error && <p className="text-danger text-sm">{error}</p>}
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={checking}
+              className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+            >
+              Continue
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep("locked"); setTypedUsername(""); setTypedPassword(""); setError(""); }}
+              className="text-text-muted text-sm hover:text-text-primary transition-colors px-4"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // step === "edit"
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 space-y-4 motion-pop">
+      <div>
+        <h2 className="text-text-primary font-semibold text-lg">{title}</h2>
+        <p className="text-text-muted text-sm mt-0.5">{description}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function ChangeUsernameCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newUsername.trim()) return;
+    setLoading(true);
+    setMsg(null);
+    try {
+      await changeUsername(newUsername.trim(), currentPassword);
+      setMsg({ type: "ok", text: "Username updated!" });
+      setNewUsername("");
+    } catch (err: unknown) {
+      const text = err instanceof Error ? err.message : "Something went wrong.";
+      setMsg({ type: "err", text: text.includes("409") ? "That username is already taken." : text.includes("401") ? "Incorrect current password." : text });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <ReauthGate
+      title="Change Username"
+      description="Pick a new username for your account."
+      editLabel="Change username"
+      onVerified={setCurrentPassword}
+    >
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input
+          type="text"
+          placeholder="New username"
+          value={newUsername}
+          onChange={(e) => setNewUsername(e.target.value)}
+          required
+          autoFocus
+          autoComplete="username"
+          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-accent"
+        />
+        {msg && (
+          <p className={`text-sm ${msg.type === "ok" ? "text-success" : "text-danger"}`}>
+            {msg.text}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+        >
+          {loading ? "Saving…" : "Save username"}
+        </button>
+      </form>
+    </ReauthGate>
+  );
+}
+
+export function ChangePasswordCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setMsg({ type: "err", text: "New password must be at least 8 characters." });
+      return;
+    }
+    setLoading(true);
+    setMsg(null);
+    try {
+      const res = await changePassword(currentPassword, newPassword);
+      if (res.access_token) setToken(res.access_token);
+      setMsg({ type: "ok", text: "Password updated successfully!" });
+      setNewPassword("");
+    } catch (err: unknown) {
+      const text = err instanceof Error ? err.message : "Something went wrong.";
+      setMsg({ type: "err", text: text.includes("401") ? "Incorrect current password." : text });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <ReauthGate
+      title="Change Password"
+      description="Choose a strong password."
+      editLabel="Change password"
+      onVerified={setCurrentPassword}
+    >
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <PasswordInput
+          placeholder="New password (8+ chars)"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          required
+          autoFocus
+          autoComplete="new-password"
+        />
+        {msg && (
+          <p className={`text-sm ${msg.type === "ok" ? "text-success" : "text-danger"}`}>
+            {msg.text}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="gradient-btn text-white font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+        >
+          {loading ? "Saving…" : "Save password"}
+        </button>
+      </form>
+    </ReauthGate>
+  );
+}
+
+// ── Delete Account: idle -> "are you sure" -> password confirm -> loading ──
+type DeleteStep = "idle" | "areYouSure" | "password" | "loading";
+
+export function DeleteAccountCard() {
+  const router = useRouter();
+  const [step, setStep] = useState<DeleteStep>("idle");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleDelete(e: React.FormEvent) {
+    e.preventDefault();
+    setStep("loading");
+    setError("");
+    try {
+      await deleteAccount(password);
+      clearToken();
+      router.push("/?deleted=1");
+    } catch {
+      setError("Incorrect password, or something went wrong. Try again.");
+      setStep("password");
+    }
+  }
+
+  return (
+    <div className="bg-card border border-danger/30 rounded-2xl p-6 space-y-4">
+      <div>
+        <h2 className="text-danger font-semibold text-lg">Delete Account</h2>
+        <p className="text-text-muted text-sm mt-0.5">
+          Permanently deletes your account and all your analyses. This cannot be undone.
+        </p>
+      </div>
+
+      {step === "idle" && (
+        <button
+          onClick={() => setStep("areYouSure")}
+          className="border border-danger/40 text-danger font-semibold px-6 py-2.5 rounded-xl hover:bg-danger/10 transition-colors"
+        >
+          Delete my account
+        </button>
+      )}
+
+      {step === "areYouSure" && (
+        <div className="space-y-3 motion-pop">
+          <p className="text-text-primary text-sm font-semibold">
+            Are you sure? This permanently deletes your account and every analysis you&apos;ve made.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setStep("password")}
+              className="bg-danger text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-danger/90 transition-colors"
+            >
+              Delete Account
+            </button>
+            <button
+              onClick={() => setStep("idle")}
+              className="border border-border text-text-primary font-semibold px-6 py-2.5 rounded-xl hover:border-text-muted/60 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(step === "password" || step === "loading") && (
+        <form onSubmit={handleDelete} className="space-y-3 motion-pop">
+          <p className="text-text-muted text-sm">
+            Enter your password to confirm. All your data will be deleted immediately.
+          </p>
+          <PasswordInput
+            placeholder="Your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus
+            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-danger"
+          />
+          {error && <p className="text-danger text-sm">{error}</p>}
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={step === "loading"}
+              className="bg-danger text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-danger/90 transition-colors disabled:opacity-50"
+            >
+              {step === "loading" ? "Deleting…" : "Yes, delete everything"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep("idle"); setPassword(""); setError(""); }}
+              className="border border-border text-text-primary font-semibold px-6 py-2.5 rounded-xl hover:border-text-muted/60 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
