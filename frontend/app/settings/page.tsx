@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
@@ -181,16 +181,30 @@ export default function SettingsPage() {
   return (
     <main className="min-h-screen flex flex-col bg-background">
       <Nav subtitle="Settings" />
-      <div className="max-w-2xl mx-auto w-full px-4 py-10 space-y-6">
+      <div className="max-w-2xl mx-auto w-full px-4 py-10 space-y-10">
         {!authReady ? <SettingsSkeleton /> : (
           <>
-            <ProfileCard />
-            <BillingCard />
-            <ChangeUsernameCard />
-            <ChangePasswordCard />
-            <DataPrivacyCard />
-            <LogOutCard />
-            <DeleteAccountCard />
+            <SettingsSection title="Account">
+              <ProfileCard />
+              <ChangeUsernameCard />
+              <ChangePasswordCard />
+            </SettingsSection>
+
+            <SettingsSection title="Plan">
+              <BillingCard />
+            </SettingsSection>
+
+            <SettingsSection title="Privacy">
+              <DataPrivacyCard />
+            </SettingsSection>
+
+            <SettingsSection title="Session">
+              <LogOutCard />
+            </SettingsSection>
+
+            <SettingsSection title="Danger zone">
+              <DeleteAccountCard />
+            </SettingsSection>
           </>
         )}
         <p className="text-center text-text-muted/60 text-xs pt-2">
@@ -200,6 +214,15 @@ export default function SettingsPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-text-muted">{title}</h2>
+      <div className="space-y-4">{children}</div>
+    </section>
   );
 }
 
