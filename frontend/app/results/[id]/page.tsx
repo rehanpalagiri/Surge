@@ -10,6 +10,7 @@ import ScoreBar from "@/components/ScoreBar";
 import FeedbackModal from "@/components/FeedbackModal";
 import UpsellModal from "@/components/UpsellModal";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
+import PostLinkCard, { PostLinkUpdate } from "@/components/PostLinkCard";
 import {
   getAnalysis, claimAnalysis, seedConsentDecision, getAnalysisStatus,
   getOutcomeSnapshots, AnalysisOut, AttentionRiskItem, OutcomeSnapshot, RubricContext,
@@ -372,6 +373,18 @@ export default function ResultsPage() {
 
   const locked = !!analysis?.scores_json.locked;
 
+  function handleLinkUpdated(_id: number, patch: PostLinkUpdate) {
+    setAnalysis((prev) => (prev ? {
+      ...prev,
+      actual_views: patch.actual_views ?? null,
+      actual_likes: patch.actual_likes ?? null,
+      video_url: patch.video_url ?? null,
+      counts_fetched_at: patch.counts_fetched_at ?? null,
+    } : prev));
+    const token = getToken();
+    if (token) getOutcomeSnapshots(Number(id), token).then(setSnapshots).catch(() => {});
+  }
+
   // Celebrate a top-tier review. "Strong craft" is the highest qualitative
   // verdict (≥4 of 6 dimensions ≥7, none below 4) — the product's contract-safe
   // stand-in for "great score" since there is no aggregate score. Fire once.
@@ -643,6 +656,25 @@ export default function ResultsPage() {
             <AttentionRiskMap risks={attentionRisks} />
 
             {analysis.video_url && <OutcomeTimeline snapshots={snapshots} />}
+
+            {!locked && !analysis.video_url && (analysis.platform === "tiktok" || analysis.platform === "instagram") && (
+              <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                <div className="px-5 pt-5">
+                  <h3 className="text-text-primary font-semibold">Track how this actually performs</h3>
+                  <p className="text-text-muted text-xs mt-1">
+                    Post it, then link it here — CraftLint fetches real public stats automatically.
+                  </p>
+                </div>
+                <PostLinkCard
+                  id={analysis.id}
+                  platform={analysis.platform}
+                  videoUrl={analysis.video_url}
+                  countsFetchedAt={analysis.counts_fetched_at}
+                  onUpdated={handleLinkUpdated}
+                  startExpanded
+                />
+              </div>
+            )}
 
             {/* Score comparison vs previous version */}
             {parentAnalysis && !parentAnalysis.scores_json.locked && (
