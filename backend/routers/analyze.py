@@ -69,9 +69,23 @@ _PRESIGN_TTL = 300
 
 
 async def _prune_pending(db: AsyncSession) -> None:
-    """Delete presign rows older than the TTL. No commit — the caller commits it
-    along with the record/pop it's about to do (or rolls this back harmlessly)."""
+    """Delete presign rows older than the TTL, and the R2 object each one pointed
+    at. A presign row past the TTL means the client got an upload URL but never
+    called /analyze with it (abandoned upload, or one that raced the deadline) —
+    without this, an uploaded-but-never-claimed video would sit in R2 forever,
+    since no other code path ever revisits it. No commit — the caller commits
+    this along with the record/pop it's about to do (or rolls it back harmlessly,
+    which just means the R2 delete below fires a bit early; deleting an object
+    that's about to be re-pruned next cycle is harmless either way)."""
     cutoff = utc_now_naive() - timedelta(seconds=_PRESIGN_TTL)
+    stale = (await db.execute(
+        select(PendingUpload).where(PendingUpload.issued_at < cutoff)
+    )).scalars().all()
+    for row in stale:
+        try:
+            await r2.delete(row.r2_key)
+        except Exception:
+            pass
     await db.execute(delete(PendingUpload).where(PendingUpload.issued_at < cutoff))
 
 
