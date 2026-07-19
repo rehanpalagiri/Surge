@@ -500,9 +500,6 @@ export default function Home() {
           platform={platform}
           parentId={reanalyzeParentId}
         />
-        <p className="text-text-muted/80 text-xs text-center mt-5 max-w-xl mx-auto">
-          Your video is analyzed privately and not stored permanently.
-        </p>
       </section>
 
       {/* ── Footer ── */}
